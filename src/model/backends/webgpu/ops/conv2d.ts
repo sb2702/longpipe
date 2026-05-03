@@ -31,7 +31,7 @@ export class Conv2DWebGPU extends WebGPUOp {
       inGroups, outGroups,
       params.kernel, params.kernel,
       params.stride, padTop, padLeft,
-      params.activation === "relu6" ? 1 : params.activation === "relu" ? 2 : 0,
+      params.activation === "relu6" ? 1 : 0,
     ]));
 
     this.defaultSetup();
