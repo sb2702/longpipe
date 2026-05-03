@@ -47,6 +47,20 @@ export class WebGPUBackend implements Backend {
     return new WebGPUTensor(h, w, c, buf);
   }
 
+  uploadTensor(data: Float32Array, h: number, w: number, c: number): WebGPUTensor {
+    const buf = this.device.createBuffer({
+      size: data.byteLength,
+      usage:
+        GPUBufferUsage.STORAGE |
+        GPUBufferUsage.COPY_DST |
+        GPUBufferUsage.COPY_SRC,
+      mappedAtCreation: true,
+    });
+    new Float32Array(buf.getMappedRange()).set(data);
+    buf.unmap();
+    return new WebGPUTensor(h, w, c, buf);
+  }
+
   upload(data: Float32Array): WebGPUTensor {
     const buf = this.device.createBuffer({
       size: data.byteLength,
