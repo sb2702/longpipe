@@ -10,6 +10,7 @@
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
+    "types": ["@webgpu/types"],
     "skipLibCheck": true,
     "isolatedModules": true,
     "baseUrl": ".",

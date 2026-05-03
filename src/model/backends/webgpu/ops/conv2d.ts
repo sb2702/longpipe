@@ -1,44 +1,98 @@
-import type { Tensor, Conv2dParams } from '~/model/backend'
-import { WebGPUTensor, WebGPUOp, convOutSize, samePadHalf, activationCode, makeUniform, makeOutputTensor, cast } from '~/model/backends/webgpu/base'
+import type { Tensor, Conv2dParams } from "~/model/backend";
+import type { WebGPUBackend } from "~/model/backends/webgpu/index";
+import {
+  WebGPUTensor,
+  WebGPUOp,
+  cast,
+} from "~/model/backends/webgpu/base_webgpu_op";
+import conv2dSrc from "~/model/backends/webgpu/shaders/conv2d.wgsl";
+
+function convOutSize(
+  inSize: number,
+  kernel: number,
+  stride: number,
+  padding: "same" | "valid",
+): number {
+  if (padding === "same") return Math.ceil(inSize / stride);
+  return Math.floor((inSize - kernel) / stride) + 1;
+}
+
+function samePadHalf(
+  inSize: number,
+  outSize: number,
+  kernel: number,
+  stride: number,
+): number {
+  return Math.floor(Math.max((outSize - 1) * stride + kernel - inSize, 0) / 2);
+}
 
 export class Conv2DWebGPU extends WebGPUOp {
-  readonly inputs: Tensor[]
-  readonly output: WebGPUTensor
-  protected pipeline: GPUComputePipeline
-  protected bindGroup: GPUBindGroup
-  protected dispatchX: number
-  protected dispatchY: number
-  protected dispatchZ: number
+  readonly inputs: Tensor[];
+  readonly output: WebGPUTensor;
+  protected pipeline: GPUComputePipeline;
+  protected bindGroup: GPUBindGroup;
+  protected dispatchX: number;
+  protected dispatchY: number;
+  protected dispatchZ: number;
 
   constructor(
-    device: GPUDevice,
-    pipeline: GPUComputePipeline,
+    backend: WebGPUBackend,
     input: Tensor,
     weights: Tensor,
     bias: Tensor,
     params: Conv2dParams,
   ) {
-    super(device)
-    const outH      = convOutSize(input.h, params.kernel, params.stride, params.padding)
-    const outW      = convOutSize(input.w, params.kernel, params.stride, params.padding)
-    const inGroups  = input.c / 4
-    const outGroups = params.outChannels / 4
-    const padTop    = params.padding === 'same' ? samePadHalf(input.h, outH, params.kernel, params.stride) : 0
-    const padLeft   = params.padding === 'same' ? samePadHalf(input.w, outW, params.kernel, params.stride) : 0
+    super(backend);
+    const outH = convOutSize(
+      input.h,
+      params.kernel,
+      params.stride,
+      params.padding,
+    );
+    const outW = convOutSize(
+      input.w,
+      params.kernel,
+      params.stride,
+      params.padding,
+    );
+    const inGroups = input.c / 4;
+    const outGroups = params.outChannels / 4;
+    const padTop =
+      params.padding === "same"
+        ? samePadHalf(input.h, outH, params.kernel, params.stride)
+        : 0;
+    const padLeft =
+      params.padding === "same"
+        ? samePadHalf(input.w, outW, params.kernel, params.stride)
+        : 0;
 
-    this.output = makeOutputTensor(device, outH, outW, params.outChannels)
+    this.output = backend.makeOutputTensor(outH, outW, params.outChannels);
 
-    const uniformBuf = makeUniform(device, [
-      input.h, input.w, outH, outW,
-      inGroups, outGroups,
-      params.kernel, params.kernel,
-      params.stride, padTop, padLeft,
-      activationCode(params.activation),
-    ])
+    const uniformBuf = backend.makeUniform([
+      input.h,
+      input.w,
+      outH,
+      outW,
+      inGroups,
+      outGroups,
+      params.kernel,
+      params.kernel,
+      params.stride,
+      padTop,
+      padLeft,
+      params.activation === "relu6" ? 1 : 0,
+    ]);
 
-    this.pipeline = pipeline
-    this.bindGroup = device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
+    this.pipeline = backend.device.createComputePipeline({
+      layout: "auto",
+      compute: {
+        module: backend.device.createShaderModule({ code: conv2dSrc }),
+        entryPoint: "main",
+      },
+    });
+
+    this.bindGroup = backend.device.createBindGroup({
+      layout: this.pipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: cast(input).buffer } },
         { binding: 1, resource: { buffer: cast(weights).buffer } },
@@ -46,11 +100,11 @@ export class Conv2DWebGPU extends WebGPUOp {
         { binding: 3, resource: { buffer: this.output.buffer } },
         { binding: 4, resource: { buffer: uniformBuf } },
       ],
-    })
+    });
 
-    this.dispatchX = Math.ceil(outW / 8)
-    this.dispatchY = Math.ceil(outH / 8)
-    this.dispatchZ = outGroups
-    this.inputs = [input]
+    this.dispatchX = Math.ceil(outW / 8);
+    this.dispatchY = Math.ceil(outH / 8);
+    this.dispatchZ = outGroups;
+    this.inputs = [input];
   }
 }

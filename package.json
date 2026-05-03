@@ -20,8 +20,9 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "@vitest/browser": "^3.0.0",
     "@types/node": "^22.0.0",
+    "@vitest/browser": "^3.0.0",
+    "@webgpu/types": "^0.1.69",
     "playwright": "^1.44.0",
     "tsup": "^8.1.0",
     "typescript": "^5.5.0",
