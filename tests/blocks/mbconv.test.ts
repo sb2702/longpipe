@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import type { Backend, Tensor } from '~/model/backend'
 import { WebGPUBackend } from '~/model/backends/webgpu/index'
+import { WebGLBackend } from '~/model/backends/webgl/index'
 import { MBConv } from '~/model/blocks/mbconv'
-import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
 import mbconv_s1 from '../fixtures/mbconv_k3_s1_residual.json'
 import mbconv_s2 from '../fixtures/mbconv_k3_s2.json'
@@ -26,9 +27,12 @@ interface MBConvFixture {
   expected_output: number[]
 }
 
-async function runFixture(fixture: MBConvFixture) {
-  const backend = await WebGPUBackend.create()
+const BACKENDS: Array<{ name: string; create: () => Promise<Backend> }> = [
+  { name: 'WebGPU', create: () => WebGPUBackend.create() },
+  { name: 'WebGL',  create: async () => WebGLBackend.create() },
+]
 
+async function runFixture(backend: Backend, fixture: MBConvFixture) {
   const [, C, H, W] = fixture.input_shape
   const input = backend.tensor(H, W, C, new Float32Array(fixture.input))
 
@@ -47,8 +51,7 @@ async function runFixture(fixture: MBConvFixture) {
 
   block.run()
 
-  const result = await backend.readback(block.output as WebGPUTensor)
-  backend.destroy()
+  const result = await backend.readback(block.output as Tensor & { texture?: unknown })
 
   const ref = new Float32Array(fixture.expected_output)
   let maxErr = 0
@@ -56,12 +59,16 @@ async function runFixture(fixture: MBConvFixture) {
   return maxErr
 }
 
-describe('MBConv', () => {
+describe.each(BACKENDS)('MBConv ($name)', ({ create }) => {
   it('k3 stride-1 with residual matches PyTorch', async () => {
-    expect(await runFixture(mbconv_s1 as MBConvFixture)).toBeLessThan(THRESHOLD)
+    const backend = await create()
+    expect(await runFixture(backend, mbconv_s1 as MBConvFixture)).toBeLessThan(THRESHOLD)
+    backend.destroy()
   })
 
   it('k3 stride-2 no residual matches PyTorch', async () => {
-    expect(await runFixture(mbconv_s2 as MBConvFixture)).toBeLessThan(THRESHOLD)
+    const backend = await create()
+    expect(await runFixture(backend, mbconv_s2 as MBConvFixture)).toBeLessThan(THRESHOLD)
+    backend.destroy()
   })
 })

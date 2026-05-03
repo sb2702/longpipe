@@ -1,15 +1,21 @@
 import { describe, it, expect } from 'vitest'
+import type { Backend, Tensor } from '~/model/backend'
 import { WebGPUBackend } from '~/model/backends/webgpu/index'
+import { WebGLBackend } from '~/model/backends/webgl/index'
 import { DepthwiseSeparable } from '~/model/blocks/depthwise_separable'
-import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
 import fixture from '../fixtures/depthwise_separable.json'
 
 const THRESHOLD = 1e-4
 
-describe('DepthwiseSeparable', () => {
+const BACKENDS: Array<{ name: string; create: () => Promise<Backend> }> = [
+  { name: 'WebGPU', create: () => WebGPUBackend.create() },
+  { name: 'WebGL',  create: async () => WebGLBackend.create() },
+]
+
+describe.each(BACKENDS)('DepthwiseSeparable ($name)', ({ create }) => {
   it('dw+relu6+pw matches PyTorch', async () => {
-    const backend = await WebGPUBackend.create()
+    const backend = await create()
 
     const [, C, H, W] = fixture.input_shape
     const input = backend.tensor(H, W, C, new Float32Array(fixture.input))
@@ -22,7 +28,7 @@ describe('DepthwiseSeparable', () => {
     })
     block.run()
 
-    const result = await backend.readback(block.output as WebGPUTensor)
+    const result = await backend.readback(block.output as Tensor & { texture?: unknown })
     backend.destroy()
 
     const ref = new Float32Array(fixture.expected_output)
