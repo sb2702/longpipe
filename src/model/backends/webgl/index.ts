@@ -10,10 +10,18 @@ export class WebGLBackend implements Backend {
 
   private constructor(readonly gl: WebGL2RenderingContext) {
     this.fbo = gl.createFramebuffer()!
+    const notImpl = (): never => { throw new Error('not implemented in WebGL backend') }
     this.ops = {
-      Conv2d:          (input, weights, bias, params) => new Conv2DWebGL(this, input, weights, bias, params),
-      DepthwiseConv2d: (input, weights, bias, params) => new DepthwiseConv2DWebGL(this, input, weights, bias, params),
-      Add:             (a, b)                         => new AddWebGL(this, a, b),
+      Conv2d:           (input, weights, bias, params) => new Conv2DWebGL(this, input, weights, bias, params),
+      DepthwiseConv2d:  (input, weights, bias, params) => new DepthwiseConv2DWebGL(this, input, weights, bias, params),
+      Add:              (a, b)                         => new AddWebGL(this, a, b),
+      Sigmoid:          notImpl,
+      BilinearUpsample: notImpl,
+      ChannelConcat:    notImpl,
+      Conv2dAdd:        notImpl,
+      UpsampleConcat:   notImpl,
+      UpsampleConv1x1:  notImpl,
+      UpsampleSigmoid:  notImpl,
     }
   }
 

@@ -1,7 +1,8 @@
 // Conv2d + skip add fused.
-// Identical to conv2d.wgsl except binding 5 carries the skip tensor,
-// which is added element-wise to the conv result at write time.
+// Identical to conv2d.wgsl except skip is an activation input (binding 1),
+// added element-wise to the conv result at write time.
 // Eliminates the separate add dispatch and its intermediate buffer round-trip.
+// Binding order: input(0), skip(1), weights(2), bias(3), params(4), output(5)
 
 struct Params {
     in_h        : u32,
@@ -19,11 +20,11 @@ struct Params {
 }
 
 @group(0) @binding(0) var<storage, read>       input_buf  : array<vec4<f32>>;
-@group(0) @binding(1) var<storage, read>       weight_buf : array<mat4x4<f32>>;
-@group(0) @binding(2) var<storage, read>       bias_buf   : array<vec4<f32>>;
-@group(0) @binding(3) var<storage, read_write> output_buf : array<vec4<f32>>;
+@group(0) @binding(1) var<storage, read>       skip_buf   : array<vec4<f32>>;
+@group(0) @binding(2) var<storage, read>       weight_buf : array<mat4x4<f32>>;
+@group(0) @binding(3) var<storage, read>       bias_buf   : array<vec4<f32>>;
 @group(0) @binding(4) var<uniform>             params     : Params;
-@group(0) @binding(5) var<storage, read>       skip_buf   : array<vec4<f32>>;
+@group(0) @binding(5) var<storage, read_write> output_buf : array<vec4<f32>>;
 
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {

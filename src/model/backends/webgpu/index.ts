@@ -3,6 +3,13 @@ import type { WebGPUTensor, WebGPUMLBuffer } from "~/model/backends/webgpu/base_
 import { Conv2DWebGPU } from "~/model/backends/webgpu/ops/conv2d";
 import { DepthwiseConv2DWebGPU } from "~/model/backends/webgpu/ops/depthwise_conv2d";
 import { AddWebGPU } from "~/model/backends/webgpu/ops/add";
+import { SigmoidWebGPU } from "~/model/backends/webgpu/ops/sigmoid";
+import { BilinearUpsampleWebGPU } from "~/model/backends/webgpu/ops/bilinear_upsample";
+import { ChannelConcatWebGPU } from "~/model/backends/webgpu/ops/channel_concat";
+import { Conv2dAddWebGPU } from "~/model/backends/webgpu/ops/conv2d_add";
+import { UpsampleConcatWebGPU } from "~/model/backends/webgpu/ops/upsample_concat";
+import { UpsampleConv1x1WebGPU } from "~/model/backends/webgpu/ops/upsample_conv1x1";
+import { UpsampleSigmoidWebGPU } from "~/model/backends/webgpu/ops/upsample_sigmoid";
 
 const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
 
@@ -11,9 +18,16 @@ export class WebGPUBackend implements Backend {
 
   private constructor(readonly device: GPUDevice) {
     this.ops = {
-      Conv2d:          (input, weights, bias, params) => new Conv2DWebGPU(this, input, weights, bias, params),
-      DepthwiseConv2d: (input, weights, bias, params) => new DepthwiseConv2DWebGPU(this, input, weights, bias, params),
-      Add:             (a, b)                         => new AddWebGPU(this, a, b),
+      Conv2d:           (input, weights, bias, params)        => new Conv2DWebGPU(this, input, weights, bias, params),
+      DepthwiseConv2d:  (input, weights, bias, params)        => new DepthwiseConv2DWebGPU(this, input, weights, bias, params),
+      Add:              (a, b)                                 => new AddWebGPU(this, a, b),
+      Sigmoid:          (input)                               => new SigmoidWebGPU(this, input),
+      BilinearUpsample: (input, params)                       => new BilinearUpsampleWebGPU(this, input, params),
+      ChannelConcat:    (a, b)                                => new ChannelConcatWebGPU(this, a, b),
+      Conv2dAdd:        (input, skip, weights, bias, params)  => new Conv2dAddWebGPU(this, input, skip, weights, bias, params),
+      UpsampleConcat:   (a, b, params)                        => new UpsampleConcatWebGPU(this, a, b, params),
+      UpsampleConv1x1:  (input, weights, bias, params)        => new UpsampleConv1x1WebGPU(this, input, weights, bias, params),
+      UpsampleSigmoid:  (input, params)                       => new UpsampleSigmoidWebGPU(this, input, params),
     };
   }
 
