@@ -25,7 +25,7 @@ describe('DepthwiseConv2d', () => {
     const backend = await WebGPUBackend.create()
 
     const [, C, H, W] = fixture.input_shape
-    const input   = backend.uploadTensor(new Float32Array(fixture.input), H, W, C)
+    const input   = backend.tensor(H, W, C, new Float32Array(fixture.input))
     const weights = backend.upload(new Float32Array(fixture.weights))
     const bias    = backend.upload(new Float32Array(fixture.bias))
 

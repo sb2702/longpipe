@@ -1,4 +1,4 @@
-import type { Tensor, Conv2dParams } from "~/model/backend";
+import type { Tensor, MLBuffer, Conv2dParams } from "~/model/backend";
 import type { WebGPUBackend } from "~/model/backends/webgpu/index";
 import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op";
 import conv2dSrc from "~/model/backends/webgpu/shaders/conv2d.wgsl";
@@ -6,22 +6,30 @@ import { convOutSize, resolvePad } from "~/model/backends/webgpu/ops/conv_utils"
 
 export class Conv2DWebGPU extends WebGPUOp {
   readonly inputs: Tensor[];
+  readonly weights: MLBuffer[];
   readonly output: WebGPUTensor;
   protected dispatch: [number, number, number];
-  shader: string = conv2dSrc;
+  shader = conv2dSrc;
 
-  constructor(backend: WebGPUBackend,  input: Tensor,  weights: Tensor, bias: Tensor, params: Conv2dParams) {
+  constructor(
+    backend: WebGPUBackend,
+    input: Tensor,
+    weights: MLBuffer,
+    bias: MLBuffer,
+    params: Conv2dParams,
+  ) {
     super(backend);
 
     const outH = convOutSize(input.h, params.kernel, params.stride, params.padding);
     const outW = convOutSize(input.w, params.kernel, params.stride, params.padding);
-    const inGroups = input.c / 4;
+    const inGroups  = input.c / 4;
     const outGroups = params.outChannels / 4;
     const padTop  = resolvePad(params.padding, input.h, outH, params.kernel, params.stride);
     const padLeft = resolvePad(params.padding, input.w, outW, params.kernel, params.stride);
 
-    this.output = backend.makeOutputTensor(outH, outW, params.outChannels);
-    this.inputs = [input, weights, bias];
+    this.output  = backend.makeOutputTensor(outH, outW, params.outChannels);
+    this.inputs  = [input];
+    this.weights = [weights, bias];
 
     this.createUniform("params", "Params");
     this.setUniform("params", new Uint32Array([
@@ -31,7 +39,6 @@ export class Conv2DWebGPU extends WebGPUOp {
       params.stride, padTop, padLeft,
       params.activation === "relu6" ? 1 : params.activation === "relu" ? 2 : 0,
     ]));
-
 
     this.defaultSetup();
 

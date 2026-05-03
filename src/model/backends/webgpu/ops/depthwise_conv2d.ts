@@ -1,4 +1,4 @@
-import type { Tensor, DepthwiseParams } from "~/model/backend";
+import type { Tensor, MLBuffer, DepthwiseParams } from "~/model/backend";
 import type { WebGPUBackend } from "~/model/backends/webgpu/index";
 import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op";
 import depthwiseSrc from "~/model/backends/webgpu/shaders/depthwise_conv2d.wgsl";
@@ -6,6 +6,7 @@ import { convOutSize, resolvePad } from "~/model/backends/webgpu/ops/conv_utils"
 
 export class DepthwiseConv2DWebGPU extends WebGPUOp {
   readonly inputs: Tensor[];
+  readonly weights: MLBuffer[];
   readonly output: WebGPUTensor;
   protected dispatch: [number, number, number];
   shader = depthwiseSrc;
@@ -13,8 +14,8 @@ export class DepthwiseConv2DWebGPU extends WebGPUOp {
   constructor(
     backend: WebGPUBackend,
     input: Tensor,
-    weights: Tensor,
-    bias: Tensor,
+    weights: MLBuffer,
+    bias: MLBuffer,
     params: DepthwiseParams,
   ) {
     super(backend);
@@ -25,8 +26,9 @@ export class DepthwiseConv2DWebGPU extends WebGPUOp {
     const padTop  = resolvePad(params.padding, input.h, outH, params.kernel, params.stride);
     const padLeft = resolvePad(params.padding, input.w, outW, params.kernel, params.stride);
 
-    this.output = backend.makeOutputTensor(outH, outW, input.c);
-    this.inputs = [input, weights, bias];
+    this.output  = backend.makeOutputTensor(outH, outW, input.c);
+    this.inputs  = [input];
+    this.weights = [weights, bias];
 
     this.createUniform("params", "Params");
     this.setUniform("params", new Uint32Array([

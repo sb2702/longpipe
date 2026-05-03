@@ -21,8 +21,8 @@ describe('Add', () => {
     const backend = await WebGPUBackend.create()
 
     const [, C, H, W] = fixture.input_shape
-    const a = backend.uploadTensor(new Float32Array(fixture.input1), H, W, C)
-    const b = backend.uploadTensor(new Float32Array(fixture.input2), H, W, C)
+    const a = backend.tensor(H, W, C, new Float32Array(fixture.input1))
+    const b = backend.tensor(H, W, C, new Float32Array(fixture.input2))
 
     const op = new AddWebGPU(backend, a, b)
     op.run()

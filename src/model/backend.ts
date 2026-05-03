@@ -4,6 +4,9 @@ export interface Tensor {
   readonly c: number; // always a multiple of 4
 }
 
+// Flat parameter buffer — weights, bias, etc. No spatial dimensions.
+export interface MLBuffer {}
+
 export interface Op {
   readonly inputs: Tensor[];
   readonly output: Tensor;
@@ -28,18 +31,15 @@ export interface DepthwiseParams {
 }
 
 export interface Backend {
-  ops: {
-    // Core ops
-    Conv2d: (
-      input: Tensor,
-      weights: Tensor,
-      bias: Tensor,
-      params: Conv2dParams,
-    ) => Op;
-  };
+  // Allocate a spatial activation buffer. Pass data to pre-fill (tests / first layer).
+  tensor(h: number, w: number, c: number, data?: Float32Array): Tensor;
 
-  // Upload a float32 array to GPU (used for weights at model init).
-  upload(data: Float32Array): Tensor;
+  // Upload a flat parameter buffer (weights, bias).
+  upload(data: Float32Array): MLBuffer;
+
+  ops: {
+    Conv2d: (input: Tensor, weights: MLBuffer, bias: MLBuffer, params: Conv2dParams) => Op;
+  };
 
   destroy(): void;
 }

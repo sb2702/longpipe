@@ -1,6 +1,8 @@
 import type { Backend } from "~/model/backend";
-import { WebGPUTensor } from "~/model/backends/webgpu/base_webgpu_op";
+import type { WebGPUTensor, WebGPUMLBuffer } from "~/model/backends/webgpu/base_webgpu_op";
 import { Conv2DWebGPU } from "~/model/backends/webgpu/ops/conv2d";
+
+const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
 
 export class WebGPUBackend implements Backend {
   readonly ops: Backend["ops"];
@@ -24,55 +26,33 @@ export class WebGPUBackend implements Backend {
     return new WebGPUBackend(device);
   }
 
-  makeUniform(values: number[]): GPUBuffer {
-    const data = new Uint32Array(values);
+  tensor(h: number, w: number, c: number, data?: Float32Array): WebGPUTensor {
+    const size = h * w * c * 4;
+    const buf = this.device.createBuffer({
+      size,
+      usage: STORAGE,
+      mappedAtCreation: data !== undefined,
+    });
+    if (data) {
+      new Float32Array(buf.getMappedRange()).set(data);
+      buf.unmap();
+    }
+    return { h, w, c, buffer: buf };
+  }
+
+  upload(data: Float32Array): WebGPUMLBuffer {
     const buf = this.device.createBuffer({
       size: data.byteLength,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
     });
-    new Uint32Array(buf.getMappedRange()).set(data);
+    new Float32Array(buf.getMappedRange()).set(data);
     buf.unmap();
-    return buf;
+    return { buffer: buf };
   }
 
   makeOutputTensor(h: number, w: number, c: number): WebGPUTensor {
-    const buf = this.device.createBuffer({
-      size: h * w * (c / 4) * 16,
-      usage:
-        GPUBufferUsage.STORAGE |
-        GPUBufferUsage.COPY_SRC |
-        GPUBufferUsage.COPY_DST,
-    });
-    return { h, w, c, buffer: buf };
-  }
-
-  uploadTensor(data: Float32Array, h: number, w: number, c: number): WebGPUTensor {
-    const buf = this.device.createBuffer({
-      size: data.byteLength,
-      usage:
-        GPUBufferUsage.STORAGE |
-        GPUBufferUsage.COPY_DST |
-        GPUBufferUsage.COPY_SRC,
-      mappedAtCreation: true,
-    });
-    new Float32Array(buf.getMappedRange()).set(data);
-    buf.unmap();
-    return { h, w, c, buffer: buf };
-  }
-
-  upload(data: Float32Array): WebGPUTensor {
-    const buf = this.device.createBuffer({
-      size: data.byteLength,
-      usage:
-        GPUBufferUsage.STORAGE |
-        GPUBufferUsage.COPY_DST |
-        GPUBufferUsage.COPY_SRC,
-      mappedAtCreation: true,
-    });
-    new Float32Array(buf.getMappedRange()).set(data);
-    buf.unmap();
-    return { h: 0, w: 0, c: 0, buffer: buf };
+    return this.tensor(h, w, c);
   }
 
   async readback(tensor: WebGPUTensor): Promise<Float32Array> {

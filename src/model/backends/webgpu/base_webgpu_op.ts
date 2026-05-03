@@ -1,7 +1,11 @@
-import type { Tensor, Op } from '~/model/backend'
+import type { Tensor, MLBuffer, Op } from '~/model/backend'
 import type { WebGPUBackend } from '~/model/backends/webgpu/index'
 
 export interface WebGPUTensor extends Tensor {
+  readonly buffer: GPUBuffer
+}
+
+export interface WebGPUMLBuffer extends MLBuffer {
   readonly buffer: GPUBuffer
 }
 
@@ -12,10 +16,12 @@ interface UniformDef {
 
 // Base for compute ops. A parallel WebGPURenderOp will handle fragment/render passes.
 export abstract class WebGPUOp implements Op {
-  abstract readonly inputs: Tensor[]
+  abstract readonly inputs: Tensor[]      // activations — change each frame
+  abstract readonly weights: MLBuffer[]   // parameters — static after construction
   abstract readonly output: WebGPUTensor
   protected abstract dispatch: [number, number, number]
-  shader: string  = "";
+
+  shader: string = ""
   protected pipeline!: GPUComputePipeline
   protected bindGroup!: GPUBindGroup
 
@@ -40,14 +46,15 @@ export abstract class WebGPUOp implements Op {
     this.uniformBuffers[name] = buf
   }
 
-  // Builds a bind group matching the layout from createStandardShader.
-  // Also works with hand-written WGSL as long as bindings follow the same order.
-  // Must be called after this.output and this.pipeline are set.
+  // Binding order: inputs → weights → uniforms → output
   protected defaultBindGroup(): GPUBindGroup {
     const entries: GPUBindGroupEntry[] = []
     let b = 0
     for (const input of this.inputs) {
       entries.push({ binding: b++, resource: { buffer: (input as WebGPUTensor).buffer } })
+    }
+    for (const w of this.weights) {
+      entries.push({ binding: b++, resource: { buffer: (w as WebGPUMLBuffer).buffer } })
     }
     for (const u of this.uniformDefs) {
       entries.push({ binding: b++, resource: { buffer: this.uniformBuffers[u.name] } })
@@ -59,11 +66,8 @@ export abstract class WebGPUOp implements Op {
     })
   }
 
-  // Creates pipeline from a shader module then builds the bind group.
   protected defaultSetup(): void {
-
-    const shader = this.backend.device.createShaderModule({ code: this.shader });
-
+    const shader = this.backend.device.createShaderModule({ code: this.shader })
     this.pipeline = this.backend.device.createComputePipeline({
       layout: 'auto',
       compute: { module: shader, entryPoint: 'main' },
@@ -80,8 +84,4 @@ export abstract class WebGPUOp implements Op {
     pass.end()
     this.backend.device.queue.submit([enc.finish()])
   }
-}
-
-export function cast(t: Tensor): WebGPUTensor {
-  return t as WebGPUTensor
 }

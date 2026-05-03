@@ -25,11 +25,11 @@ async function runFixture(fixture: Conv2dFixture) {
   const backend = await WebGPUBackend.create()
 
   const [, C, H, W] = fixture.input_shape
-  const inputTensor  = backend.uploadTensor(new Float32Array(fixture.input), H, W, C)
-  const weightTensor = backend.upload(new Float32Array(fixture.weights))
-  const biasTensor   = backend.upload(new Float32Array(fixture.bias))
+  const input   = backend.tensor(H, W, C, new Float32Array(fixture.input))
+  const weights = backend.upload(new Float32Array(fixture.weights))
+  const bias    = backend.upload(new Float32Array(fixture.bias))
 
-  const op = backend.ops.Conv2d(inputTensor, weightTensor, biasTensor, {
+  const op = backend.ops.Conv2d(input, weights, bias, {
     outChannels: fixture.out_channels,
     kernel:      fixture.kernel_size,
     stride:      fixture.stride,

@@ -5,6 +5,7 @@ import addSrc from "~/model/backends/webgpu/shaders/add.wgsl";
 
 export class AddWebGPU extends WebGPUOp {
   readonly inputs: Tensor[];
+  readonly weights: never[] = [];
   readonly output: WebGPUTensor;
   protected dispatch: [number, number, number];
   shader = addSrc;
