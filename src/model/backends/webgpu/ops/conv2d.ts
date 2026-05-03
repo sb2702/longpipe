@@ -11,8 +11,9 @@ function convOutSize(
   inSize: number,
   kernel: number,
   stride: number,
-  padding: "same" | "valid",
+  padding: number | "same" | "valid",
 ): number {
+  if (typeof padding === "number") return Math.floor((inSize + 2 * padding - kernel) / stride) + 1;
   if (padding === "same") return Math.ceil(inSize / stride);
   return Math.floor((inSize - kernel) / stride) + 1;
 }
@@ -58,13 +59,17 @@ export class Conv2DWebGPU extends WebGPUOp {
     const inGroups = input.c / 4;
     const outGroups = params.outChannels / 4;
     const padTop =
-      params.padding === "same"
-        ? samePadHalf(input.h, outH, params.kernel, params.stride)
-        : 0;
+      typeof params.padding === "number"
+        ? params.padding
+        : params.padding === "same"
+          ? samePadHalf(input.h, outH, params.kernel, params.stride)
+          : 0;
     const padLeft =
-      params.padding === "same"
-        ? samePadHalf(input.w, outW, params.kernel, params.stride)
-        : 0;
+      typeof params.padding === "number"
+        ? params.padding
+        : params.padding === "same"
+          ? samePadHalf(input.w, outW, params.kernel, params.stride)
+          : 0;
 
     this.output = backend.makeOutputTensor(outH, outW, params.outChannels);
 

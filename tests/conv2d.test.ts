@@ -33,7 +33,7 @@ async function runFixture(fixture: Conv2dFixture) {
     outChannels: fixture.out_channels,
     kernel:      fixture.kernel_size,
     stride:      fixture.stride,
-    padding:     fixture.padding === 0 ? 'valid' : 'same',
+    padding:     fixture.padding,
     activation:  'none',
   })
 

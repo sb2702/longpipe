@@ -16,14 +16,14 @@ export interface Conv2dParams {
   outChannels: number;
   kernel: number;
   stride: number;
-  padding: "same" | "valid";
+  padding: number | "same" | "valid";
   activation: Activation;
 }
 
 export interface DepthwiseParams {
   kernel: number;
   stride: number;
-  padding: "same" | "valid";
+  padding: number | "same" | "valid";
   activation: Activation;
 }
 

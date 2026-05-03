@@ -1,2 +1,11 @@
 node_modules
 .idea
+
+# Build output
+dist/
+
+
+# Test artifacts
+test-results/
+playwright-report/
+coverage/

@@ -1,13 +1,21 @@
 import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
+import type { Plugin } from 'vite'
+
+const wgslPlugin: Plugin = {
+  name: 'wgsl-text',
+  transform(src, id) {
+    if (id.endsWith('.wgsl')) return `export default ${JSON.stringify(src)}`
+  },
+}
 
 export default defineConfig({
+  plugins: [wgslPlugin],
   resolve: {
     alias: {
       '~': resolve(__dirname, 'src'),
     },
   },
-  assetsInclude: ['**/*.wgsl'],
   test: {
     browser: {
       enabled: true,
