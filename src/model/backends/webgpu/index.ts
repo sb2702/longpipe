@@ -44,7 +44,7 @@ export class WebGPUBackend implements Backend {
         GPUBufferUsage.COPY_SRC |
         GPUBufferUsage.COPY_DST,
     });
-    return new WebGPUTensor(h, w, c, buf);
+    return { h, w, c, buffer: buf };
   }
 
   uploadTensor(data: Float32Array, h: number, w: number, c: number): WebGPUTensor {
@@ -58,7 +58,7 @@ export class WebGPUBackend implements Backend {
     });
     new Float32Array(buf.getMappedRange()).set(data);
     buf.unmap();
-    return new WebGPUTensor(h, w, c, buf);
+    return { h, w, c, buffer: buf };
   }
 
   upload(data: Float32Array): WebGPUTensor {
@@ -72,7 +72,7 @@ export class WebGPUBackend implements Backend {
     });
     new Float32Array(buf.getMappedRange()).set(data);
     buf.unmap();
-    return new WebGPUTensor(0, 0, 0, buf);
+    return { h: 0, w: 0, c: 0, buffer: buf };
   }
 
   async readback(tensor: WebGPUTensor): Promise<Float32Array> {

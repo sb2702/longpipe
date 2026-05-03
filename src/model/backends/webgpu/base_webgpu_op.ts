@@ -1,13 +1,8 @@
 import type { Tensor, Op } from '~/model/backend'
 import type { WebGPUBackend } from '~/model/backends/webgpu/index'
 
-export class WebGPUTensor implements Tensor {
-  constructor(
-    readonly h: number,
-    readonly w: number,
-    readonly c: number,
-    readonly buffer: GPUBuffer,
-  ) {}
+export interface WebGPUTensor extends Tensor {
+  readonly buffer: GPUBuffer
 }
 
 interface UniformDef {
