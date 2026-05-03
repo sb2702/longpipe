@@ -67,5 +67,8 @@ export interface Backend {
     UpsampleSigmoid: (input: Tensor, params: UpsampleParams) => Op;
   };
 
+  // Read tensor data back to host. The tensor must have been allocated by this backend.
+  readback(tensor: Tensor): Promise<Float32Array>;
+
   destroy(): void;
 }

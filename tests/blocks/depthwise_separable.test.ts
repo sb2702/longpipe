@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { Backend, Tensor } from '~/model/backend'
+import type { Backend } from '~/model/backend'
 import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { WebGLBackend } from '~/model/backends/webgl/index'
 import { DepthwiseSeparable } from '~/model/blocks/depthwise_separable'
@@ -28,7 +28,7 @@ describe.each(BACKENDS)('DepthwiseSeparable ($name)', ({ create }) => {
     })
     block.run()
 
-    const result = await backend.readback(block.output as Tensor & { texture?: unknown })
+    const result = await backend.readback(block.output)
     backend.destroy()
 
     const ref = new Float32Array(fixture.expected_output)
