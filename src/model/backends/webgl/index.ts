@@ -1,6 +1,8 @@
 import type { Backend } from '~/model/backend'
 import type { WebGLTensor, WebGLMLBuffer } from '~/model/backends/webgl/base_webgl_op'
 import { Conv2DWebGL } from '~/model/backends/webgl/ops/conv2d'
+import { DepthwiseConv2DWebGL } from '~/model/backends/webgl/ops/depthwise_conv2d'
+import { AddWebGL } from '~/model/backends/webgl/ops/add'
 
 export class WebGLBackend implements Backend {
   readonly ops: Backend['ops']
@@ -10,8 +12,8 @@ export class WebGLBackend implements Backend {
     this.fbo = gl.createFramebuffer()!
     this.ops = {
       Conv2d:          (input, weights, bias, params) => new Conv2DWebGL(this, input, weights, bias, params),
-      DepthwiseConv2d: (_i, _w, _b, _p) => { throw new Error('DepthwiseConv2d not yet implemented for WebGL') },
-      Add:             (_a, _b)         => { throw new Error('Add not yet implemented for WebGL') },
+      DepthwiseConv2d: (input, weights, bias, params) => new DepthwiseConv2DWebGL(this, input, weights, bias, params),
+      Add:             (a, b)                         => new AddWebGL(this, a, b),
     }
   }
 
