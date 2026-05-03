@@ -8,6 +8,7 @@ export class Conv2DWebGPU extends WebGPUOp {
   readonly inputs: Tensor[];
   readonly output: WebGPUTensor;
   protected dispatch: [number, number, number];
+  shader: string = conv2dSrc;
 
   constructor(backend: WebGPUBackend,  input: Tensor,  weights: Tensor, bias: Tensor, params: Conv2dParams) {
     super(backend);
@@ -31,7 +32,8 @@ export class Conv2DWebGPU extends WebGPUOp {
       params.activation === "relu6" ? 1 : params.activation === "relu" ? 2 : 0,
     ]));
 
-    this.defaultSetup(backend.device.createShaderModule({ code: conv2dSrc }));
+
+    this.defaultSetup();
 
     this.dispatch = [Math.ceil(outW / 8), Math.ceil(outH / 8), outGroups];
   }

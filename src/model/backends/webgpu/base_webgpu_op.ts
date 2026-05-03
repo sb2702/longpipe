@@ -20,7 +20,7 @@ export abstract class WebGPUOp implements Op {
   abstract readonly inputs: Tensor[]
   abstract readonly output: WebGPUTensor
   protected abstract dispatch: [number, number, number]
-
+  shader: string  = "";
   protected pipeline!: GPUComputePipeline
   protected bindGroup!: GPUBindGroup
 
@@ -45,24 +45,6 @@ export abstract class WebGPUOp implements Op {
     this.uniformBuffers[name] = buf
   }
 
-  // Generates WGSL declarations and wraps the compute body.
-  // Binding order: inputs (storage read) → uniforms → output (storage read_write).
-  // Call after this.inputs and all createUniform() calls are set up.
-  protected createStandardShader(computeCode: string): GPUShaderModule {
-    const lines: string[] = []
-    let b = 0
-    for (let i = 0; i < this.inputs.length; i++) {
-      lines.push(`@group(0) @binding(${b++}) var<storage, read> input${i}: array<vec4<f32>>;`)
-    }
-    for (const u of this.uniformDefs) {
-      lines.push(`@group(0) @binding(${b++}) var<uniform> ${u.name}: ${u.type};`)
-    }
-    lines.push(`@group(0) @binding(${b}) var<storage, read_write> output: array<vec4<f32>>;`)
-    return this.backend.device.createShaderModule({
-      code: `${lines.join('\n')}\n${computeCode}`,
-    })
-  }
-
   // Builds a bind group matching the layout from createStandardShader.
   // Also works with hand-written WGSL as long as bindings follow the same order.
   // Must be called after this.output and this.pipeline are set.
@@ -83,7 +65,10 @@ export abstract class WebGPUOp implements Op {
   }
 
   // Creates pipeline from a shader module then builds the bind group.
-  protected defaultSetup(shader: GPUShaderModule): void {
+  protected defaultSetup(): void {
+
+    const shader = this.backend.device.createShaderModule({ code: this.shader });
+
     this.pipeline = this.backend.device.createComputePipeline({
       layout: 'auto',
       compute: { module: shader, entryPoint: 'main' },
