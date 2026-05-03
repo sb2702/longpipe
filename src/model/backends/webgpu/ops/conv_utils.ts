@@ -1,0 +1,31 @@
+export function convOutSize(
+  inSize: number,
+  kernel: number,
+  stride: number,
+  padding: number | "same" | "valid",
+): number {
+  if (typeof padding === "number") return Math.floor((inSize + 2 * padding - kernel) / stride) + 1;
+  if (padding === "same") return Math.ceil(inSize / stride);
+  return Math.floor((inSize - kernel) / stride) + 1;
+}
+
+export function samePadHalf(
+  inSize: number,
+  outSize: number,
+  kernel: number,
+  stride: number,
+): number {
+  return Math.floor(Math.max((outSize - 1) * stride + kernel - inSize, 0) / 2);
+}
+
+export function resolvePad(
+  padding: number | "same" | "valid",
+  inSize: number,
+  outSize: number,
+  kernel: number,
+  stride: number,
+): number {
+  if (typeof padding === "number") return padding;
+  if (padding === "same") return samePadHalf(inSize, outSize, kernel, stride);
+  return 0;
+}

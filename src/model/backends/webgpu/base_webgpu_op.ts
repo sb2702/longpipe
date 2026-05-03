@@ -19,9 +19,7 @@ interface UniformDef {
 export abstract class WebGPUOp implements Op {
   abstract readonly inputs: Tensor[]
   abstract readonly output: WebGPUTensor
-  protected abstract dispatchX: number
-  protected abstract dispatchY: number
-  protected abstract dispatchZ: number
+  protected abstract dispatch: [number, number, number]
 
   protected pipeline!: GPUComputePipeline
   protected bindGroup!: GPUBindGroup
@@ -98,7 +96,7 @@ export abstract class WebGPUOp implements Op {
     const pass = enc.beginComputePass()
     pass.setPipeline(this.pipeline)
     pass.setBindGroup(0, this.bindGroup)
-    pass.dispatchWorkgroups(this.dispatchX, this.dispatchY, this.dispatchZ)
+    pass.dispatchWorkgroups(...this.dispatch)
     pass.end()
     this.backend.device.queue.submit([enc.finish()])
   }
