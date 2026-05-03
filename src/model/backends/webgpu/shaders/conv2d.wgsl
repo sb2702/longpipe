@@ -32,8 +32,8 @@ struct Params {
 @group(0) @binding(0) var<storage, read>       input_buf  : array<vec4<f32>>;
 @group(0) @binding(1) var<storage, read>       weight_buf : array<mat4x4<f32>>;
 @group(0) @binding(2) var<storage, read>       bias_buf   : array<vec4<f32>>;
-@group(0) @binding(3) var<storage, read_write> output_buf : array<vec4<f32>>;
-@group(0) @binding(4) var<uniform>             params     : Params;
+@group(0) @binding(3) var<uniform>             params     : Params;
+@group(0) @binding(4) var<storage, read_write> output_buf : array<vec4<f32>>;
 
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
