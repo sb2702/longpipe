@@ -1,17 +1,23 @@
 import { describe, it, expect } from 'vitest'
+import type { Backend, Tensor } from '~/model/backend'
 import { WebGPUBackend } from '~/model/backends/webgpu/index'
+import { WebGLBackend } from '~/model/backends/webgl/index'
 import { EfficientNetLiteMattingLarge } from '~/model/networks/efficientnetlite_matting_large'
 import type { ModelWeights } from '~/model/weights'
-import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
 import fixture from '../fixtures/model_large.json'
 
 // Accumulated FP error across ~75 ops — matches 03_full_model threshold
 const THRESHOLD = 1e-3
 
-describe('EfficientNetLiteMattingLarge', () => {
+const BACKENDS: Array<{ name: string; create: () => Promise<Backend> }> = [
+  { name: 'WebGPU', create: () => WebGPUBackend.create() },
+  { name: 'WebGL',  create: async () => WebGLBackend.create() },
+]
+
+describe.each(BACKENDS)('EfficientNetLiteMattingLarge ($name)', ({ create }) => {
   it('layer-by-layer outputs match PyTorch reference', async () => {
-    const backend = await WebGPUBackend.create()
+    const backend = await create()
     const { input_h, input_w } = fixture.config
 
     const input = backend.tensor(input_h, input_w, 4, new Float32Array(fixture.input))
@@ -28,7 +34,7 @@ describe('EfficientNetLiteMattingLarge', () => {
     // Each entry: [checkpoint key in fixture, op whose .output to read back]
     // Multi-channel outputs compared directly (NHWC vec4).
     // alpha is 1-channel in fixture — compare against ch0 of 4-channel SDK output.
-    const layers: Array<[string, { output: unknown }, boolean?]> = [
+    const layers: Array<[string, { output: Tensor }, boolean?]> = [
       ['stem',       m.stem],
       ['s0',         m.s0],
       ['s1b0',       m.s1b0],
@@ -57,7 +63,7 @@ describe('EfficientNetLiteMattingLarge', () => {
     for (const [name, op, singleChannel] of layers) {
       if (!(name in caps)) continue
 
-      const result = await backend.readback(op.output as WebGPUTensor)
+      const result = await backend.readback(op.output)
       const ref    = new Float32Array(caps[name])
 
       let maxErr = 0
