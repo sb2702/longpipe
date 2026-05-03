@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
-import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
+import { WebGLBackend } from '~/model/backends/webgl/index'
+import type { WebGLTensor } from '~/model/backends/webgl/base_webgl_op'
 
-import conv2d_1x1 from './fixtures/conv2d_1x1.json'
-import conv2d_3x3 from './fixtures/conv2d_3x3.json'
-import conv2d_3x3_stride2 from './fixtures/conv2d_3x3_stride2.json'
+import conv2d_1x1 from '../fixtures/conv2d_1x1.json'
+import conv2d_3x3 from '../fixtures/conv2d_3x3.json'
+import conv2d_3x3_stride2 from '../fixtures/conv2d_3x3_stride2.json'
 
 const THRESHOLD = 1e-4
 
@@ -22,7 +22,7 @@ interface Conv2dFixture {
 }
 
 async function runFixture(fixture: Conv2dFixture) {
-  const backend = await WebGPUBackend.create()
+  const backend = WebGLBackend.create()
 
   const [, C, H, W] = fixture.input_shape
   const input   = backend.tensor(H, W, C, new Float32Array(fixture.input))
@@ -39,7 +39,7 @@ async function runFixture(fixture: Conv2dFixture) {
 
   op.run()
 
-  const result = await backend.readback(op.output as WebGPUTensor)
+  const result = await backend.readback(op.output as WebGLTensor)
   backend.destroy()
 
   const ref = new Float32Array(fixture.expected_output)
@@ -48,7 +48,7 @@ async function runFixture(fixture: Conv2dFixture) {
   return maxErr
 }
 
-describe('Conv2d', () => {
+describe('Conv2d (WebGL)', () => {
   it('1x1 matches PyTorch', async () => {
     expect(await runFixture(conv2d_1x1 as Conv2dFixture)).toBeLessThan(THRESHOLD)
   })

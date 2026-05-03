@@ -3,7 +3,7 @@ import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { AddWebGPU } from '~/model/backends/webgpu/ops/add'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
-import elementwise_add from './fixtures/elementwise_add.json'
+import elementwise_add from '../fixtures/elementwise_add.json'
 
 const THRESHOLD = 1e-4
 

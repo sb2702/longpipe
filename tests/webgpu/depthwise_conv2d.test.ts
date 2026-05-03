@@ -3,7 +3,7 @@ import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { DepthwiseConv2DWebGPU } from '~/model/backends/webgpu/ops/depthwise_conv2d'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
-import depthwise_3x3 from './fixtures/depthwise_3x3.json'
+import depthwise_3x3 from '../fixtures/depthwise_3x3.json'
 
 const THRESHOLD = 1e-4
 

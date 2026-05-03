@@ -3,8 +3,8 @@ import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { MBConv } from '~/model/blocks/mbconv'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
-import mbconv_s1 from './fixtures/mbconv_k3_s1_residual.json'
-import mbconv_s2 from './fixtures/mbconv_k3_s2.json'
+import mbconv_s1 from '../fixtures/mbconv_k3_s1_residual.json'
+import mbconv_s2 from '../fixtures/mbconv_k3_s2.json'
 
 const THRESHOLD = 1e-4
 
