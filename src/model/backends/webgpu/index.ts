@@ -1,6 +1,8 @@
 import type { Backend } from "~/model/backend";
 import type { WebGPUTensor, WebGPUMLBuffer } from "~/model/backends/webgpu/base_webgpu_op";
 import { Conv2DWebGPU } from "~/model/backends/webgpu/ops/conv2d";
+import { DepthwiseConv2DWebGPU } from "~/model/backends/webgpu/ops/depthwise_conv2d";
+import { AddWebGPU } from "~/model/backends/webgpu/ops/add";
 
 const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
 
@@ -9,8 +11,9 @@ export class WebGPUBackend implements Backend {
 
   private constructor(readonly device: GPUDevice) {
     this.ops = {
-      Conv2d: (input, weights, bias, params) =>
-        new Conv2DWebGPU(this, input, weights, bias, params),
+      Conv2d:          (input, weights, bias, params) => new Conv2DWebGPU(this, input, weights, bias, params),
+      DepthwiseConv2d: (input, weights, bias, params) => new DepthwiseConv2DWebGPU(this, input, weights, bias, params),
+      Add:             (a, b)                         => new AddWebGPU(this, a, b),
     };
   }
 

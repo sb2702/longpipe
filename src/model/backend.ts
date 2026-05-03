@@ -38,7 +38,9 @@ export interface Backend {
   upload(data: Float32Array): MLBuffer;
 
   ops: {
-    Conv2d: (input: Tensor, weights: MLBuffer, bias: MLBuffer, params: Conv2dParams) => Op;
+    Conv2d:         (input: Tensor, weights: MLBuffer, bias: MLBuffer, params: Conv2dParams) => Op;
+    DepthwiseConv2d:(input: Tensor, weights: MLBuffer, bias: MLBuffer, params: DepthwiseParams) => Op;
+    Add:            (a: Tensor, b: Tensor) => Op;
   };
 
   destroy(): void;
