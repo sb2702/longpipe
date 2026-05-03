@@ -27,7 +27,7 @@ export class Conv2DWebGPU extends WebGPUOp {
     const padTop  = resolvePad(params.padding, input.h, outH, params.kernel, params.stride);
     const padLeft = resolvePad(params.padding, input.w, outW, params.kernel, params.stride);
 
-    this.output  = backend.makeOutputTensor(outH, outW, params.outChannels);
+    this.output  = backend.tensor(outH, outW, params.outChannels);
     this.inputs  = [input];
     this.weights = [weights, bias];
 

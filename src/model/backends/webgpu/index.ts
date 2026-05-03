@@ -51,9 +51,6 @@ export class WebGPUBackend implements Backend {
     return { buffer: buf };
   }
 
-  makeOutputTensor(h: number, w: number, c: number): WebGPUTensor {
-    return this.tensor(h, w, c);
-  }
 
   async readback(tensor: WebGPUTensor): Promise<Float32Array> {
     const staging = this.device.createBuffer({

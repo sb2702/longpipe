@@ -15,7 +15,7 @@ export class AddWebGPU extends WebGPUOp {
 
     const size = a.h * a.w * a.c;
 
-    this.output = backend.makeOutputTensor(a.h, a.w, a.c);
+    this.output = backend.tensor(a.h, a.w, a.c);
     this.inputs = [a, b];
 
     this.createUniform("params", "Params");
