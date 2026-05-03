@@ -3,6 +3,13 @@ import type { WebGLTensor, WebGLMLBuffer } from '~/model/backends/webgl/base_web
 import { Conv2DWebGL } from '~/model/backends/webgl/ops/conv2d'
 import { DepthwiseConv2DWebGL } from '~/model/backends/webgl/ops/depthwise_conv2d'
 import { AddWebGL } from '~/model/backends/webgl/ops/add'
+import { SigmoidWebGL } from '~/model/backends/webgl/ops/sigmoid'
+import { BilinearUpsampleWebGL } from '~/model/backends/webgl/ops/bilinear_upsample'
+import { ChannelConcatWebGL } from '~/model/backends/webgl/ops/channel_concat'
+import { UpsampleSigmoidWebGL } from '~/model/backends/webgl/ops/upsample_sigmoid'
+import { UpsampleConcatWebGL } from '~/model/backends/webgl/ops/upsample_concat'
+import { UpsampleConv1x1WebGL } from '~/model/backends/webgl/ops/upsample_conv1x1'
+import { Conv2dAddWebGL } from '~/model/backends/webgl/ops/conv2d_add'
 
 export class WebGLBackend implements Backend {
   readonly ops: Backend['ops']
@@ -15,13 +22,13 @@ export class WebGLBackend implements Backend {
       Conv2d:           (input, weights, params) => new Conv2DWebGL(this, input, weights, params),
       DepthwiseConv2d:  (input, weights, params) => new DepthwiseConv2DWebGL(this, input, weights, params),
       Add:              (a, b)                         => new AddWebGL(this, a, b),
-      Sigmoid:          notImpl,
-      BilinearUpsample: notImpl,
-      ChannelConcat:    notImpl,
-      Conv2dAdd:        notImpl,
-      UpsampleConcat:   notImpl,
-      UpsampleConv1x1:  notImpl,
-      UpsampleSigmoid:  notImpl,
+      Sigmoid:          (input)                          => new SigmoidWebGL(this, input),
+      BilinearUpsample: (input, params)                => new BilinearUpsampleWebGL(this, input, params),
+      ChannelConcat:    (a, b)                           => new ChannelConcatWebGL(this, a, b),
+      Conv2dAdd:        (input, skip, weights, params)   => new Conv2dAddWebGL(this, input, skip, weights, params),
+      UpsampleConcat:   (a, b, params)                   => new UpsampleConcatWebGL(this, a, b, params),
+      UpsampleConv1x1:  (input, weights, params)         => new UpsampleConv1x1WebGL(this, input, weights, params),
+      UpsampleSigmoid:  (input, params)                  => new UpsampleSigmoidWebGL(this, input, params),
     }
   }
 
