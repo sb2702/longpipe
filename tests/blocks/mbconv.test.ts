@@ -15,8 +15,7 @@ interface MBConvFixture {
   kernel_size:  number
   stride:       number
   padding:      number
-  expand_ratio: number
-  input_shape:  [number, number, number, number]  // NCHW
+  input_shape:  [number, number, number, number]
   input:           number[]
   expand_weights:  number[]
   expand_bias:     number[]
@@ -34,12 +33,9 @@ async function runFixture(fixture: MBConvFixture) {
   const input = backend.tensor(H, W, C, new Float32Array(fixture.input))
 
   const block = new MBConv(backend, input, {
-    expandWeights: backend.upload(new Float32Array(fixture.expand_weights)),
-    expandBias:    backend.upload(new Float32Array(fixture.expand_bias)),
-    dwWeights:     backend.upload(new Float32Array(fixture.dw_weights)),
-    dwBias:        backend.upload(new Float32Array(fixture.dw_bias)),
-    projWeights:   backend.upload(new Float32Array(fixture.proj_weights)),
-    projBias:      backend.upload(new Float32Array(fixture.proj_bias)),
+    expand: { weights: fixture.expand_weights, bias: fixture.expand_bias },
+    dw:     { weights: fixture.dw_weights,     bias: fixture.dw_bias },
+    proj:   { weights: fixture.proj_weights,   bias: fixture.proj_bias },
   }, {
     inChannels:  fixture.in_channels,
     midChannels: fixture.mid_channels,

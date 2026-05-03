@@ -2,22 +2,22 @@ import { describe, it, expect } from 'vitest'
 import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
-import conv2d_1x1 from '../fixtures/conv2d_1x1.json'
-import conv2d_3x3 from '../fixtures/conv2d_3x3.json'
-import conv2d_3x3_stride2 from '../fixtures/conv2d_3x3_stride2.json'
+import conv2d_1x1      from '../fixtures/conv2d_1x1.json'
+import conv2d_3x3      from '../fixtures/conv2d_3x3.json'
+import conv2d_3x3_s2   from '../fixtures/conv2d_3x3_stride2.json'
 
 const THRESHOLD = 1e-4
 
 interface Conv2dFixture {
-  kernel_size: number
-  stride: number
-  padding: number
-  in_channels: number
+  kernel_size:  number
+  stride:       number
+  padding:      number
+  in_channels:  number
   out_channels: number
-  input_shape: [number, number, number, number]  // NCHW
-  input: number[]
-  weights: number[]
-  bias: number[]
+  input_shape:  [number, number, number, number]
+  input:           number[]
+  weights:         number[]
+  bias:            number[]
   expected_output: number[]
 }
 
@@ -25,18 +25,15 @@ async function runFixture(fixture: Conv2dFixture) {
   const backend = await WebGPUBackend.create()
 
   const [, C, H, W] = fixture.input_shape
-  const input   = backend.tensor(H, W, C, new Float32Array(fixture.input))
-  const weights = backend.upload(new Float32Array(fixture.weights))
-  const bias    = backend.upload(new Float32Array(fixture.bias))
+  const input = backend.tensor(H, W, C, new Float32Array(fixture.input))
 
-  const op = backend.ops.Conv2d(input, weights, bias, {
+  const op = backend.ops.Conv2d(input, { weights: fixture.weights, bias: fixture.bias }, {
     outChannels: fixture.out_channels,
     kernel:      fixture.kernel_size,
     stride:      fixture.stride,
     padding:     fixture.padding,
     activation:  'none',
   })
-
   op.run()
 
   const result = await backend.readback(op.output as WebGPUTensor)
@@ -49,15 +46,7 @@ async function runFixture(fixture: Conv2dFixture) {
 }
 
 describe('Conv2d', () => {
-  it('1x1 matches PyTorch', async () => {
-    expect(await runFixture(conv2d_1x1 as Conv2dFixture)).toBeLessThan(THRESHOLD)
-  })
-
-  it('3x3 same padding matches PyTorch', async () => {
-    expect(await runFixture(conv2d_3x3 as Conv2dFixture)).toBeLessThan(THRESHOLD)
-  })
-
-  it('3x3 stride-2 matches PyTorch', async () => {
-    expect(await runFixture(conv2d_3x3_stride2 as Conv2dFixture)).toBeLessThan(THRESHOLD)
-  })
+  it('1x1 matches PyTorch',              async () => expect(await runFixture(conv2d_1x1    as Conv2dFixture)).toBeLessThan(THRESHOLD))
+  it('3x3 same padding matches PyTorch', async () => expect(await runFixture(conv2d_3x3    as Conv2dFixture)).toBeLessThan(THRESHOLD))
+  it('3x3 stride-2 matches PyTorch',     async () => expect(await runFixture(conv2d_3x3_s2 as Conv2dFixture)).toBeLessThan(THRESHOLD))
 })

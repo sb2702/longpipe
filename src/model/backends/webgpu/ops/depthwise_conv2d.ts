@@ -1,4 +1,5 @@
 import type { Tensor, MLBuffer, DepthwiseParams } from "~/model/backend";
+import type { DepthwiseWeights } from "~/model/weights";
 import type { WebGPUBackend } from "~/model/backends/webgpu/index";
 import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op";
 import depthwiseSrc from "~/model/backends/webgpu/shaders/depthwise_conv2d.wgsl";
@@ -11,7 +12,7 @@ export class DepthwiseConv2DWebGPU extends WebGPUOp {
   protected dispatch: [number, number, number];
   shader = depthwiseSrc;
 
-  constructor(backend: WebGPUBackend,  input: Tensor,  weights: MLBuffer, bias: MLBuffer, params: DepthwiseParams) {
+  constructor(backend: WebGPUBackend, input: Tensor, w: DepthwiseWeights, params: DepthwiseParams) {
     super(backend);
 
     const outH = convOutSize(input.h, params.kernel, params.stride, params.padding);
@@ -22,7 +23,7 @@ export class DepthwiseConv2DWebGPU extends WebGPUOp {
 
     this.output  = backend.tensor(outH, outW, input.c);
     this.inputs  = [input];
-    this.weights = [weights, bias];
+    this.weights = [backend.upload(new Float32Array(w.weights)), backend.upload(new Float32Array(w.bias))];
 
     this.createUniform("params", "Params");
     this.setUniform("params", new Uint32Array([

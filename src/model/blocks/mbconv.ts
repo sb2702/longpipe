@@ -1,13 +1,5 @@
-import type { Backend, Tensor, MLBuffer, Op } from '~/model/backend'
-
-export interface MBConvWeights {
-  expandWeights?: MLBuffer  // omit when expandRatio === 1
-  expandBias?:    MLBuffer
-  dwWeights:      MLBuffer
-  dwBias:         MLBuffer
-  projWeights:    MLBuffer
-  projBias:       MLBuffer
-}
+import type { Backend, Tensor, Op } from '~/model/backend'
+import type { MBConvWeights } from '~/model/weights'
 
 export interface MBConvParams {
   inChannels:  number
@@ -35,7 +27,7 @@ export class MBConv implements Op {
 
     // 1. Expand (1x1, relu6) — null when expandRatio === 1
     this.expandOp = hasExpand
-      ? backend.ops.Conv2d(input, w.expandWeights!, w.expandBias!, {
+      ? backend.ops.Conv2d(input, w.expand, {
           outChannels: params.midChannels,
           kernel:      1,
           stride:      1,
@@ -47,7 +39,7 @@ export class MBConv implements Op {
     const expanded = this.expandOp ? this.expandOp.output : input
 
     // 2. Depthwise (kxk, relu6)
-    this.dwOp = backend.ops.DepthwiseConv2d(expanded, w.dwWeights, w.dwBias, {
+    this.dwOp = backend.ops.DepthwiseConv2d(expanded, w.dw, {
       kernel:     params.kernel,
       stride:     params.stride,
       padding:    params.padding,
@@ -55,7 +47,7 @@ export class MBConv implements Op {
     })
 
     // 3. Project (1x1, no activation)
-    this.projOp = backend.ops.Conv2d(this.dwOp.output, w.projWeights, w.projBias, {
+    this.projOp = backend.ops.Conv2d(this.dwOp.output, w.proj, {
       outChannels: params.outChannels,
       kernel:      1,
       stride:      1,

@@ -11,11 +11,9 @@ describe('UpsampleConv1x1 (WebGPU)', () => {
     const backend = await WebGPUBackend.create()
 
     const [, C, H, W] = fixture.input_shape
-    const input   = backend.tensor(H, W, C, new Float32Array(fixture.input))
-    const weights = backend.upload(new Float32Array(fixture.weights))
-    const bias    = backend.upload(new Float32Array(fixture.bias))
+    const input = backend.tensor(H, W, C, new Float32Array(fixture.input))
 
-    const op = backend.ops.UpsampleConv1x1(input, weights, bias, {
+    const op = backend.ops.UpsampleConv1x1(input, { weights: fixture.weights, bias: fixture.bias }, {
       outH:        fixture.out_h,
       outW:        fixture.out_w,
       outChannels: fixture.out_channels,

@@ -18,16 +18,16 @@ export class WebGPUBackend implements Backend {
 
   private constructor(readonly device: GPUDevice) {
     this.ops = {
-      Conv2d:           (input, weights, bias, params)        => new Conv2DWebGPU(this, input, weights, bias, params),
-      DepthwiseConv2d:  (input, weights, bias, params)        => new DepthwiseConv2DWebGPU(this, input, weights, bias, params),
-      Add:              (a, b)                                 => new AddWebGPU(this, a, b),
-      Sigmoid:          (input)                               => new SigmoidWebGPU(this, input),
-      BilinearUpsample: (input, params)                       => new BilinearUpsampleWebGPU(this, input, params),
-      ChannelConcat:    (a, b)                                => new ChannelConcatWebGPU(this, a, b),
-      Conv2dAdd:        (input, skip, weights, bias, params)  => new Conv2dAddWebGPU(this, input, skip, weights, bias, params),
-      UpsampleConcat:   (a, b, params)                        => new UpsampleConcatWebGPU(this, a, b, params),
-      UpsampleConv1x1:  (input, weights, bias, params)        => new UpsampleConv1x1WebGPU(this, input, weights, bias, params),
-      UpsampleSigmoid:  (input, params)                       => new UpsampleSigmoidWebGPU(this, input, params),
+      Conv2d:           (input, weights, params)        => new Conv2DWebGPU(this, input, weights, params),
+      DepthwiseConv2d:  (input, weights, params)        => new DepthwiseConv2DWebGPU(this, input, weights, params),
+      Add:              (a, b)                          => new AddWebGPU(this, a, b),
+      Sigmoid:          (input)                         => new SigmoidWebGPU(this, input),
+      BilinearUpsample: (input, params)                 => new BilinearUpsampleWebGPU(this, input, params),
+      ChannelConcat:    (a, b)                          => new ChannelConcatWebGPU(this, a, b),
+      Conv2dAdd:        (input, skip, weights, params)  => new Conv2dAddWebGPU(this, input, skip, weights, params),
+      UpsampleConcat:   (a, b, params)                  => new UpsampleConcatWebGPU(this, a, b, params),
+      UpsampleConv1x1:  (input, weights, params)        => new UpsampleConv1x1WebGPU(this, input, weights, params),
+      UpsampleSigmoid:  (input, params)                 => new UpsampleSigmoidWebGPU(this, input, params),
     };
   }
 

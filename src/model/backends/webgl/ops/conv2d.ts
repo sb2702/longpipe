@@ -1,6 +1,7 @@
 import type { Tensor, MLBuffer, Conv2dParams } from '~/model/backend'
+import type { Conv2DWeights } from '~/model/weights'
 import type { WebGLBackend } from '~/model/backends/webgl/index'
-import { WebGLTensor, WebGLMLBuffer, WebGLOp } from '~/model/backends/webgl/base_webgl_op'
+import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op'
 import conv2dSrc from '~/model/backends/webgl/shaders/conv2d.glsl'
 import { convOutSize, resolvePad } from '~/model/backends/webgpu/ops/conv_utils'
 
@@ -11,13 +12,7 @@ export class Conv2DWebGL extends WebGLOp {
   protected dispatch: [number, number]
   shader = conv2dSrc
 
-  constructor(
-    backend: WebGLBackend,
-    input: Tensor,
-    weights: MLBuffer,
-    bias: MLBuffer,
-    params: Conv2dParams,
-  ) {
+  constructor(backend: WebGLBackend, input: Tensor, w: Conv2DWeights, params: Conv2dParams) {
     super(backend)
 
     const outH      = convOutSize(input.h, params.kernel, params.stride, params.padding)
@@ -27,22 +22,21 @@ export class Conv2DWebGL extends WebGLOp {
     const padTop    = resolvePad(params.padding, input.h, outH, params.kernel, params.stride)
     const padLeft   = resolvePad(params.padding, input.w, outW, params.kernel, params.stride)
 
+    const weightData = new Float32Array(w.weights)
+    const biasData   = new Float32Array(w.bias)
+
     // Weight texture: (inGroups * 4, kernel² * outGroups)
-    const wTexW = inGroups * 4
-    const wTexH = params.kernel * params.kernel * outGroups
-    const weightTex = this.makeTexture((weights as WebGLMLBuffer).data, wTexW, wTexH)
+    const weightTex = this.makeTexture(weightData, inGroups * 4, params.kernel * params.kernel * outGroups)
 
     // Bias texture: (outGroups, 1)
-    const biasTex = this.makeTexture((bias as WebGLMLBuffer).data, outGroups, 1)
+    const biasTex = this.makeTexture(biasData, outGroups, 1)
 
     // Output tensor texture: (outW * outGroups, outH)
-    const outTexW   = outW * outGroups
-    const outTexH   = outH
-    const outTexture = this.makeTexture(null, outTexW, outTexH)
-    this.output = { h: outH, w: outW, c: params.outChannels, texture: outTexture, texW: outTexW, texH: outTexH }
-
+    const outTexW    = outW * outGroups
+    const outTexture = this.makeTexture(null, outTexW, outH)
+    this.output  = { h: outH, w: outW, c: params.outChannels, texture: outTexture, texW: outTexW, texH: outH }
     this.inputs  = [input]
-    this.weights = [weights, bias]
+    this.weights = []
 
     this.samplers = [
       { name: 'u_input',   texture: (input as WebGLTensor).texture },
@@ -51,19 +45,19 @@ export class Conv2DWebGL extends WebGLOp {
     ]
 
     this.uniformInts = {
-      u_in_w:        input.w,
-      u_in_h:        input.h,
-      u_in_c_groups: inGroups,
+      u_in_w:         input.w,
+      u_in_h:         input.h,
+      u_in_c_groups:  inGroups,
       u_out_c_groups: outGroups,
-      u_kernel_h:    params.kernel,
-      u_kernel_w:    params.kernel,
-      u_stride:      params.stride,
-      u_pad_top:     padTop,
-      u_pad_left:    padLeft,
-      u_activation:  params.activation === 'relu6' ? 1 : 0,
+      u_kernel_h:     params.kernel,
+      u_kernel_w:     params.kernel,
+      u_stride:       params.stride,
+      u_pad_top:      padTop,
+      u_pad_left:     padLeft,
+      u_activation:   params.activation === 'relu6' ? 1 : 0,
     }
 
     this.defaultSetup()
-    this.dispatch = [outTexW, outTexH]
+    this.dispatch = [outTexW, outH]
   }
 }

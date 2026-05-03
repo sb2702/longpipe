@@ -1,4 +1,5 @@
-import type { Tensor, MLBuffer, Conv2dParams } from "~/model/backend";
+import type { Tensor, Conv2dParams } from "~/model/backend";
+import type { Conv2DWeights } from "~/model/weights";
 import type { WebGPUBackend } from "~/model/backends/webgpu/index";
 import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op";
 import conv2dSrc from "~/model/backends/webgpu/shaders/conv2d.wgsl";
@@ -6,12 +7,12 @@ import { convOutSize, resolvePad } from "~/model/backends/webgpu/ops/conv_utils"
 
 export class Conv2DWebGPU extends WebGPUOp {
   readonly inputs: Tensor[];
-  readonly weights: MLBuffer[];
+  readonly weights: import("~/model/backend").MLBuffer[];
   readonly output: WebGPUTensor;
   protected dispatch: [number, number, number];
   shader = conv2dSrc;
 
-  constructor( backend: WebGPUBackend,  input: Tensor, weights: MLBuffer, bias: MLBuffer,  params: Conv2dParams) {
+  constructor(backend: WebGPUBackend, input: Tensor, w: Conv2DWeights, params: Conv2dParams) {
     super(backend);
 
     const outH = convOutSize(input.h, params.kernel, params.stride, params.padding);
@@ -23,7 +24,7 @@ export class Conv2DWebGPU extends WebGPUOp {
 
     this.output  = backend.tensor(outH, outW, params.outChannels);
     this.inputs  = [input];
-    this.weights = [weights, bias];
+    this.weights = [backend.upload(new Float32Array(w.weights)), backend.upload(new Float32Array(w.bias))];
 
     this.createUniform("params", "Params");
     this.setUniform("params", new Uint32Array([

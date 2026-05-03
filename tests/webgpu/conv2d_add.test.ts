@@ -11,12 +11,10 @@ describe('Conv2dAdd (WebGPU)', () => {
     const backend = await WebGPUBackend.create()
 
     const [, C, H, W] = fixture.input_shape
-    const input   = backend.tensor(H, W, C, new Float32Array(fixture.input))
-    const skip    = backend.tensor(H, W, fixture.out_channels, new Float32Array(fixture.skip))
-    const weights = backend.upload(new Float32Array(fixture.weights))
-    const bias    = backend.upload(new Float32Array(fixture.bias))
+    const input = backend.tensor(H, W, C, new Float32Array(fixture.input))
+    const skip  = backend.tensor(H, W, fixture.out_channels, new Float32Array(fixture.skip))
 
-    const op = backend.ops.Conv2dAdd(input, skip, weights, bias, {
+    const op = backend.ops.Conv2dAdd(input, skip, { weights: fixture.weights, bias: fixture.bias }, {
       outChannels: fixture.out_channels,
       kernel:      fixture.kernel_size,
       stride:      fixture.stride,

@@ -8,13 +8,13 @@ const THRESHOLD = 1e-4
 
 interface DepthwiseFixture {
   kernel_size: number
-  stride: number
-  padding: number
-  channels: number
+  stride:      number
+  padding:     number
+  channels:    number
   input_shape: [number, number, number, number]
-  input: number[]
-  weights: number[]
-  bias: number[]
+  input:           number[]
+  weights:         number[]
+  bias:            number[]
   expected_output: number[]
 }
 
@@ -24,17 +24,14 @@ describe('DepthwiseConv2d (WebGL)', () => {
     const backend = WebGLBackend.create()
 
     const [, C, H, W] = fixture.input_shape
-    const input   = backend.tensor(H, W, C, new Float32Array(fixture.input))
-    const weights = backend.upload(new Float32Array(fixture.weights))
-    const bias    = backend.upload(new Float32Array(fixture.bias))
+    const input = backend.tensor(H, W, C, new Float32Array(fixture.input))
 
-    const op = backend.ops.DepthwiseConv2d(input, weights, bias, {
+    const op = backend.ops.DepthwiseConv2d(input, { weights: fixture.weights, bias: fixture.bias }, {
       kernel:     fixture.kernel_size,
       stride:     fixture.stride,
       padding:    fixture.padding,
       activation: 'none',
     })
-
     op.run()
 
     const result = await backend.readback(op.output as WebGLTensor)
