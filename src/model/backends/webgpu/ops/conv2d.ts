@@ -11,13 +11,7 @@ export class Conv2DWebGPU extends WebGPUOp {
   protected dispatch: [number, number, number];
   shader = conv2dSrc;
 
-  constructor(
-    backend: WebGPUBackend,
-    input: Tensor,
-    weights: MLBuffer,
-    bias: MLBuffer,
-    params: Conv2dParams,
-  ) {
+  constructor( backend: WebGPUBackend,  input: Tensor, weights: MLBuffer, bias: MLBuffer,  params: Conv2dParams) {
     super(backend);
 
     const outH = convOutSize(input.h, params.kernel, params.stride, params.padding);

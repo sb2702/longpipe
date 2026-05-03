@@ -11,13 +11,7 @@ export class DepthwiseConv2DWebGPU extends WebGPUOp {
   protected dispatch: [number, number, number];
   shader = depthwiseSrc;
 
-  constructor(
-    backend: WebGPUBackend,
-    input: Tensor,
-    weights: MLBuffer,
-    bias: MLBuffer,
-    params: DepthwiseParams,
-  ) {
+  constructor(backend: WebGPUBackend,  input: Tensor,  weights: MLBuffer, bias: MLBuffer, params: DepthwiseParams) {
     super(backend);
 
     const outH = convOutSize(input.h, params.kernel, params.stride, params.padding);
