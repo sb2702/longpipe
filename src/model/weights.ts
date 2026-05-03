@@ -8,6 +8,11 @@ export interface DepthwiseWeights {
   bias:    number[]
 }
 
+export interface DepthwiseSeparableWeights {
+  dw: DepthwiseWeights
+  pw: Conv2DWeights
+}
+
 export interface MBConvWeights {
   expand: Conv2DWeights
   dw:     DepthwiseWeights
@@ -22,7 +27,7 @@ export interface DecoderBlockWeights {
 export interface ModelWeights {
   encoder: {
     stem: Conv2DWeights
-    s0:   { dw: DepthwiseWeights; pw: Conv2DWeights }
+    s0:   DepthwiseSeparableWeights
     s1:   MBConvWeights[]
     s2:   MBConvWeights[]
     s3:   MBConvWeights[]

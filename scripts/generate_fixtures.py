@@ -174,6 +174,77 @@ def generate_upsample_sigmoid():
     }
 
 
+# ── Blocks ───────────────────────────────────────────────────────────────────
+
+def generate_depthwise_separable():
+    """Stage-0-sized: 32→16, k=3, s=1. DW has relu6, PW has no activation."""
+    C_in, C_out, H, W = 32, 16, 8, 8
+    dw = nn.Conv2d(C_in, C_in, kernel_size=3, padding=1, groups=C_in, bias=True)
+    pw = nn.Conv2d(C_in, C_out, kernel_size=1, bias=True)
+    x  = torch.randn(1, C_in, H, W)
+    with torch.no_grad():
+        after_dw = torch.clamp(dw(x), 0, 6)
+        y        = pw(after_dw)
+    return {
+        "in_channels":  C_in,
+        "out_channels": C_out,
+        "kernel_size":  3,
+        "stride":       1,
+        "padding":      1,
+        "input_shape":  [1, C_in, H, W],
+        "output_shape": [1, C_out, H, W],
+        "input":    to_nhwc(x),
+        "dw":       { "weights": dw_weights(dw.weight.detach()),
+                      "bias":    dw.bias.detach().cpu().numpy().tolist() },
+        "pw":       { "weights": conv_weights(pw.weight.detach()),
+                      "bias":    pw.bias.detach().cpu().numpy().tolist() },
+        "expected_output": to_nhwc(y),
+    }
+
+
+def generate_decoder_block():
+    """Realistic decoder block: deep(128,4,4) + skip(112,8,8) → (64,8,8)."""
+    deep_c, skip_c, out_c = 128, 112, 64
+    deep_H, deep_W = 4, 4
+    skip_H, skip_W = 8, 8
+    conv1 = nn.Conv2d(deep_c + skip_c, out_c, kernel_size=3, padding=1, bias=True)
+    conv2 = nn.Conv2d(out_c,           out_c, kernel_size=3, padding=1, bias=True)
+    deep = torch.randn(1, deep_c, deep_H, deep_W)
+    skip = torch.randn(1, skip_c, skip_H, skip_W)
+    with torch.no_grad():
+        up   = F.interpolate(deep, scale_factor=2, mode='bilinear', align_corners=False)
+        cat  = torch.cat([up, skip], dim=1)
+        mid  = torch.clamp(conv1(cat), 0, 6)
+        y    = torch.clamp(conv2(mid), 0, 6)
+    return {
+        "deep_channels": deep_c,
+        "skip_channels": skip_c,
+        "out_channels":  out_c,
+        "deep_shape":    [1, deep_c, deep_H, deep_W],
+        "skip_shape":    [1, skip_c, skip_H, skip_W],
+        "output_shape":  [1, out_c,  skip_H, skip_W],
+        "deep_input":    to_nhwc(deep),
+        "skip_input":    to_nhwc(skip),
+        "conv1": { "weights": conv_weights(conv1.weight.detach()),
+                   "bias":    conv1.bias.detach().cpu().numpy().tolist() },
+        "conv2": { "weights": conv_weights(conv2.weight.detach()),
+                   "bias":    conv2.bias.detach().cpu().numpy().tolist() },
+        "expected_output": to_nhwc(y),
+    }
+
+
+def dw_weights(w):
+    """[C,1,KH,KW] → vec4 list for depthwise_conv2d.wgsl."""
+    C, _, KH, KW = w.shape
+    assert C % 4 == 0
+    out = []
+    for ky in range(KH):
+        for kx in range(KW):
+            for c in range(C // 4):
+                out.extend([w[c*4+ch, 0, ky, kx].item() for ch in range(4)])
+    return out
+
+
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 FIXTURES = {
@@ -183,7 +254,9 @@ FIXTURES = {
     "conv2d_add":           generate_conv2d_add,
     "upsample_concat":      generate_upsample_concat,
     "upsample_conv1x1":     generate_upsample_conv1x1,
-    "upsample_sigmoid":     generate_upsample_sigmoid,
+    "upsample_sigmoid":         generate_upsample_sigmoid,
+    "depthwise_separable":      generate_depthwise_separable,
+    "decoder_block":            generate_decoder_block,
 }
 
 if __name__ == "__main__":
