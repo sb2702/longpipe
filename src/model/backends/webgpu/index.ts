@@ -14,6 +14,7 @@ import { UpsampleConv1x1WebGPU } from "~/model/backends/webgpu/ops/upsample_conv
 import { UpsampleSigmoidWebGPU } from "~/model/backends/webgpu/ops/upsample_sigmoid";
 import { CompositeSolidWebGPU } from "~/model/backends/webgpu/ops/composite_solid";
 import { CompositeImageWebGPU } from "~/model/backends/webgpu/ops/composite_image";
+import { CompositePassthroughWebGPU } from "~/model/backends/webgpu/ops/composite_passthrough";
 import { GaussianBlur1DWebGPU } from "~/model/backends/webgpu/ops/gaussian_blur_1d";
 import { InputWebGPU } from "~/model/backends/webgpu/ops/input";
 
@@ -81,6 +82,15 @@ export class WebGPUBackend implements Backend {
       },
       CompositeImage: (image, alpha, bg) => {
         const op = new CompositeImageWebGPU(this, image, alpha, bg);
+        return {
+          run: () => {
+            op.setOutput(this.getCurrentDisplayTexture());
+            op.run();
+          },
+        };
+      },
+      CompositePassthrough: (image) => {
+        const op = new CompositePassthroughWebGPU(this, image);
         return {
           run: () => {
             op.setOutput(this.getCurrentDisplayTexture());

@@ -78,14 +78,17 @@ export class Renderer {
 
   // Per-frame entry point. Always cheap (display). Sometimes expensive (model).
   process(frame: VideoFrame): void {
+    this.renderOp.setSource(frame)
+
     if (!this.enabled) {
-      // True passthrough is handled at the MediaStream level by the Pipeline
-      // (input track routed to output without going through the worker).
-      // If a frame still arrives here, we no-op so we don't burn GPU.
+      // True passthrough at the GPU level: input image written directly to
+      // canvas, no model, no alpha math. Output stream / MSTG / shuttle
+      // path picks up the unmodified frame as if no pipeline existed.
+      this.renderOp.runPassthrough()
+      this.framesRenderedAt.push(performance.now())
+      this.trim(this.framesRenderedAt)
       return
     }
-
-    this.renderOp.setSource(frame)
 
     const tsUs = frame.timestamp ?? performance.now() * 1000
     if (this.shouldRunModel(tsUs)) {

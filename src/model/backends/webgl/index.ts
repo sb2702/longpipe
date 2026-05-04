@@ -14,6 +14,7 @@ import { UpsampleConv1x1WebGL } from '~/model/backends/webgl/ops/upsample_conv1x
 import { Conv2dAddWebGL } from '~/model/backends/webgl/ops/conv2d_add'
 import { CompositeSolidWebGL } from '~/model/backends/webgl/ops/composite_solid'
 import { CompositeImageWebGL } from '~/model/backends/webgl/ops/composite_image'
+import { CompositePassthroughWebGL } from '~/model/backends/webgl/ops/composite_passthrough'
 import { GaussianBlur1DWebGL } from '~/model/backends/webgl/ops/gaussian_blur_1d'
 import { InputWebGL } from '~/model/backends/webgl/ops/input'
 
@@ -73,6 +74,8 @@ export class WebGLBackend implements Backend {
         new CompositeSolidWebGL(this, image, alpha, bgColor),
       CompositeImage: (image, alpha, bg) =>
         new CompositeImageWebGL(this, image, alpha, bg),
+      CompositePassthrough: (image) =>
+        new CompositePassthroughWebGL(this, image),
     }
   }
 

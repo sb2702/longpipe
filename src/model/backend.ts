@@ -119,8 +119,12 @@ export interface Backend {
 
   // Render-to-display ops. Produce no Tensor — write directly to the canvas.
   presenters: {
-    CompositeSolid: (image: Tensor, alpha: Tensor, bgColor: [number, number, number]) => Presenter;
-    CompositeImage: (image: Tensor, alpha: Tensor, bg: Tensor) => Presenter;
+    CompositeSolid:       (image: Tensor, alpha: Tensor, bgColor: [number, number, number]) => Presenter;
+    CompositeImage:       (image: Tensor, alpha: Tensor, bg: Tensor) => Presenter;
+    // Passthrough: writes image directly to canvas; no alpha, no bg. Used
+    // by RenderOp when the renderer is disabled (true GPU-level passthrough
+    // — input frame in, same frame on the canvas).
+    CompositePassthrough: (image: Tensor) => Presenter;
   };
 
   // Read tensor data back to host as fp32. The tensor must have been allocated

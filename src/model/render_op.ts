@@ -40,6 +40,10 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
   private bgConfig:     BackgroundConfig
   private upscaler:     UpscalerHandle
   private compositor:   CompositorHandle
+  // Passthrough compositor — built once at construction; renderer calls
+  // runPassthrough() to write the input image directly to the canvas with
+  // no model / no alpha math. Used when the renderer is in disabled state.
+  private readonly passthroughCompositor: CompositorHandle
   private readonly displayInput: InputOp
   private readonly image:        Tensor
 
@@ -56,8 +60,9 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
     this.displayInput = backend.ops.Input(canvas.height, canvas.width)
     this.image        = this.displayInput.output
 
-    this.upscaler   = this.makeUpscaler()
-    this.compositor = this.makeCompositor()
+    this.upscaler             = this.makeUpscaler()
+    this.compositor           = this.makeCompositor()
+    this.passthroughCompositor = backend.presenters.CompositePassthrough(this.image)
   }
 
   // Stage a single source for the next run(). Both InputOps see the same
@@ -91,6 +96,14 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
   runDisplay(): void {
     this.displayInput.run()
     this.compositor.run()
+  }
+
+  // True passthrough: writes the input image directly to the canvas. Used
+  // by the renderer when disabled. setSource() is still required (display
+  // input needs a fresh frame); model + alpha pipeline is skipped entirely.
+  runPassthrough(): void {
+    this.displayInput.run()
+    this.passthroughCompositor.run()
   }
 
   // Expensive, runs at preset.modelFps: refresh the alpha tensor.
