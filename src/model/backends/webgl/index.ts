@@ -76,6 +76,34 @@ export class WebGLBackend implements Backend {
     }
   }
 
+  // Cheap capability probe — works in both Window and Worker scope
+  // (OffscreenCanvas is universal on our targets). Probes WebGL2 plus the
+  // float-render extension we depend on. The actual create() may still
+  // fail on a real canvas due to browser quirks, so callers must handle
+  // create() throwing too.
+  //
+  // We explicitly tear down the probe context via WEBGL_lose_context.
+  // Browsers cap simultaneous WebGL contexts (~16 in Chrome); if we leak
+  // probe contexts into GC limbo, future production context creation can
+  // fail in confusing ways.
+  static isAvailable(): boolean {
+    let gl: WebGL2RenderingContext | null = null
+    try {
+      const probe = new OffscreenCanvas(1, 1)
+      gl = probe.getContext('webgl2') as WebGL2RenderingContext | null
+      if (!gl) return false
+      if (!gl.getExtension('EXT_color_buffer_float')) return false
+      return true
+    } catch {
+      return false
+    } finally {
+      // WEBGL_lose_context is broadly supported. If it isn't here for some
+      // reason, we proceed without — the context will be reclaimed by GC
+      // eventually, just less promptly.
+      gl?.getExtension('WEBGL_lose_context')?.loseContext()
+    }
+  }
+
   static create(opts: WebGLBackendOptions): WebGLBackend {
     const gl = opts.canvas.getContext('webgl2') as WebGL2RenderingContext | null
     if (!gl) throw new Error('WebGL2 not available')

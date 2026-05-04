@@ -40,7 +40,12 @@ export interface InitData {
   effect:   EffectConfig
   enabled:  boolean
   weights:  ArrayBuffer | null   // initial preset's weights (null when preset === 'auto')
-  backend:  'webgpu' | 'webgl'
+
+  // Backend + dtype are *preferences*. Worker's setup_backend honors them
+  // when possible and falls back when not. 'auto' = pick the best available
+  // (try WebGPU → fall back to WebGL). Resolved values come back via
+  // InitResponse so main can log/display what's actually running.
+  backend:  'webgpu' | 'webgl' | 'auto'
   dtype:    Dtype
 
   // Transport endpoints — presence depends on topology. Transferred via
@@ -53,7 +58,9 @@ export interface InitData {
 }
 
 export interface InitResponse {
-  resolvedPreset: ManualPreset       // 'auto' resolves to a concrete preset
+  resolvedPreset:  ManualPreset                    // 'auto' resolves to a concrete preset
+  resolvedBackend: 'webgpu' | 'webgl'              // what the worker actually got
+  resolvedDtype:   Dtype                           // patched if downgraded (f16 → f32)
 }
 
 export interface PresetSwapResult {

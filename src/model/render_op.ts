@@ -81,11 +81,23 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
   }
 
   run(): void {
-    this.networkInput.run()
+    this.runModel()
+    this.runDisplay()
+  }
+
+  // Cheap, runs every frame: refresh display tensor at canvas resolution,
+  // composite with whatever's currently in the alpha tensor (which persists
+  // between model runs).
+  runDisplay(): void {
     this.displayInput.run()
+    this.compositor.run()
+  }
+
+  // Expensive, runs at preset.modelFps: refresh the alpha tensor.
+  runModel(): void {
+    this.networkInput.run()
     this.network.run()
     this.upscaler.run()
-    this.compositor.run()
   }
 
   private makeUpscaler(): UpscalerHandle {
