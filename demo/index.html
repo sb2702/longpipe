@@ -23,6 +23,10 @@
         <span class="desc">End-to-end matting on a still image. Pick backend (WebGPU/WebGL), precision (fp32/fp16), upscaler, and background mode.</span>
       </li>
       <li>
+        <a href="/loop-video.html">Pipeline: looped video → Pipeline → video element</a>
+        <span class="desc">Full SDK end-to-end. Looped video file feeds <code>captureStream()</code> as the input MediaStream; the output MediaStream drives a second video element. Real-world device test target.</span>
+      </li>
+      <li>
         <a href="/transfer-capture.html">transferControlToOffscreen + captureStream</a>
         <span class="desc">Pipeline plumbing test. Does a canvas's <code>captureStream()</code> keep emitting frames after its drawing control is transferred to a worker? Chromium yes, Firefox no.</span>
       </li>
