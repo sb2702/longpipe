@@ -26,29 +26,24 @@ async function loadImage(url: string): Promise<ImageBitmap> {
   return createImageBitmap(blob)
 }
 
-function drawCovered(img: ImageBitmap, w: number, h: number): Uint8ClampedArray {
-  const c = new OffscreenCanvas(w, h)
-  const ctx = c.getContext('2d')!
-  const scale = Math.max(w / img.width, h / img.height)
-  const dw = img.width * scale, dh = img.height * scale
-  const dx = (w - dw) / 2, dy = (h - dh) / 2
-  ctx.drawImage(img, dx, dy, dw, dh)
-  return ctx.getImageData(0, 0, w, h).data
-}
-
-function bytesToFloat(rgba: Uint8ClampedArray): Float32Array {
-  const out = new Float32Array(rgba.length)
-  for (let i = 0; i < rgba.length; i++) out[i] = rgba[i] / 255
-  return out
-}
-
-function drawBytesToCanvas(rgba: Uint8ClampedArray, canvas: HTMLCanvasElement, w: number, h: number) {
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')!
-  const id = ctx.createImageData(w, h)
-  id.data.set(rgba)
-  ctx.putImageData(id, 0, 0)
+// Crop the bitmap to a target aspect ratio at native resolution (cover-style:
+// preserve the maximum centred area). The Input op only does stretch, so the
+// caller does the aspect math here.
+async function cropToAspect(img: ImageBitmap, aspect: number): Promise<ImageBitmap> {
+  const srcAspect = img.width / img.height
+  let sx: number, sy: number, sw: number, sh: number
+  if (srcAspect > aspect) {
+    sh = img.height
+    sw = Math.round(sh * aspect)
+    sx = Math.round((img.width - sw) / 2)
+    sy = 0
+  } else {
+    sw = img.width
+    sh = Math.round(sw / aspect)
+    sx = 0
+    sy = Math.round((img.height - sh) / 2)
+  }
+  return createImageBitmap(img, sx, sy, sw, sh)
 }
 
 // ── Backend creation ──────────────────────────────────────────────────────
@@ -145,40 +140,50 @@ async function run() {
   status(`creating ${backendName}/${dtype} backend (${dispW}×${dispH} canvas)…`)
   const backend = await createBackend(backendName, dtype, outputCanvas)
 
-  status('preparing tensors…')
-  const dispBytes = drawCovered(img, dispW, dispH)
-  const netBytes  = drawCovered(img, NET_W, NET_H)
-  drawBytesToCanvas(netBytes, inputCanvas, NET_W, NET_H)
+  status('cropping source…')
+  // Crop once to network aspect; the Input ops inside RenderOp bilinear-
+  // resample to display + network resolutions. Same ImageBitmap drives both;
+  // in the pipeline layer this would be the same VideoFrame each tick.
+  const cropped = await cropToAspect(img, targetAspect)
 
-  const dispTensor  = backend.tensor(dispH, dispW, 4, bytesToFloat(dispBytes))
-  const inputTensor = backend.tensor(NET_H, NET_W, 4, bytesToFloat(netBytes))
+  // Visualize the network-input source on the small input canvas.
+  inputCanvas.width  = NET_W
+  inputCanvas.height = NET_H
+  inputCanvas.getContext('2d')!.drawImage(cropped, 0, 0, NET_W, NET_H)
 
   status('parsing weights…')
   const weights = loadWeightsFromBinary(weightsBuf) as ModelWeights
 
   status('building network…')
-  const model = new EfficientNetLiteMattingLarge(backend, inputTensor, weights)
+  // Network owns its input tensor (constructed at network resolution); we
+  // hand the same Input op to RenderOp so its setSource() can fan out.
+  const networkInput = backend.ops.Input(NET_H, NET_W)
+  const model = new EfficientNetLiteMattingLarge(backend, networkInput.output, weights)
 
-  // Resolve background config — for image mode, scale demo.jpg to canvas res.
+  // Resolve background config — for image mode, ingest demo.jpg via a one-
+  // shot Input op (static, no per-frame fanout needed).
   let bgConfig: BackgroundConfig
   if (bgMode === 'solid') {
     bgConfig = { mode: 'solid', color: bgColor }
   } else if (bgMode === 'image') {
     if (!bgImg) throw new Error('bg image failed to load')
-    const bgBytes  = drawCovered(bgImg, dispW, dispH)
-    const bgTensor = backend.tensor(dispH, dispW, 4, bytesToFloat(bgBytes))
-    bgConfig = { mode: 'image', image: bgTensor }
+    const bgCropped = await cropToAspect(bgImg, targetAspect)
+    const bgInput = backend.ops.Input(dispH, dispW)
+    bgInput.setSource(bgCropped)
+    bgInput.run()
+    bgConfig = { mode: 'image', image: bgInput.output }
   } else {
     bgConfig = { mode: 'blur', sigma }
   }
 
-  const renderOp = new RenderOp(backend, model, dispTensor, {
+  const renderOp = new RenderOp(backend, model, networkInput, {
     upscaler:   upscalerMode === 'bicubic' ? 'bicubic' : 'bilinear',
     background: bgConfig,
   })
 
   status('rendering…')
   const t0 = performance.now()
+  renderOp.setSource(cropped)
   renderOp.run()
   const tTotal = performance.now() - t0
 

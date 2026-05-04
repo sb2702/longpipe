@@ -15,6 +15,7 @@ import { UpsampleSigmoidWebGPU } from "~/model/backends/webgpu/ops/upsample_sigm
 import { CompositeSolidWebGPU } from "~/model/backends/webgpu/ops/composite_solid";
 import { CompositeImageWebGPU } from "~/model/backends/webgpu/ops/composite_image";
 import { GaussianBlur1DWebGPU } from "~/model/backends/webgpu/ops/gaussian_blur_1d";
+import { InputWebGPU } from "~/model/backends/webgpu/ops/input";
 
 const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
 
@@ -63,6 +64,7 @@ export class WebGPUBackend implements Backend {
       UpsampleConv1x1:  (input, weights, params)        => new UpsampleConv1x1WebGPU(this, input, weights, params),
       UpsampleSigmoid:  (input, params)                 => new UpsampleSigmoidWebGPU(this, input, params),
       GaussianBlur1D:   (input, params)                 => new GaussianBlur1DWebGPU(this, input, params),
+      Input:            (h, w)                          => new InputWebGPU(this, h, w),
     };
 
     this.presenters = {

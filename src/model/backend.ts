@@ -57,6 +57,23 @@ export interface GaussianBlur1DParams {
   sigma:     number;
 }
 
+// External image source for the Input op. ImageBitmap is the static / test
+// path (one-shot copy); VideoFrame is the production path (zero-copy on
+// WebGPU via importExternalTexture). Both work directly with WebGL2's
+// texImage2D.
+export type ImageSource = ImageBitmap | VideoFrame;
+
+// Input op produces a Tensor at a fixed (h, w, 4) target resolution. Source
+// is set per-frame with setSource(); the output tensor is stable across
+// frames (its contents are overwritten in place). Caller pattern:
+//   inputOp.setSource(frame); inputOp.run();
+// then downstream ops read inputOp.output.
+export interface InputOp {
+  readonly output: Tensor;
+  setSource(src: ImageSource): void;
+  run(): void;
+}
+
 // Initial data for tensor() and parameters for upload() may arrive as Float32
 // (fp32 source) or Uint16 (raw fp16 bits, from a loaded .f16.bin). Backends
 // convert as needed to match their own dtype.
@@ -65,6 +82,11 @@ export type DataView_ = Float32Array | Uint16Array;
 export interface Backend {
   // Numeric precision for activation / weight storage and (on WebGPU) compute.
   readonly dtype: Dtype;
+
+  // The canvas the backend renders to. RenderOp reads its dimensions to size
+  // the display Input op + compositor output. Both backends require a canvas
+  // at create() time per project_backend_canvas_contract.md.
+  readonly canvas: HTMLCanvasElement | OffscreenCanvas;
 
   // Allocate a spatial activation buffer. Pass data to pre-fill (tests / first layer).
   tensor(h: number, w: number, c: number, data?: DataView_): Tensor;
@@ -90,6 +112,9 @@ export interface Backend {
 
     // Effects
     GaussianBlur1D:  (input: Tensor, params: GaussianBlur1DParams) => Op;
+
+    // Image source ingestion. Bilinear-resamples the source down to (h, w, 4).
+    Input:           (h: number, w: number) => InputOp;
   };
 
   // Render-to-display ops. Produce no Tensor — write directly to the canvas.
