@@ -3,11 +3,7 @@ import type { ModelWeights } from '~/model/weights'
 import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { WebGLBackend } from '~/model/backends/webgl/index'
 import { EfficientNetLiteMattingLarge } from '~/model/networks/efficientnetlite_matting_large'
-import { BilinearUpscaler } from '~/model/effects/upscale_bilinear'
-import { BicubicUpscaler  } from '~/model/effects/upscale_bicubic'
-import { CompositorSolid } from '~/model/effects/compositor_solid'
-import { CompositorImage } from '~/model/effects/compositor_image'
-import { CompositorBlur }  from '~/model/effects/compositor_blur'
+import { RenderOp, type BackgroundConfig } from '~/model/render_op'
 import { loadWeightsFromBinary } from '~/utils/loadWeights'
 
 // Network input dimensions for the "large" preset (16:9 landscape).
@@ -136,32 +132,30 @@ async function run() {
   status('building network…')
   const model = new EfficientNetLiteMattingLarge(backend, inputTensor, weights)
 
-  status('running network…')
-  const t0 = performance.now()
-  model.run()
-  const tNet = performance.now() - t0
-
-  status(`upscaling alpha (${upscalerMode})…`)
-  const upscaler = upscalerMode === 'bicubic'
-    ? new BicubicUpscaler(backend,  model.output, dispH, dispW)
-    : new BilinearUpscaler(backend, model.output, dispH, dispW)
-  upscaler.run()
-
-  status(`compositing (${bgMode})…`)
-  const tComp0 = performance.now()
+  // Resolve background config — for image mode, scale demo.jpg to canvas res.
+  let bgConfig: BackgroundConfig
   if (bgMode === 'solid') {
-    new CompositorSolid(backend, dispTensor, upscaler.output, bgColor).run()
+    bgConfig = { mode: 'solid', color: bgColor }
   } else if (bgMode === 'image') {
     if (!bgImg) throw new Error('bg image failed to load')
     const bgBytes  = drawCovered(bgImg, dispW, dispH)
     const bgTensor = backend.tensor(dispH, dispW, 4, bytesToFloat(bgBytes))
-    new CompositorImage(backend, dispTensor, upscaler.output, bgTensor).run()
+    bgConfig = { mode: 'image', image: bgTensor }
   } else {
-    new CompositorBlur(backend, dispTensor, upscaler.output, sigma).run()
+    bgConfig = { mode: 'blur', sigma }
   }
-  const tComp = performance.now() - tComp0
 
-  status(`done. network=${tNet.toFixed(1)}ms · compose=${tComp.toFixed(1)}ms · canvas=${dispW}×${dispH} · upscale=${upscalerMode} · bg=${bgMode}`)
+  const renderOp = new RenderOp(backend, model, dispTensor, {
+    upscaler:   upscalerMode === 'bicubic' ? 'bicubic' : 'bilinear',
+    background: bgConfig,
+  })
+
+  status('rendering…')
+  const t0 = performance.now()
+  renderOp.run()
+  const tTotal = performance.now() - t0
+
+  status(`done. render=${tTotal.toFixed(1)}ms · canvas=${dispW}×${dispH} · upscale=${upscalerMode} · bg=${bgMode}`)
 }
 
 // ── UI wiring ─────────────────────────────────────────────────────────────
