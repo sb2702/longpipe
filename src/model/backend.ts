@@ -131,5 +131,11 @@ export interface Backend {
   // by this backend; conversion from fp16 storage is handled internally.
   readback(tensor: Tensor): Promise<Float32Array>;
 
+  // Wait for all pending GPU work to complete. Cheaper than readback when
+  // you only need a sync barrier (e.g., timing benchmarks). WebGPU uses
+  // queue.onSubmittedWorkDone(); WebGL2 uses fenceSync + clientWaitSync
+  // or gl.finish() as fallback.
+  sync(): Promise<void>;
+
   destroy(): void;
 }

@@ -174,6 +174,34 @@ export class WebGLBackend implements Backend {
     return px
   }
 
+  // Wait for all pending GL work to complete. Uses fenceSync + polling
+  // clientWaitSync (non-blocking, yields to the event loop). Falls back to
+  // gl.finish() if fences aren't available.
+  async sync(): Promise<void> {
+    const gl = this.gl
+    const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0)
+    if (!fence) {
+      gl.finish()
+      return
+    }
+    gl.flush()   // ensure commands are submitted, otherwise the fence may never signal
+    while (true) {
+      const status = gl.clientWaitSync(fence, 0, 0)
+      if (status === gl.ALREADY_SIGNALED || status === gl.CONDITION_SATISFIED) {
+        gl.deleteSync(fence)
+        return
+      }
+      if (status === gl.WAIT_FAILED) {
+        gl.deleteSync(fence)
+        throw new Error('WebGLBackend.sync: clientWaitSync returned WAIT_FAILED')
+      }
+      // Yield ~1ms then poll again. setTimeout granularity caps how tight
+      // this loop is; for most preset benches the actual GPU work
+      // dominates so this overhead is small.
+      await new Promise<void>(r => setTimeout(r, 1))
+    }
+  }
+
   destroy(): void {
     this.gl.deleteFramebuffer(this.fbo)
   }

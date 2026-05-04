@@ -204,6 +204,12 @@ export class WebGPUBackend implements Backend {
     return result;
   }
 
+  // Awaits all in-flight queue work. Used for benchmarking when we want
+  // a sync barrier without paying the readback bandwidth cost.
+  async sync(): Promise<void> {
+    await this.device.queue.onSubmittedWorkDone();
+  }
+
   destroy(): void {
     this.device.destroy();
   }
