@@ -1,4 +1,4 @@
-import type { Tensor, MLBuffer, Op } from '~/model/backend'
+import type { Tensor, MLBuffer, Op, DataView_ } from '~/model/backend'
 import type { WebGLBackend } from '~/model/backends/webgl/index'
 
 export interface WebGLTensor extends Tensor {
@@ -8,8 +8,10 @@ export interface WebGLTensor extends Tensor {
 }
 
 // Stores raw data; ops create textures with backend-specific dimensions.
+// `data` may be Float32 (fp32 source) or Uint16 (raw fp16 bits from a .f16.bin
+// loader) — the backend's textureFormat decides how it's uploaded.
 export interface WebGLMLBuffer extends MLBuffer {
-  readonly data: Float32Array
+  readonly data: DataView_
 }
 
 const QUAD_VERT = `#version 300 es
@@ -33,11 +35,16 @@ export abstract class WebGLOp implements Op {
 
   constructor(protected readonly backend: WebGLBackend) {}
 
-  protected makeTexture(data: Float32Array | null, w: number, h: number): WebGLTexture {
+  // Create a texture in the backend's current format. Source data may be fp32
+  // or fp16-bits or null (allocate-only). Conversion to the backend dtype is
+  // delegated to backend.toTextureView().
+  protected makeTexture(data: DataView_ | null, w: number, h: number): WebGLTexture {
     const gl  = this.backend.gl
+    const fmt = this.backend.textureFormat
+    const view = this.backend.toTextureView(data)
     const tex = gl.createTexture()!
     gl.bindTexture(gl.TEXTURE_2D, tex)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, data)
+    gl.texImage2D(gl.TEXTURE_2D, 0, fmt.internalFormat, w, h, 0, fmt.format, fmt.type, view)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)

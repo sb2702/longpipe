@@ -4,6 +4,7 @@ import type { WebGLBackend } from '~/model/backends/webgl/index'
 import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op'
 import conv2dAddSrc from '~/model/backends/webgl/shaders/conv2d_add.glsl'
 import { convOutSize, resolvePad } from '~/model/backends/webgpu/ops/conv_utils'
+import { toUploadView } from '~/utils/weights'
 
 export class Conv2dAddWebGL extends WebGLOp {
   readonly inputs: Tensor[]
@@ -22,8 +23,8 @@ export class Conv2dAddWebGL extends WebGLOp {
     const padTop    = resolvePad(params.padding, input.h, outH, params.kernel, params.stride)
     const padLeft   = resolvePad(params.padding, input.w, outW, params.kernel, params.stride)
 
-    const weightData = new Float32Array(w.weights)
-    const biasData   = new Float32Array(w.bias)
+    const weightData = toUploadView(w.weights)
+    const biasData   = toUploadView(w.bias)
 
     const weightTex = this.makeTexture(weightData, inGroups * 4, params.kernel * params.kernel * outGroups)
     const biasTex   = this.makeTexture(biasData, outGroups, 1)

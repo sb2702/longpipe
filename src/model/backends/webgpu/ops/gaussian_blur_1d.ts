@@ -2,17 +2,19 @@ import type { Tensor, MLBuffer } from '~/model/backend'
 import type { GaussianBlur1DParams } from '~/model/backend'
 import type { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { WebGPUTensor, WebGPUOp } from '~/model/backends/webgpu/base_webgpu_op'
-import blurSrc from '~/model/backends/webgpu/shaders/gaussian_blur_1d.wgsl'
+import blurF32Src from '~/model/backends/webgpu/shaders/gaussian_blur_1d.wgsl'
+import blurF16Src from '~/model/backends/webgpu/shaders/gaussian_blur_1d_f16.wgsl'
 
 export class GaussianBlur1DWebGPU extends WebGPUOp {
   readonly inputs: Tensor[]
   readonly weights: MLBuffer[] = []
   readonly output: WebGPUTensor
   protected dispatch: [number, number, number]
-  shader = blurSrc
+  shader: string
 
   constructor(backend: WebGPUBackend, input: Tensor, params: GaussianBlur1DParams) {
     super(backend)
+    this.shader = backend.dtype === 'f16' ? blurF16Src : blurF32Src
 
     const cGroups = input.c / 4
     this.output = backend.tensor(input.h, input.w, input.c)

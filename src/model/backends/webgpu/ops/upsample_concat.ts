@@ -1,17 +1,19 @@
 import type { Tensor, MLBuffer, UpsampleParams } from "~/model/backend";
 import type { WebGPUBackend } from "~/model/backends/webgpu/index";
 import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op";
-import upsampleConcatSrc from "~/model/backends/webgpu/shaders/upsample_concat.wgsl";
+import upsampleConcatF32Src from "~/model/backends/webgpu/shaders/upsample_concat.wgsl";
+import upsampleConcatF16Src from "~/model/backends/webgpu/shaders/upsample_concat_f16.wgsl";
 
 export class UpsampleConcatWebGPU extends WebGPUOp {
   readonly inputs: Tensor[];
   readonly weights: MLBuffer[] = [];
   readonly output: WebGPUTensor;
   protected dispatch: [number, number, number];
-  shader = upsampleConcatSrc;
+  shader: string;
 
   constructor(backend: WebGPUBackend, a: Tensor, b: Tensor, params: UpsampleParams) {
     super(backend);
+    this.shader = backend.dtype === "f16" ? upsampleConcatF16Src : upsampleConcatF32Src;
 
     const aGroups   = a.c / 4;
     const bGroups   = b.c / 4;

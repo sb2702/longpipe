@@ -1,7 +1,8 @@
 import type { Tensor } from '~/model/backend'
 import type { WebGPUBackend } from '~/model/backends/webgpu/index'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
-import compositeImageSrc from '~/model/backends/webgpu/shaders/composite_image.wgsl'
+import compositeImageF32Src from '~/model/backends/webgpu/shaders/composite_image.wgsl'
+import compositeImageF16Src from '~/model/backends/webgpu/shaders/composite_image_f16.wgsl'
 
 // Like CompositeSolidWebGPU but bg is a Tensor (e.g. a virtual background or
 // a blurred copy of the input). Standalone — produces no Tensor output.
@@ -35,6 +36,7 @@ export class CompositeImageWebGPU {
     new Uint32Array(ab, 0, 1)[0] = image.w
     device.queue.writeBuffer(this.uniformBuffer, 0, ab)
 
+    const compositeImageSrc = backend.dtype === 'f16' ? compositeImageF16Src : compositeImageF32Src
     const module = device.createShaderModule({ code: compositeImageSrc })
 
     this.pipeline = device.createRenderPipeline({

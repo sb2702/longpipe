@@ -3,6 +3,7 @@ import type { Conv2DWeights } from '~/model/weights'
 import type { WebGLBackend } from '~/model/backends/webgl/index'
 import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op'
 import upsampleConv1x1Src from '~/model/backends/webgl/shaders/upsample_conv1x1.glsl'
+import { toUploadView } from '~/utils/weights'
 
 export class UpsampleConv1x1WebGL extends WebGLOp {
   readonly inputs: Tensor[]
@@ -17,8 +18,8 @@ export class UpsampleConv1x1WebGL extends WebGLOp {
     const inGroups  = input.c / 4
     const outGroups = params.outChannels / 4
 
-    const weightData = new Float32Array(w.weights)
-    const biasData   = new Float32Array(w.bias)
+    const weightData = toUploadView(w.weights)
+    const biasData   = toUploadView(w.bias)
 
     // Weight texture: (inGroups * 4, outGroups) — K=1, so kernel-row dim collapses.
     const weightTex = this.makeTexture(weightData, inGroups * 4, outGroups)

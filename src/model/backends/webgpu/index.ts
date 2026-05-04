@@ -1,5 +1,6 @@
-import type { Backend } from "~/model/backend";
+import type { Backend, Dtype, DataView_ } from "~/model/backend";
 import type { WebGPUTensor, WebGPUMLBuffer } from "~/model/backends/webgpu/base_webgpu_op";
+import { float32ArrayToHalf, halfArrayToFloat32 } from "~/utils/fp16";
 import { Conv2DWebGPU } from "~/model/backends/webgpu/ops/conv2d";
 import { DepthwiseConv2DWebGPU } from "~/model/backends/webgpu/ops/depthwise_conv2d";
 import { AddWebGPU } from "~/model/backends/webgpu/ops/add";
@@ -20,6 +21,9 @@ const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsag
 export interface WebGPUBackendOptions {
   canvas: HTMLCanvasElement | OffscreenCanvas;
   device?: GPUDevice;
+  // Defaults to 'f32'. 'f16' requires the device to expose the `shader-f16`
+  // feature; create() throws otherwise.
+  dtype?: Dtype;
 }
 
 export class WebGPUBackend implements Backend {
@@ -27,11 +31,15 @@ export class WebGPUBackend implements Backend {
   readonly presenters: Backend["presenters"];
   readonly canvasContext: GPUCanvasContext;
   readonly canvasFormat: GPUTextureFormat;
+  readonly bytesPerElement: 2 | 4;
 
   private constructor(
     readonly device: GPUDevice,
     readonly canvas: HTMLCanvasElement | OffscreenCanvas,
+    readonly dtype: Dtype,
   ) {
+    this.bytesPerElement = dtype === "f16" ? 2 : 4;
+
     const ctx = canvas.getContext("webgpu");
     if (!ctx) throw new Error("Failed to get WebGPU context from canvas");
     this.canvasContext = ctx;
@@ -86,14 +94,27 @@ export class WebGPUBackend implements Backend {
     return (await navigator.gpu.requestAdapter()) !== null;
   }
 
+  static async hasF16Support(): Promise<boolean> {
+    if (!navigator.gpu) return false;
+    const adapter = await navigator.gpu.requestAdapter();
+    return adapter ? adapter.features.has("shader-f16") : false;
+  }
+
   static async create(opts: WebGPUBackendOptions): Promise<WebGPUBackend> {
+    const dtype: Dtype = opts.dtype ?? "f32";
     let device = opts.device;
     if (!device) {
       const adapter = await navigator.gpu.requestAdapter();
       if (!adapter) throw new Error("WebGPU adapter not available");
-      device = await adapter.requestDevice();
+      if (dtype === "f16" && !adapter.features.has("shader-f16"))
+        throw new Error("WebGPU dtype='f16' requested but adapter lacks `shader-f16` feature");
+      device = await adapter.requestDevice({
+        requiredFeatures: dtype === "f16" ? (["shader-f16"] as GPUFeatureName[]) : [],
+      });
+    } else if (dtype === "f16" && !device.features.has("shader-f16")) {
+      throw new Error("WebGPU dtype='f16' requested but supplied device lacks `shader-f16`");
     }
-    return new WebGPUBackend(device, opts.canvas);
+    return new WebGPUBackend(device, opts.canvas, dtype);
   }
 
   // The swapchain texture for the current frame. Must be called inside the
@@ -103,29 +124,53 @@ export class WebGPUBackend implements Backend {
     return this.canvasContext.getCurrentTexture();
   }
 
-  tensor(h: number, w: number, c: number, data?: Float32Array): WebGPUTensor {
-    const size = h * w * c * 4;
+  tensor(h: number, w: number, c: number, data?: DataView_): WebGPUTensor {
+    const elements = h * w * c;
+    const bytes = elements * this.bytesPerElement;
     const buf = this.device.createBuffer({
-      size,
+      size: bytes,
       usage: STORAGE,
       mappedAtCreation: data !== undefined,
     });
-    if (data) {
-      new Float32Array(buf.getMappedRange()).set(data);
+    if (data !== undefined) {
+      const range = buf.getMappedRange();
+      this.writeView(range, data);
       buf.unmap();
     }
     return { h, w, c, buffer: buf };
   }
 
-  upload(data: Float32Array): WebGPUMLBuffer {
+  upload(data: DataView_): WebGPUMLBuffer {
+    const elements = data.length;
+    const bytes = elements * this.bytesPerElement;
     const buf = this.device.createBuffer({
-      size: data.byteLength,
+      size: bytes,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
     });
-    new Float32Array(buf.getMappedRange()).set(data);
+    this.writeView(buf.getMappedRange(), data);
     buf.unmap();
     return { buffer: buf };
+  }
+
+  // Write `data` (Float32 or Uint16-fp16-bits) into the mapped buffer range,
+  // converting to match the backend's dtype if necessary.
+  private writeView(range: ArrayBuffer, data: DataView_): void {
+    const wantHalf = this.dtype === "f16";
+    const isHalf = data instanceof Uint16Array;
+    if (wantHalf === isHalf) {
+      // Storage matches source — copy bytes directly.
+      if (wantHalf) new Uint16Array(range).set(data as Uint16Array);
+      else          new Float32Array(range).set(data as Float32Array);
+      return;
+    }
+    if (wantHalf) {
+      // f32 input → f16 storage
+      new Uint16Array(range).set(float32ArrayToHalf(data as Float32Array));
+    } else {
+      // f16 input → f32 storage
+      new Float32Array(range).set(halfArrayToFloat32(data as Uint16Array));
+    }
   }
 
 
@@ -138,7 +183,10 @@ export class WebGPUBackend implements Backend {
     enc.copyBufferToBuffer(tensor.buffer, 0, staging, 0, tensor.buffer.size);
     this.device.queue.submit([enc.finish()]);
     await staging.mapAsync(GPUMapMode.READ);
-    const result = new Float32Array(staging.getMappedRange().slice(0));
+    const mapped = staging.getMappedRange();
+    const result = this.dtype === "f16"
+      ? halfArrayToFloat32(new Uint16Array(mapped.slice(0)))
+      : new Float32Array(mapped.slice(0));
     staging.unmap();
     staging.destroy();
     return result;

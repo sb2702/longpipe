@@ -1,17 +1,19 @@
 import type { Tensor, MLBuffer, UpsampleParams } from "~/model/backend";
 import type { WebGPUBackend } from "~/model/backends/webgpu/index";
 import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op";
-import upsampleSigmoidSrc from "~/model/backends/webgpu/shaders/upsample_sigmoid.wgsl";
+import upsampleSigmoidF32Src from "~/model/backends/webgpu/shaders/upsample_sigmoid.wgsl";
+import upsampleSigmoidF16Src from "~/model/backends/webgpu/shaders/upsample_sigmoid_f16.wgsl";
 
 export class UpsampleSigmoidWebGPU extends WebGPUOp {
   readonly inputs: Tensor[];
   readonly weights: MLBuffer[] = [];
   readonly output: WebGPUTensor;
   protected dispatch: [number, number, number];
-  shader = upsampleSigmoidSrc;
+  shader: string;
 
   constructor(backend: WebGPUBackend, input: Tensor, params: UpsampleParams) {
     super(backend);
+    this.shader = backend.dtype === "f16" ? upsampleSigmoidF16Src : upsampleSigmoidF32Src;
 
     const channelGroups = input.c / 4;
 

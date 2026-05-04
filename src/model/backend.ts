@@ -1,5 +1,7 @@
 import type { Conv2DWeights, DepthwiseWeights } from '~/model/weights'
 
+export type Dtype = 'f32' | 'f16'
+
 export interface Tensor {
   readonly h: number;
   readonly w: number;
@@ -55,12 +57,20 @@ export interface GaussianBlur1DParams {
   sigma:     number;
 }
 
+// Initial data for tensor() and parameters for upload() may arrive as Float32
+// (fp32 source) or Uint16 (raw fp16 bits, from a loaded .f16.bin). Backends
+// convert as needed to match their own dtype.
+export type DataView_ = Float32Array | Uint16Array;
+
 export interface Backend {
+  // Numeric precision for activation / weight storage and (on WebGPU) compute.
+  readonly dtype: Dtype;
+
   // Allocate a spatial activation buffer. Pass data to pre-fill (tests / first layer).
-  tensor(h: number, w: number, c: number, data?: Float32Array): Tensor;
+  tensor(h: number, w: number, c: number, data?: DataView_): Tensor;
 
   // Upload a flat parameter buffer — used internally by ops.
-  upload(data: Float32Array): MLBuffer;
+  upload(data: DataView_): MLBuffer;
 
   ops: {
     // Core
@@ -88,7 +98,8 @@ export interface Backend {
     CompositeImage: (image: Tensor, alpha: Tensor, bg: Tensor) => Presenter;
   };
 
-  // Read tensor data back to host. The tensor must have been allocated by this backend.
+  // Read tensor data back to host as fp32. The tensor must have been allocated
+  // by this backend; conversion from fp16 storage is handled internally.
   readback(tensor: Tensor): Promise<Float32Array>;
 
   destroy(): void;

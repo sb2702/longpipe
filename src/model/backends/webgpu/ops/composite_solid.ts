@@ -1,7 +1,8 @@
 import type { Tensor } from '~/model/backend'
 import type { WebGPUBackend } from '~/model/backends/webgpu/index'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
-import compositeSolidSrc from '~/model/backends/webgpu/shaders/composite_solid.wgsl'
+import compositeSolidF32Src from '~/model/backends/webgpu/shaders/composite_solid.wgsl'
+import compositeSolidF16Src from '~/model/backends/webgpu/shaders/composite_solid_f16.wgsl'
 
 // Composites image + alpha over a solid background and writes the result to a
 // canvas swapchain texture. Standalone — not a WebGPUOp (those are compute-
@@ -47,6 +48,7 @@ export class CompositeSolidWebGPU {
     new Float32Array(ab, 16, 4).set([bgColor[0], bgColor[1], bgColor[2], 0])
     device.queue.writeBuffer(this.uniformBuffer, 0, ab)
 
+    const compositeSolidSrc = backend.dtype === 'f16' ? compositeSolidF16Src : compositeSolidF32Src
     const module = device.createShaderModule({ code: compositeSolidSrc })
 
     this.pipeline = device.createRenderPipeline({
