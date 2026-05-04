@@ -13,10 +13,30 @@ import { UpsampleSigmoidWebGPU } from "~/model/backends/webgpu/ops/upsample_sigm
 
 const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
 
+export interface WebGPUBackendOptions {
+  canvas: HTMLCanvasElement | OffscreenCanvas;
+  device?: GPUDevice;
+}
+
 export class WebGPUBackend implements Backend {
   readonly ops: Backend["ops"];
+  readonly canvasContext: GPUCanvasContext;
+  readonly canvasFormat: GPUTextureFormat;
 
-  private constructor(readonly device: GPUDevice) {
+  private constructor(
+    readonly device: GPUDevice,
+    readonly canvas: HTMLCanvasElement | OffscreenCanvas,
+  ) {
+    const ctx = canvas.getContext("webgpu");
+    if (!ctx) throw new Error("Failed to get WebGPU context from canvas");
+    this.canvasContext = ctx;
+    this.canvasFormat  = navigator.gpu.getPreferredCanvasFormat();
+    this.canvasContext.configure({
+      device,
+      format: this.canvasFormat,
+      alphaMode: "premultiplied",
+    });
+
     this.ops = {
       Conv2d:           (input, weights, params)        => new Conv2DWebGPU(this, input, weights, params),
       DepthwiseConv2d:  (input, weights, params)        => new DepthwiseConv2DWebGPU(this, input, weights, params),
@@ -36,11 +56,21 @@ export class WebGPUBackend implements Backend {
     return (await navigator.gpu.requestAdapter()) !== null;
   }
 
-  static async create(): Promise<WebGPUBackend> {
-    const adapter = await navigator.gpu.requestAdapter();
-    if (!adapter) throw new Error("WebGPU adapter not available");
-    const device = await adapter.requestDevice();
-    return new WebGPUBackend(device);
+  static async create(opts: WebGPUBackendOptions): Promise<WebGPUBackend> {
+    let device = opts.device;
+    if (!device) {
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) throw new Error("WebGPU adapter not available");
+      device = await adapter.requestDevice();
+    }
+    return new WebGPUBackend(device, opts.canvas);
+  }
+
+  // The swapchain texture for the current frame. Must be called inside the
+  // same task that submits the render commands — texture is invalidated after
+  // the next browser paint.
+  getCurrentDisplayTexture(): GPUTexture {
+    return this.canvasContext.getCurrentTexture();
   }
 
   tensor(h: number, w: number, c: number, data?: Float32Array): WebGPUTensor {

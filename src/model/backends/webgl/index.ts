@@ -11,11 +11,18 @@ import { UpsampleConcatWebGL } from '~/model/backends/webgl/ops/upsample_concat'
 import { UpsampleConv1x1WebGL } from '~/model/backends/webgl/ops/upsample_conv1x1'
 import { Conv2dAddWebGL } from '~/model/backends/webgl/ops/conv2d_add'
 
+export interface WebGLBackendOptions {
+  canvas: HTMLCanvasElement | OffscreenCanvas;
+}
+
 export class WebGLBackend implements Backend {
   readonly ops: Backend['ops']
   readonly fbo: WebGLFramebuffer
 
-  private constructor(readonly gl: WebGL2RenderingContext) {
+  private constructor(
+    readonly gl: WebGL2RenderingContext,
+    readonly canvas: HTMLCanvasElement | OffscreenCanvas,
+  ) {
     this.fbo = gl.createFramebuffer()!
     const notImpl = (): never => { throw new Error('not implemented in WebGL backend') }
     this.ops = {
@@ -32,12 +39,18 @@ export class WebGLBackend implements Backend {
     }
   }
 
-  static create(): WebGLBackend {
-    const canvas = document.createElement('canvas')
-    const gl = canvas.getContext('webgl2')
+  static create(opts: WebGLBackendOptions): WebGLBackend {
+    const gl = opts.canvas.getContext('webgl2') as WebGL2RenderingContext | null
     if (!gl) throw new Error('WebGL2 not available')
     if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('EXT_color_buffer_float not available')
-    return new WebGLBackend(gl)
+    return new WebGLBackend(gl, opts.canvas)
+  }
+
+  // Bind the canvas (default framebuffer) as the render target. Compositor
+  // calls this before its draw to render directly to the display.
+  bindDisplayFramebuffer(): void {
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null)
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height)
   }
 
   tensor(h: number, w: number, c: number, data?: Float32Array): WebGLTensor {
