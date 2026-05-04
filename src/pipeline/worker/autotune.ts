@@ -26,7 +26,7 @@ import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlit
 // compositor + transport + main-thread headroom. 0.5 = "model takes at
 // most half the frame", which keeps xl/large from being picked just
 // because they squeak under the 33ms wall.
-const SAFETY_MARGIN = 0.3
+const SAFETY_MARGIN = 0.5
 const WARMUP_ITERS  = 3
 const TIMED_ITERS   = 10
 const DEFAULT_SOURCE_FPS = 30
@@ -40,6 +40,7 @@ type NetworkCtor = new (b: Backend, i: Tensor, w: ModelWeights) => NetworkLike
 // docs/MODEL_PLAN.md) — only the input resolution and dtype differ, which
 // flow in via the input Tensor and backend respectively, not the class.
 const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
+  xxs:     EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   xs:      EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   small2:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   small:   EfficientNetLiteMattingSmall   as unknown as NetworkCtor,

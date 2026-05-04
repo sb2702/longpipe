@@ -34,6 +34,7 @@ type NetworkCtor = new (backend: Backend, input: Tensor, w: ModelWeights) => Net
 // docs/MODEL_PLAN.md) — only the input resolution and dtype differ, which
 // flow in via the input Tensor and backend respectively, not the class.
 const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
+  xxs:     EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   xs:      EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   small2:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   small:   EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
