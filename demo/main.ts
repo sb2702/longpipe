@@ -1,4 +1,4 @@
-import type { Backend } from '~/model/backend'
+import type { Backend, Dtype } from '~/model/backend'
 import type { ModelWeights } from '~/model/weights'
 import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { WebGLBackend } from '~/model/backends/webgl/index'
@@ -53,12 +53,41 @@ function drawBytesToCanvas(rgba: Uint8ClampedArray, canvas: HTMLCanvasElement, w
 
 // ── Backend creation ──────────────────────────────────────────────────────
 
-async function createBackend(name: string, canvas: HTMLCanvasElement): Promise<Backend> {
+async function createBackend(name: string, dtype: Dtype, canvas: HTMLCanvasElement): Promise<Backend> {
   if (name === 'webgpu') {
     if (!('gpu' in navigator)) throw new Error('WebGPU not available')
-    return WebGPUBackend.create({ canvas })
+    if (dtype === 'f16' && !(await WebGPUBackend.hasF16Support())) {
+      throw new Error("WebGPU adapter lacks `shader-f16` feature — try Chrome with --enable-unsafe-webgpu, or pick a different precision/backend")
+    }
+    return WebGPUBackend.create({ canvas, dtype })
   }
-  return WebGLBackend.create({ canvas })
+  return WebGLBackend.create({ canvas, dtype })
+}
+
+// Try the dtype-matched .f16.bin first; fall back to the fp32 .bin (backend
+// converts at upload-time). Lets the demo work whether or not the user has
+// regenerated weights with the latest Python serializer.
+//
+// Vite's dev server returns index.html for missing files (SPA fallback), so
+// `r.ok` alone isn't enough — also check the content-type to detect the HTML
+// fallback before treating the response as a binary blob.
+async function fetchBin(url: string): Promise<ArrayBuffer | null> {
+  const r = await fetch(url)
+  if (!r.ok) return null
+  const ct = r.headers.get('content-type') ?? ''
+  if (ct.startsWith('text/html')) return null
+  return r.arrayBuffer()
+}
+
+async function fetchWeights(dtype: Dtype): Promise<ArrayBuffer> {
+  if (dtype === 'f16') {
+    const f16 = await fetchBin('/model_large.f16.bin')
+    if (f16) return f16
+    console.warn('[demo] no model_large.f16.bin — falling back to fp32 .bin (backend will convert)')
+  }
+  const f32 = await fetchBin('/model_large.bin')
+  if (!f32) throw new Error('failed to fetch /model_large.bin')
+  return f32
 }
 
 function parseHexColor(hex: string): [number, number, number] {
@@ -72,6 +101,7 @@ function parseHexColor(hex: string): [number, number, number] {
 
 async function run() {
   const backendName  = (document.getElementById('backend')  as HTMLSelectElement).value
+  const dtype        = (document.getElementById('dtype')    as HTMLSelectElement).value as Dtype
   const upscalerMode = (document.getElementById('upscaler') as HTMLSelectElement).value
   const bgMode       = (document.getElementById('bgMode')   as HTMLSelectElement).value
   const bgHex       = (document.getElementById('bgColor') as HTMLInputElement).value
@@ -85,13 +115,10 @@ async function run() {
   outputCanvas.id = 'outputCanvas'
   oldOutput.replaceWith(outputCanvas)
 
-  status(`loading test image and weights (${backendName}, bg=${bgMode})…`)
+  status(`loading test image and weights (${backendName}/${dtype}, bg=${bgMode})…`)
   const fetches: Array<Promise<unknown>> = [
     loadImage('/test_img.jpg'),
-    fetch('/model_large.bin').then(r => {
-      if (!r.ok) throw new Error(`failed to fetch /model_large.bin: ${r.status}`)
-      return r.arrayBuffer()
-    }),
+    fetchWeights(dtype),
   ]
   if (bgMode === 'image') fetches.push(loadImage('/demo.jpg'))
   const [img, weightsBuf, bgImg] = await Promise.all(fetches) as [ImageBitmap, ArrayBuffer, ImageBitmap?]
@@ -115,8 +142,8 @@ async function run() {
   outputCanvas.width  = dispW
   outputCanvas.height = dispH
 
-  status(`creating ${backendName} backend (${dispW}×${dispH} canvas)…`)
-  const backend = await createBackend(backendName, outputCanvas)
+  status(`creating ${backendName}/${dtype} backend (${dispW}×${dispH} canvas)…`)
+  const backend = await createBackend(backendName, dtype, outputCanvas)
 
   status('preparing tensors…')
   const dispBytes = drawCovered(img, dispW, dispH)
@@ -155,7 +182,7 @@ async function run() {
   renderOp.run()
   const tTotal = performance.now() - t0
 
-  status(`done. render=${tTotal.toFixed(1)}ms · canvas=${dispW}×${dispH} · upscale=${upscalerMode} · bg=${bgMode}`)
+  status(`done. render=${tTotal.toFixed(1)}ms · ${backendName}/${dtype} · canvas=${dispW}×${dispH} · upscale=${upscalerMode} · bg=${bgMode}`)
 }
 
 // ── UI wiring ─────────────────────────────────────────────────────────────

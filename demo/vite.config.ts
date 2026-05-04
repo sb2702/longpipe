@@ -21,6 +21,8 @@ export default defineConfig({
     },
   },
   server: {
+    host: true,           // bind 0.0.0.0 — reachable from LAN / containers
+    allowedHosts: true,   // accept any Host header (vite 5+ strict-checks otherwise)
     fs: { allow: [resolve(__dirname, '..')] },
   },
 })

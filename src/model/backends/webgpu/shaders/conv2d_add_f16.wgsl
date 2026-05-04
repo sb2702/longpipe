@@ -17,12 +17,14 @@ struct Params {
     activation  : u32,
 }
 
+// Binding order matches conv2d_add.wgsl: input(0), skip(1), weight(2), bias(3),
+// params(4), output(5).
 @group(0) @binding(0) var<storage, read>       input_buf  : array<vec4<f16>>;
-@group(0) @binding(1) var<storage, read>       weight_buf : array<mat4x4<f16>>;
-@group(0) @binding(2) var<storage, read>       bias_buf   : array<vec4<f16>>;
-@group(0) @binding(3) var<storage, read_write> output_buf : array<vec4<f16>>;
+@group(0) @binding(1) var<storage, read>       skip_buf   : array<vec4<f16>>;
+@group(0) @binding(2) var<storage, read>       weight_buf : array<mat4x4<f16>>;
+@group(0) @binding(3) var<storage, read>       bias_buf   : array<vec4<f16>>;
 @group(0) @binding(4) var<uniform>             params     : Params;
-@group(0) @binding(5) var<storage, read>       skip_buf   : array<vec4<f16>>;
+@group(0) @binding(5) var<storage, read_write> output_buf : array<vec4<f16>>;
 
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
