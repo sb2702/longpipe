@@ -2,66 +2,38 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Longpipe demo — matting</title>
+    <title>Longpipe demos</title>
     <style>
-      body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
-      .row { display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
-      .panel { display: flex; flex-direction: column; gap: 8px; }
-      canvas, img { display: block; border: 1px solid #333; background: #222; }
-      .label { font-size: 12px; color: #888; }
-      #status { padding: 8px 16px; font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; }
-      .controls { padding: 0 16px 16px; }
-      button { background: #333; color: #ddd; border: 1px solid #555; padding: 6px 12px; cursor: pointer; }
-      button:hover { background: #444; }
+      body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; padding: 32px; max-width: 720px; }
+      h1 { margin: 0 0 8px; }
+      .sub { color: #888; margin: 0 0 24px; font-size: 14px; }
+      ul { list-style: none; padding: 0; margin: 0; }
+      li { margin: 16px 0; padding: 16px; border: 1px solid #333; border-radius: 6px; }
+      a { color: #6cf; text-decoration: none; font-size: 18px; font-weight: 600; }
+      a:hover { text-decoration: underline; }
+      .desc { display: block; color: #aaa; font-size: 14px; margin-top: 6px; line-height: 1.5; }
     </style>
   </head>
   <body>
-    <div id="status">loading…</div>
-    <div class="controls">
-      <label>backend:
-        <select id="backend">
-          <option value="webgpu">WebGPU</option>
-          <option value="webgl">WebGL</option>
-        </select>
-      </label>
-      <label style="margin-left:16px">precision:
-        <select id="dtype">
-          <option value="f32">fp32</option>
-          <option value="f16">fp16</option>
-        </select>
-      </label>
-      <label style="margin-left:16px">upscaler:
-        <select id="upscaler">
-          <option value="bilinear">bilinear</option>
-          <option value="bicubic">bicubic</option>
-        </select>
-      </label>
-      <label style="margin-left:16px">background:
-        <select id="bgMode">
-          <option value="solid">solid color</option>
-          <option value="image">image (demo.jpg)</option>
-          <option value="blur">blur of input</option>
-        </select>
-      </label>
-      <label style="margin-left:16px" id="bgColorLabel">color:
-        <input type="color" id="bgColor" value="#00b050" />
-      </label>
-      <label style="margin-left:16px; display:none" id="bgSigmaLabel">sigma:
-        <input type="range" id="bgSigma" min="1" max="20" step="0.5" value="8" />
-        <span id="bgSigmaVal">8</span>
-      </label>
-      <button id="run" style="margin-left:16px">run</button>
-    </div>
-    <div class="row">
-      <div class="panel">
-        <span class="label">input image (network resolution)</span>
-        <canvas id="inputCanvas"></canvas>
-      </div>
-      <div class="panel">
-        <span class="label">composited output (canvas, full resolution)</span>
-        <canvas id="outputCanvas"></canvas>
-      </div>
-    </div>
-    <script type="module" src="./main.ts"></script>
+    <h1>Longpipe demos</h1>
+    <p class="sub">Pick one. Each is an isolated page so you can link/share/test individually.</p>
+    <ul>
+      <li>
+        <a href="/matting.html">Matting (static image)</a>
+        <span class="desc">End-to-end matting on a still image. Pick backend (WebGPU/WebGL), precision (fp32/fp16), upscaler, and background mode.</span>
+      </li>
+      <li>
+        <a href="/transfer-capture.html">transferControlToOffscreen + captureStream</a>
+        <span class="desc">Pipeline plumbing test. Does a canvas's <code>captureStream()</code> keep emitting frames after its drawing control is transferred to a worker? Chromium yes, Firefox no.</span>
+      </li>
+      <li>
+        <a href="/bitmap-shuttle.html">Bitmap shuttle (worker → ImageBitmap → main canvas → captureStream)</a>
+        <span class="desc">Universal-fallback path test. Worker renders to its own OffscreenCanvas, ships an ImageBitmap to main per frame, main draws it into a bitmaprenderer canvas that's captured.</span>
+      </li>
+      <li>
+        <a href="/mstg.html">MediaStreamTrackGenerator (worker writes VideoFrames)</a>
+        <span class="desc">Best-path test for the output side. Main creates a generator and transfers its writable to the worker; worker writes <code>VideoFrame</code>s; main wraps the generator in a <code>MediaStream</code>.</span>
+      </li>
+    </ul>
   </body>
 </html>

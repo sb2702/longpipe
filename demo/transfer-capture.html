@@ -1,0 +1,208 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Longpipe — transferControlToOffscreen + captureStream test</title>
+    <style>
+      body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+      a { color: #6cf; }
+      .topbar { padding: 8px 16px; }
+      h2 { padding: 0 16px; margin: 0 0 8px; }
+      #status { padding: 8px 16px; font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; }
+      .info { padding: 4px 16px; font-family: ui-monospace, monospace; font-size: 12px; color: #aaa; word-break: break-all; }
+      .info span { color: #fff; }
+      .row { display: flex; gap: 16px; padding: 16px; align-items: flex-start; flex-wrap: wrap; }
+      .panel { display: flex; flex-direction: column; gap: 8px; }
+      canvas, video { display: block; border: 1px solid #333; background: #222; width: 480px; height: 270px; }
+      .label { font-size: 12px; color: #888; }
+      .legend { padding: 16px; font-size: 13px; color: #aaa; line-height: 1.5; }
+      .legend strong { color: #ddd; }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><a href="/">← demos</a></div>
+    <h2>transferControlToOffscreen + captureStream</h2>
+    <div id="status">loading…</div>
+    <div class="info">
+      worker alive: <span id="alive">no</span>
+      &nbsp;·&nbsp;
+      worker init-received: <span id="init">no</span>
+    </div>
+    <div class="info">
+      worker frame: <span id="workerFrame">–</span>
+      &nbsp;·&nbsp;
+      video frame (rVFC): <span id="videoFrame">–</span>
+    </div>
+    <div class="info">UA: <span id="ua">–</span></div>
+    <div class="row">
+      <div class="panel">
+        <span class="label">&lt;canvas&gt; — drawn by worker via OffscreenCanvas</span>
+        <canvas id="canvas"></canvas>
+      </div>
+      <div class="panel">
+        <span class="label">&lt;video&gt; — fed by canvas.captureStream()</span>
+        <video id="video" autoplay muted playsinline></video>
+      </div>
+    </div>
+    <div class="legend">
+      <strong>Pass:</strong> both panels show the same animation; the rVFC counter on the video climbs steadily.<br>
+      <strong>Fail (captureStream broken after transfer):</strong> canvas animates, video stays blank/frozen, rVFC counter stalls.<br>
+      <strong>Fail (transfer broken):</strong> canvas stays blank.
+    </div>
+
+    <!-- Worker source. Marked type="javascript/worker" so the browser
+         doesn't execute it on page load — we read the textContent and turn
+         it into a Blob URL. Keeps everything in one file. -->
+    <script id="worker-src" type="javascript/worker">
+      let canvas = null
+      let ctx = null
+      let frame = 0
+
+      const post = (msg) => self.postMessage(msg)
+      post({ type: 'alive' })
+
+      self.addEventListener('message', (e) => {
+        const d = e.data
+        if (d && d.type === 'init') {
+          post({ type: 'init-received' })
+          canvas = d.canvas
+          try {
+            ctx = canvas.getContext('2d')
+            if (!ctx) {
+              post({ type: 'error', error: '2d context unavailable in worker' })
+              return
+            }
+            loop()
+          } catch (err) {
+            post({ type: 'error', error: 'getContext threw: ' + (err && err.message ? err.message : err) })
+          }
+        }
+      })
+
+      self.addEventListener('error', (e) => {
+        post({ type: 'error', error: 'worker uncaught: ' + e.message })
+      })
+
+      function loop() {
+        render()
+        frame++
+        if (frame % 30 === 0) post({ type: 'frame', frame })
+        setTimeout(loop, 16)
+      }
+
+      function render() {
+        if (!canvas || !ctx) return
+        const w = canvas.width
+        const h = canvas.height
+
+        const hue = (frame * 0.5) % 360
+        ctx.fillStyle = 'hsl(' + hue + ', 30%, 18%)'
+        ctx.fillRect(0, 0, w, h)
+
+        const t = frame / 60
+        const cx = w / 2 + Math.cos(t) * (w * 0.35)
+        const cy = h / 2 + Math.sin(t * 1.3) * (h * 0.35)
+        ctx.fillStyle = 'hsl(' + ((hue + 180) % 360) + ', 80%, 60%)'
+        ctx.beginPath()
+        ctx.arc(cx, cy, Math.min(w, h) * 0.08, 0, Math.PI * 2)
+        ctx.fill()
+
+        ctx.fillStyle = 'white'
+        ctx.font = 'bold 32px ui-monospace, monospace'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('frame ' + frame, w / 2, 40)
+      }
+    </script>
+
+    <script>
+      const status     = document.getElementById('status')
+      const canvas     = document.getElementById('canvas')
+      const video      = document.getElementById('video')
+      const workerInfo = document.getElementById('workerFrame')
+      const videoInfo  = document.getElementById('videoFrame')
+      const aliveInfo  = document.getElementById('alive')
+      const initInfo   = document.getElementById('init')
+      const uaInfo     = document.getElementById('ua')
+
+      uaInfo.textContent = navigator.userAgent
+
+      canvas.width  = 480
+      canvas.height = 270
+
+      function setStatus(s, ok) {
+        status.textContent = s
+        status.style.color = ok === false ? '#f66' : '#6cf'
+        console.log('[transfer-capture]', s)
+      }
+
+      function run() {
+        setStatus('transferControlToOffscreen…')
+        let offscreen
+        try {
+          offscreen = canvas.transferControlToOffscreen()
+        } catch (e) {
+          setStatus('transferControlToOffscreen() threw: ' + (e.message || e), false)
+          return
+        }
+
+        setStatus('spawning worker (inline blob)…')
+        const src = document.getElementById('worker-src').textContent
+        const blob = new Blob([src], { type: 'application/javascript' })
+        const url = URL.createObjectURL(blob)
+        const worker = new Worker(url)
+        worker.addEventListener('message', (e) => {
+          const d = e.data
+          if (!d) return
+          if (d.type === 'alive')         aliveInfo.textContent = 'yes'
+          if (d.type === 'init-received') initInfo.textContent  = 'yes'
+          if (d.type === 'frame')         workerInfo.textContent = String(d.frame)
+          if (d.type === 'error')         setStatus('worker error: ' + d.error, false)
+        })
+        worker.addEventListener('error', (e) => {
+          setStatus('worker load/runtime error: ' + (e.message || '(no message)') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || '?'), false)
+        })
+        worker.addEventListener('messageerror', () => {
+          setStatus('worker messageerror', false)
+        })
+
+        worker.postMessage({ type: 'init', canvas: offscreen }, [offscreen])
+
+        // captureStream AFTER the worker is rendering so the stream's track
+        // is producing frames by the time the video element attaches.
+        setStatus('captureStream(30) + attaching to video…')
+        let stream
+        try {
+          stream = canvas.captureStream(30)
+        } catch (e) {
+          setStatus('captureStream() threw: ' + (e.message || e), false)
+          return
+        }
+
+        video.srcObject = stream
+        // Don't await — play() can hang until the first frame arrives, and
+        // some browsers reject for autoplay reasons we can't repair from JS.
+        // Failure here is recoverable; the video element will still update
+        // when frames arrive.
+        video.play().catch(e => console.warn('[transfer-capture] play rejected:', e))
+
+        setStatus('running. canvas + video should both animate; counters below show liveness.')
+
+        let videoFrames = 0
+        const rvfc = video.requestVideoFrameCallback
+        if (rvfc) {
+          const tick = () => {
+            videoFrames++
+            videoInfo.textContent = String(videoFrames)
+            rvfc.call(video, tick)
+          }
+          rvfc.call(video, tick)
+        } else {
+          videoInfo.textContent = '(rVFC unsupported)'
+        }
+      }
+
+      try { run() } catch (e) { setStatus('error: ' + (e.message || e), false) }
+    </script>
+  </body>
+</html>
