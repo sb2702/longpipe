@@ -11,6 +11,8 @@ import { UpsampleConcatWebGPU } from "~/model/backends/webgpu/ops/upsample_conca
 import { UpsampleConv1x1WebGPU } from "~/model/backends/webgpu/ops/upsample_conv1x1";
 import { UpsampleSigmoidWebGPU } from "~/model/backends/webgpu/ops/upsample_sigmoid";
 import { CompositeSolidWebGPU } from "~/model/backends/webgpu/ops/composite_solid";
+import { CompositeImageWebGPU } from "~/model/backends/webgpu/ops/composite_image";
+import { GaussianBlur1DWebGPU } from "~/model/backends/webgpu/ops/gaussian_blur_1d";
 
 const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
 
@@ -50,6 +52,7 @@ export class WebGPUBackend implements Backend {
       UpsampleConcat:   (a, b, params)                  => new UpsampleConcatWebGPU(this, a, b, params),
       UpsampleConv1x1:  (input, weights, params)        => new UpsampleConv1x1WebGPU(this, input, weights, params),
       UpsampleSigmoid:  (input, params)                 => new UpsampleSigmoidWebGPU(this, input, params),
+      GaussianBlur1D:   (input, params)                 => new GaussianBlur1DWebGPU(this, input, params),
     };
 
     this.presenters = {
@@ -57,6 +60,15 @@ export class WebGPUBackend implements Backend {
       // it so callers don't have to think about presentation lifecycle.
       CompositeSolid: (image, alpha, bgColor) => {
         const op = new CompositeSolidWebGPU(this, image, alpha, bgColor);
+        return {
+          run: () => {
+            op.setOutput(this.getCurrentDisplayTexture());
+            op.run();
+          },
+        };
+      },
+      CompositeImage: (image, alpha, bg) => {
+        const op = new CompositeImageWebGPU(this, image, alpha, bg);
         return {
           run: () => {
             op.setOutput(this.getCurrentDisplayTexture());

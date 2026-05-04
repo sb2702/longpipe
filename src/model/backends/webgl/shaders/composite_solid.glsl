@@ -15,7 +15,12 @@ uniform vec3      u_bgColor; // straight-alpha background color, [0,1]
 out vec4 fragColor;
 
 void main() {
-    ivec2 px = ivec2(gl_FragCoord.xy);
+    // WebGL gl_FragCoord origin is bottom-left, but tensor textures are
+    // stored top-down (matches NHWC + getImageData). Flip y when sampling so
+    // the displayed image is upright. (WebGPU's @builtin(position) is already
+    // top-down, so its compositor doesn't need this.)
+    int H = textureSize(u_image, 0).y;
+    ivec2 px = ivec2(int(gl_FragCoord.x), H - 1 - int(gl_FragCoord.y));
     vec3  fg = texelFetch(u_image, px, 0).rgb;
     float a  = texelFetch(u_alpha, px, 0).r;
 

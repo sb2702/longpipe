@@ -11,6 +11,8 @@ import { UpsampleConcatWebGL } from '~/model/backends/webgl/ops/upsample_concat'
 import { UpsampleConv1x1WebGL } from '~/model/backends/webgl/ops/upsample_conv1x1'
 import { Conv2dAddWebGL } from '~/model/backends/webgl/ops/conv2d_add'
 import { CompositeSolidWebGL } from '~/model/backends/webgl/ops/composite_solid'
+import { CompositeImageWebGL } from '~/model/backends/webgl/ops/composite_image'
+import { GaussianBlur1DWebGL } from '~/model/backends/webgl/ops/gaussian_blur_1d'
 
 export interface WebGLBackendOptions {
   canvas: HTMLCanvasElement | OffscreenCanvas;
@@ -38,6 +40,7 @@ export class WebGLBackend implements Backend {
       UpsampleConcat:   (a, b, params)                   => new UpsampleConcatWebGL(this, a, b, params),
       UpsampleConv1x1:  (input, weights, params)         => new UpsampleConv1x1WebGL(this, input, weights, params),
       UpsampleSigmoid:  (input, params)                  => new UpsampleSigmoidWebGL(this, input, params),
+      GaussianBlur1D:   (input, params)                  => new GaussianBlur1DWebGL(this, input, params),
     }
     this.presenters = {
       // WebGL writes to the implicit default framebuffer — the op binds it
@@ -45,6 +48,8 @@ export class WebGLBackend implements Backend {
       // straight pass-through.
       CompositeSolid: (image, alpha, bgColor) =>
         new CompositeSolidWebGL(this, image, alpha, bgColor),
+      CompositeImage: (image, alpha, bg) =>
+        new CompositeImageWebGL(this, image, alpha, bg),
     }
   }
 

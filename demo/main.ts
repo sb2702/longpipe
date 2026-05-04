@@ -5,6 +5,8 @@ import { WebGLBackend } from '~/model/backends/webgl/index'
 import { EfficientNetLiteMattingLarge } from '~/model/networks/efficientnetlite_matting_large'
 import { BilinearUpscaler } from '~/model/effects/upscale_bilinear'
 import { CompositorSolid } from '~/model/effects/compositor_solid'
+import { CompositorImage } from '~/model/effects/compositor_image'
+import { CompositorBlur }  from '~/model/effects/compositor_blur'
 import { loadWeightsFromBinary } from '~/utils/loadWeights'
 
 // Network input dimensions for the "large" preset (16:9 landscape).
@@ -27,12 +29,9 @@ async function loadImage(url: string): Promise<ImageBitmap> {
   return createImageBitmap(blob)
 }
 
-// Draws an image into a canvas of the given size (cover-fit, center-cropped)
-// and returns the raw RGBA byte array.
 function drawCovered(img: ImageBitmap, w: number, h: number): Uint8ClampedArray {
   const c = new OffscreenCanvas(w, h)
   const ctx = c.getContext('2d')!
-  // Cover-fit center crop.
   const scale = Math.max(w / img.width, h / img.height)
   const dw = img.width * scale, dh = img.height * scale
   const dx = (w - dw) / 2, dy = (h - dh) / 2
@@ -40,7 +39,6 @@ function drawCovered(img: ImageBitmap, w: number, h: number): Uint8ClampedArray 
   return ctx.getImageData(0, 0, w, h).data
 }
 
-// RGBA bytes [0,255] → NHWC vec4 Float32 [0,1].
 function bytesToFloat(rgba: Uint8ClampedArray): Float32Array {
   const out = new Float32Array(rgba.length)
   for (let i = 0; i < rgba.length; i++) out[i] = rgba[i] / 255
@@ -66,7 +64,6 @@ async function createBackend(name: string, canvas: HTMLCanvasElement): Promise<B
   return WebGLBackend.create({ canvas })
 }
 
-// Hex string "#rrggbb" → linearish [0,1] triplet (no gamma — straight-through).
 function parseHexColor(hex: string): [number, number, number] {
   const r = parseInt(hex.slice(1, 3), 16) / 255
   const g = parseInt(hex.slice(3, 5), 16) / 255
@@ -78,25 +75,32 @@ function parseHexColor(hex: string): [number, number, number] {
 
 async function run() {
   const backendName = (document.getElementById('backend') as HTMLSelectElement).value
+  const bgMode      = (document.getElementById('bgMode')  as HTMLSelectElement).value
   const bgHex       = (document.getElementById('bgColor') as HTMLInputElement).value
+  const sigma       = parseFloat((document.getElementById('bgSigma') as HTMLInputElement).value)
   const bgColor     = parseHexColor(bgHex)
 
   const inputCanvas  = document.getElementById('inputCanvas')  as HTMLCanvasElement
-  const outputCanvas = document.getElementById('outputCanvas') as HTMLCanvasElement
 
-  status(`loading test image and weights (${backendName})…`)
-  const [img, weightsBuf] = await Promise.all([
+  const oldOutput = document.getElementById('outputCanvas') as HTMLCanvasElement
+  const outputCanvas = document.createElement('canvas')
+  outputCanvas.id = 'outputCanvas'
+  oldOutput.replaceWith(outputCanvas)
+
+  status(`loading test image and weights (${backendName}, bg=${bgMode})…`)
+  const fetches: Array<Promise<unknown>> = [
     loadImage('/test_img.jpg'),
     fetch('/model_large.bin').then(r => {
       if (!r.ok) throw new Error(`failed to fetch /model_large.bin: ${r.status}`)
       return r.arrayBuffer()
     }),
-  ])
+  ]
+  if (bgMode === 'image') fetches.push(loadImage('/demo.jpg'))
+  const [img, weightsBuf, bgImg] = await Promise.all(fetches) as [ImageBitmap, ArrayBuffer, ImageBitmap?]
 
-  // Display resolution = source image resolution (after cover-crop to 16:9).
-  // Pick the largest 16:9 box that fits in the source image.
-  const srcAspect = img.width / img.height
+  // Display resolution: largest 16:9 box that fits the input image, capped.
   const targetAspect = NET_W / NET_H
+  const srcAspect = img.width / img.height
   let dispW: number, dispH: number
   if (srcAspect > targetAspect) {
     dispH = img.height
@@ -105,7 +109,6 @@ async function run() {
     dispW = img.width
     dispH = Math.round(dispW / targetAspect)
   }
-  // Cap display size so the demo isn't enormous.
   const cap = 1024
   if (dispW > cap) {
     dispH = Math.round(dispH * cap / dispW)
@@ -140,14 +143,39 @@ async function run() {
   const upscaler = new BilinearUpscaler(backend, model.output, dispH, dispW)
   upscaler.run()
 
-  status('compositing…')
-  const compositor = new CompositorSolid(backend, dispTensor, upscaler.output, bgColor)
-  compositor.run()
+  status(`compositing (${bgMode})…`)
+  const tComp0 = performance.now()
+  if (bgMode === 'solid') {
+    new CompositorSolid(backend, dispTensor, upscaler.output, bgColor).run()
+  } else if (bgMode === 'image') {
+    if (!bgImg) throw new Error('bg image failed to load')
+    const bgBytes  = drawCovered(bgImg, dispW, dispH)
+    const bgTensor = backend.tensor(dispH, dispW, 4, bytesToFloat(bgBytes))
+    new CompositorImage(backend, dispTensor, upscaler.output, bgTensor).run()
+  } else {
+    new CompositorBlur(backend, dispTensor, upscaler.output, sigma).run()
+  }
+  const tComp = performance.now() - tComp0
 
-  status(`done. network=${tNet.toFixed(1)}ms · canvas=${dispW}×${dispH} · alpha=${NET_W}×${NET_H}→${dispW}×${dispH}`)
+  status(`done. network=${tNet.toFixed(1)}ms · compose=${tComp.toFixed(1)}ms · canvas=${dispW}×${dispH} · bg=${bgMode}`)
 }
 
-// ── Wire up ───────────────────────────────────────────────────────────────
+// ── UI wiring ─────────────────────────────────────────────────────────────
+
+const bgModeSelect  = document.getElementById('bgMode')        as HTMLSelectElement
+const bgColorLabel  = document.getElementById('bgColorLabel')  as HTMLLabelElement
+const bgSigmaLabel  = document.getElementById('bgSigmaLabel')  as HTMLLabelElement
+const bgSigmaInput  = document.getElementById('bgSigma')       as HTMLInputElement
+const bgSigmaVal    = document.getElementById('bgSigmaVal')    as HTMLSpanElement
+
+function syncBgControls() {
+  const mode = bgModeSelect.value
+  bgColorLabel.style.display = mode === 'solid' ? '' : 'none'
+  bgSigmaLabel.style.display = mode === 'blur'  ? '' : 'none'
+}
+bgModeSelect.addEventListener('change', syncBgControls)
+bgSigmaInput.addEventListener('input', () => { bgSigmaVal.textContent = bgSigmaInput.value })
+syncBgControls()
 
 document.getElementById('run')!.addEventListener('click', () => {
   run().catch(err => {
@@ -156,7 +184,6 @@ document.getElementById('run')!.addEventListener('click', () => {
   })
 })
 
-// Auto-run on load.
 run().catch(err => {
   console.error(err)
   status(`error: ${err.message ?? err}`)

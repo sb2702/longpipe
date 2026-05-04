@@ -50,6 +50,11 @@ export interface UpsampleConv1x1Params {
   activation:  Activation;
 }
 
+export interface GaussianBlur1DParams {
+  direction: "horizontal" | "vertical";
+  sigma:     number;
+}
+
 export interface Backend {
   // Allocate a spatial activation buffer. Pass data to pre-fill (tests / first layer).
   tensor(h: number, w: number, c: number, data?: Float32Array): Tensor;
@@ -71,11 +76,15 @@ export interface Backend {
     UpsampleConcat:  (a: Tensor, b: Tensor, params: UpsampleParams) => Op;
     UpsampleConv1x1: (input: Tensor, weights: Conv2DWeights,                  params: UpsampleConv1x1Params) => Op;
     UpsampleSigmoid: (input: Tensor, params: UpsampleParams) => Op;
+
+    // Effects
+    GaussianBlur1D:  (input: Tensor, params: GaussianBlur1DParams) => Op;
   };
 
   // Render-to-display ops. Produce no Tensor — write directly to the canvas.
   presenters: {
     CompositeSolid: (image: Tensor, alpha: Tensor, bgColor: [number, number, number]) => Presenter;
+    CompositeImage: (image: Tensor, alpha: Tensor, bg: Tensor) => Presenter;
   };
 
   // Read tensor data back to host. The tensor must have been allocated by this backend.
