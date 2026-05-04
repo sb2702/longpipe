@@ -18,7 +18,7 @@ import { CompositePassthroughWebGPU } from "~/model/backends/webgpu/ops/composit
 import { GaussianBlur1DWebGPU } from "~/model/backends/webgpu/ops/gaussian_blur_1d";
 import { InputWebGPU } from "~/model/backends/webgpu/ops/input";
 
-const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
+const STORAGE = navigator.gpu ? GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST : 0;
 
 export interface WebGPUBackendOptions {
   canvas: HTMLCanvasElement | OffscreenCanvas;

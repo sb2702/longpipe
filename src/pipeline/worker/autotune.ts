@@ -20,13 +20,14 @@ import { EfficientNetLiteMattingLarge }   from '~/model/networks/efficientnetlit
 import { EfficientNetLiteMattingCompact } from '~/model/networks/efficientnetlite_matting_compact'
 import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small'
 import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl'
+import {WebGLBackend} from "~/model/backends/webgl";
 
 // Frame budget = (1000 / sourceFps) × SAFETY_MARGIN. The model gets at
 // most this fraction of each input frame; the rest is reserved for
 // compositor + transport + main-thread headroom. 0.5 = "model takes at
 // most half the frame", which keeps xl/large from being picked just
 // because they squeak under the 33ms wall.
-const SAFETY_MARGIN = 0.5
+let SAFETY_MARGIN = 0.5
 const WARMUP_ITERS  = 3
 const TIMED_ITERS   = 10
 const DEFAULT_SOURCE_FPS = 30
@@ -53,6 +54,9 @@ export async function autotunePreset(
   backend:         Backend,
   sourceFpsTarget: number = DEFAULT_SOURCE_FPS,
 ): Promise<ManualPreset> {
+
+  //Be conservative with WebGL
+  if(backend instanceof  WebGLBackend) SAFETY_MARGIN = SAFETY_MARGIN*0.5;
   const budgetMs = (1000 / sourceFpsTarget) * SAFETY_MARGIN
   log(`start; budget per source frame: ${budgetMs.toFixed(1)}ms (source ${sourceFpsTarget}fps × ${SAFETY_MARGIN} safety)`)
   log('backend dtype:', backend.dtype)
