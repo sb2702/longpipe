@@ -1,11 +1,11 @@
 export interface Conv2DWeights {
-  weights: number[]
-  bias:    number[]
+  weights: ArrayLike<number>
+  bias:    ArrayLike<number>
 }
 
 export interface DepthwiseWeights {
-  weights: number[]
-  bias:    number[]
+  weights: ArrayLike<number>
+  bias:    ArrayLike<number>
 }
 
 export interface DepthwiseSeparableWeights {
