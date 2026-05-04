@@ -36,7 +36,6 @@ type NetworkCtor = new (backend: Backend, input: Tensor, w: ModelWeights) => Net
 const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
   xxs:     EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   xs:      EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
-  small2:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   small:   EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   compact: EfficientNetLiteMattingCompact as unknown as NetworkCtor,
   medium:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,

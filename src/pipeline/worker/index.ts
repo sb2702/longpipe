@@ -81,6 +81,12 @@ async function handleInit(data: InitData): Promise<InitResponse> {
   log('handleInit: start; topology=', data.topology, 'preset=', data.preset, 'backend=', data.backend, 'dtype=', data.dtype)
   if (initState) throw new Error('handleInit: already initialized')
 
+  // dtype: f16 if backend supports shader-f16, else f32. Preset's intended
+  // dtype (e.g. PRESETS lists large/xl as f32 for accuracy) is only a
+  // spec/intent, not enforced — runtime always uses the cheaper f16 when
+  // it's available. Trade-off: simpler than rebuilding the backend per-
+  // preset, but bench timings underestimate the cost of large/xl on
+  // devices that would otherwise need f32. Acceptable for v0.1.
   log('handleInit: setupBackend…')
   const setup = await setupBackend(data, DEFAULT_CANVAS)
   log('handleInit: backend ready:', setup.resolvedBackend, setup.resolvedDtype, 'canvas:', setup.canvas.width, 'x', setup.canvas.height)

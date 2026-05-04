@@ -1,6 +1,6 @@
 import type { Dtype } from '~/model/backend'
 
-export type ModelName = 'xxs' | 'xs' | 'small2' | 'small' | 'compact' | 'medium' | 'large' | 'xl'
+export type ModelName = 'xxs' | 'xs' | 'small' | 'compact' | 'medium' | 'large' | 'xl'
 
 export type PresetName = 'fast' | 'balanced' | 'quality' | 'auto'
 
@@ -27,7 +27,6 @@ export const PRESETS: ManualPreset[] = [
   // fetch model_xxs.bin so upload a copy on the CDN.
   { model: 'xxs',     dtype: 'f16', resolution: { w: 128, h: 72  }, skipFrames: 3 },
   { model: 'xs',      dtype: 'f16', resolution: { w: 192, h: 108 }, skipFrames: 1 },
-  { model: 'small2',  dtype: 'f16', resolution: { w: 192, h: 108 }, skipFrames: 1 },
   { model: 'small',   dtype: 'f16', resolution: { w: 256, h: 144 }, skipFrames: 1 },
   { model: 'compact', dtype: 'f16', resolution: { w: 256, h: 144 }, skipFrames: 1 },
   { model: 'medium',  dtype: 'f16', resolution: { w: 256, h: 144 }, skipFrames: 1 },
@@ -38,8 +37,8 @@ export const PRESETS: ManualPreset[] = [
 // Named shortcuts → index into PRESETS. 'auto' resolved via microbench at init.
 export const NAMED_PRESET_INDEX: Record<Exclude<PresetName, 'auto'>, number> = {
   fast:     1,   // xs (xxs is too aggressive for the 'fast' shortcut)
-  balanced: 5,   // medium
-  quality:  7,   // xl
+  balanced: 4,   // medium
+  quality:  6,   // xl
 }
 
 export function resolveNamedPreset(name: PresetName): ManualPreset | null {
