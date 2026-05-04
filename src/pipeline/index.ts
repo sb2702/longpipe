@@ -186,6 +186,15 @@ export class Pipeline implements PromiseLike<Pipeline> {
     void this.controller.sendMessage('setEnabled', { enabled: on })
   }
 
+  // Async stats snapshot from the worker. Returned object includes rolling
+  // FPS / model time / display time / current preset / etc. — see
+  // RendererStats for the full shape. Cheap to call frequently (a single
+  // postMessage round-trip; renderer just reads its already-tracked
+  // counters).
+  async getStats() {
+    return this.controller.sendMessage('getStats', {} as Record<string, never>)
+  }
+
   destroy(): void {
     void this.controller.sendMessage('destroy', {} as Record<string, never>)
     this.controller.terminate()

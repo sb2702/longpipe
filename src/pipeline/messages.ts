@@ -75,9 +75,17 @@ export interface PresetSwapResult {
 }
 
 export interface RendererStats {
-  fps:     number
-  modelMs: number
-  skipped: number
+  // Rolling 1-second window
+  fps:           number    // process() calls per second (≈ source FPS)
+  modelFps:      number    // model runs per second
+  modelMs:       number    // median model run time (ms)
+  displayMs:     number    // median runDisplay time (ms)
+  skipped:       number    // total skipped-model frames since init
+
+  // Static state (snapshot at last preset swap)
+  preset:        string    // resolved preset's model name
+  skipFrames:    number    // resolved preset's skipFrames
+  enabled:       boolean   // false = passthrough mode
 }
 
 // ── Persistent events from worker → main ────────────────────────────────────

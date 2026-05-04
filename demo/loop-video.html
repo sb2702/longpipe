@@ -27,6 +27,7 @@
     <h2>Pipeline: looped video → captureStream → Pipeline → &lt;video&gt;</h2>
     <div id="status">loading…</div>
     <div class="info">UA: <span id="ua">–</span></div>
+    <pre id="stats" class="info" style="white-space: pre; padding-top: 8px;">stats: (waiting for first frame)</pre>
     <div class="row">
       <div class="panel">
         <span class="label">input: looped video file (source for captureStream)</span>
@@ -40,15 +41,15 @@
     <div class="controls">
       <label>background:
         <select id="bgMode">
+          <option value="image" selected>image (demo.jpg)</option>
           <option value="blur">blur</option>
           <option value="solid">solid color</option>
-          <option value="image">image (demo.jpg)</option>
         </select>
       </label>
       <label id="bgColorLabel" style="display:none">color:
         <input type="color" id="bgColor" value="#00b050" />
       </label>
-      <label id="bgSigmaLabel">sigma:
+      <label id="bgSigmaLabel" style="display:none">sigma:
         <input type="range" id="bgSigma" min="1" max="20" step="0.5" value="8" />
         <span id="bgSigmaVal">8</span>
       </label>
@@ -69,6 +70,7 @@
       const $bgSigmaVal = document.getElementById('bgSigmaVal')
       const $bgSigmaLabel = document.getElementById('bgSigmaLabel')
       const $toggle = document.getElementById('toggleEnabled')
+      const $stats  = document.getElementById('stats')
 
       $ua.textContent = navigator.userAgent
 
@@ -112,9 +114,15 @@
         // 2. captureStream from the input <video> — that's our input MediaStream.
         const inputStream = $input.captureStream()
 
+        // Resolve initial background config — image mode needs an async
+        // bitmap fetch before construction.
+        const initialBgConfig = $bgMode.value === 'image'
+          ? await loadBgImage()
+          : (currentBgConfig() ?? { blur: { sigma: 8 } })
+
         setStatus('constructing pipeline (autotune + weights fetched from default CDN by SDK)…')
         const pipeline = new Pipeline(inputStream, {
-          effect: { effect: 'background', config: currentBgConfig() ?? { blur: { sigma: 8 } } },
+          effect: { effect: 'background', config: initialBgConfig },
           preset: 'auto',   // worker microbenches each preset, picks largest that fits 15fps budget
           audio:  'drop',
         })
@@ -132,6 +140,24 @@
           setStatus('init failed: ' + (err.message || err), false)
           return
         }
+
+        // Poll stats every 500ms; getStats() is a single postMessage round-trip
+        // and the worker just reads pre-tracked counters, so it's cheap.
+        setInterval(async () => {
+          try {
+            const s = await pipeline.getStats()
+            $stats.textContent =
+              `preset:    ${s.preset}  (skipFrames=${s.skipFrames})\n` +
+              `enabled:   ${s.enabled}\n` +
+              `fps:       ${s.fps}     (process() / sec)\n` +
+              `modelFps:  ${s.modelFps}     (network runs / sec)\n` +
+              `modelMs:   ${s.modelMs.toFixed(2)} ms (median)\n` +
+              `displayMs: ${s.displayMs.toFixed(2)} ms (median; compositor + display input)\n` +
+              `skipped:   ${s.skipped}    (cumulative skipped-model frames)`
+          } catch (err) {
+            $stats.textContent = 'stats error: ' + (err.message || err)
+          }
+        }, 500)
 
         // 4. UI wiring.
         let enabled = true

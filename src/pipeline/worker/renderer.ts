@@ -66,7 +66,9 @@ export class Renderer {
 
   // Stats — rolling windows trimmed to STATS_WINDOW_MS
   private framesRenderedAt: number[] = []
+  private modelRunsAt:      number[] = []
   private modelRunsMs:      number[] = []
+  private displayRunsMs:    number[] = []
   private skippedCount:     number   = 0
 
   constructor(opts: RendererOptions) {
@@ -98,13 +100,19 @@ export class Renderer {
     if (this.shouldRunModel()) {
       const t = performance.now()
       this.renderOp.runModel()
-      this.modelRunsMs.push(performance.now() - t)
+      const dt = performance.now() - t
+      this.modelRunsMs.push(dt)
+      this.modelRunsAt.push(performance.now())
       this.trim(this.modelRunsMs)
+      this.trim(this.modelRunsAt)
     } else {
       this.skippedCount++
     }
 
+    const td = performance.now()
     this.renderOp.runDisplay()
+    this.displayRunsMs.push(performance.now() - td)
+    this.trim(this.displayRunsMs)
 
     this.framesRenderedAt.push(performance.now())
     this.trim(this.framesRenderedAt)
@@ -148,11 +156,19 @@ export class Renderer {
   getStats(): RendererStats {
     const now = performance.now()
     this.trimRecent(this.framesRenderedAt, now)
+    this.trimRecent(this.modelRunsAt,      now)
     this.trimRecent(this.modelRunsMs,      now)
+    this.trimRecent(this.displayRunsMs,    now)
     return {
-      fps:     this.framesRenderedAt.length,        // window is 1s, so length = fps
-      modelMs: median(this.modelRunsMs),
-      skipped: this.skippedCount,
+      // window is 1s, so length = events-per-second
+      fps:        this.framesRenderedAt.length,
+      modelFps:   this.modelRunsAt.length,
+      modelMs:    median(this.modelRunsMs),
+      displayMs:  median(this.displayRunsMs),
+      skipped:    this.skippedCount,
+      preset:     this.preset.model,
+      skipFrames: this.preset.skipFrames,
+      enabled:    this.enabled,
     }
   }
 
