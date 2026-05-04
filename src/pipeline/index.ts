@@ -40,7 +40,15 @@ const DEFAULT_CANVAS = { w: 1280, h: 720 }
 
 export class Pipeline implements PromiseLike<Pipeline> {
   readonly stream: MediaStream
-  readonly ready:  Promise<this>
+  // Promise<void> rather than Promise<this> on purpose: resolving a Promise
+  // with a thenable value triggers the spec's "follow" behavior — it tries
+  // to settle by calling the thenable's then(). Pipeline IS a thenable
+  // (see then() below), and its then() delegates back to this.ready —
+  // which is the same Promise being resolved. That's a cycle and the
+  // promise hangs forever. Resolving with void breaks the cycle. Callers
+  // who want the Pipeline as the awaited value use `await pipeline`
+  // (which goes through then() and resolves with `this`).
+  readonly ready:  Promise<void>
 
   private controller:    WorkerController
   private worker:        Worker
@@ -73,13 +81,14 @@ export class Pipeline implements PromiseLike<Pipeline> {
     this.worker     = new Worker(new URL('./worker/index.ts', import.meta.url), { type: 'module' })
     this.controller = new WorkerController(this.worker)
 
-    this.ready = new Promise<this>((resolve, reject) => {
+    this.ready = new Promise<void>((resolve, reject) => {
       this.controller.addPersistentListener('ready', () => {
+        console.log('[longpipe/pipeline] ready handler invoked; resolving .ready')
         opts.onReady?.()
-        resolve(this)
+        resolve()
       })
       this.controller.addPersistentListener('error', (info) => {
-        console.error('[pipeline] worker error:', info.message)
+        console.error('[longpipe/pipeline] worker error:', info.message)
         if (!info.recoverable) reject(new Error(info.message))
       })
     })
@@ -104,12 +113,16 @@ export class Pipeline implements PromiseLike<Pipeline> {
     ])
   }
 
-  // Thenable — `await pipeline` resolves to this once ready.
+  // Thenable — `await pipeline` resolves to `this` once ready. Wraps
+  // ready (Promise<void>) so the awaited value is the Pipeline instance.
   then<T1 = this, T2 = never>(
       onFulfilled?: ((value: this) => T1 | PromiseLike<T1>) | null,
       onRejected?:  ((reason: unknown) => T2 | PromiseLike<T2>) | null,
   ): PromiseLike<T1 | T2> {
-    return this.ready.then(onFulfilled, onRejected)
+    return this.ready.then(
+      () => onFulfilled ? onFulfilled(this) : (this as unknown as T1),
+      onRejected,
+    )
   }
 
   setEffect(e: EffectConfig): void {

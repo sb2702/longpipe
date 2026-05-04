@@ -8,6 +8,9 @@
 //
 // All actual work lives in the submodules; this file should stay thin.
 
+const log = (...args: unknown[]) => console.log('[longpipe/worker]', ...args)
+log('script loaded')
+
 import type {
   WorkerRequest,
   WorkerResponse,
@@ -42,10 +45,13 @@ const DEFAULT_CANVAS = { w: 1280, h: 720 }
 
 self.onmessage = async function (event: MessageEvent<WorkerRequest>) {
   const { cmd, data, request_id } = event.data
+  log('cmd received:', cmd, 'request_id:', request_id)
   try {
     const res = await handleCommand(cmd, data)
+    log('cmd ok:', cmd)
     respond(request_id, res)
   } catch (err) {
+    log('cmd FAILED:', cmd, err)
     emit('error', { message: (err as Error).message ?? String(err), recoverable: false })
   }
 }
@@ -63,24 +69,23 @@ async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
 }
 
 async function handleInit(data: InitData): Promise<InitResponse> {
+  log('handleInit: start; topology=', data.topology, 'preset=', data.preset, 'backend=', data.backend, 'dtype=', data.dtype)
   if (renderer) throw new Error('handleInit: already initialized')
 
-  // For non-transfer-capture the canvas is allocated inside setupBackend at
-  // this size. For transfer-capture, setupBackend uses data.outputCanvas
-  // directly and ignores the size hint.
+  log('handleInit: setupBackend…')
   const setup = await setupBackend(data, DEFAULT_CANVAS)
+  log('handleInit: backend ready:', setup.resolvedBackend, setup.resolvedDtype, 'canvas:', setup.canvas.width, 'x', setup.canvas.height)
 
+  log('handleInit: resolvePreset…')
   const preset = await resolvePreset(data.preset, setup.resolvedDtype, setup.backend)
+  log('handleInit: preset resolved:', preset)
 
-  // Weights are required at init time. v0.1 limitation: for preset='auto'
-  // the caller can't know in advance which preset's weights to ship, so
-  // they should supply weights for a reasonable default (e.g. 'large') or
-  // skip 'auto'. Followup: emit 'preset-resolved' after autotune and let
-  // main lazy-fetch + send via setPreset before the pipe starts.
   if (!data.weights) {
     throw new Error("handleInit: weights required (v0.1 has no deferred-fetch path for preset='auto')")
   }
+  log('handleInit: weights bytes:', data.weights.byteLength)
 
+  log('handleInit: constructing Renderer…')
   renderer = new Renderer({
     backend: setup.backend,
     canvas:  setup.canvas,
@@ -89,24 +94,35 @@ async function handleInit(data: InitData): Promise<InitResponse> {
     effect:  data.effect,
     enabled: data.enabled,
   })
+  log('handleInit: Renderer constructed')
 
   pumpAbort = new AbortController()
+  log('handleInit: createInputStream…')
   const input  = createInputStream(data)
+  log('handleInit: createOutputSink…')
   const output = createOutputSink(data, renderer, pumpAbort.signal)
 
-  // Start pipe in background — handleInit's response is the init ack, not
-  // the end-of-pipe completion. Errors after init come through 'error'
-  // events; clean shutdown via destroy() aborts the signal.
+  log('handleInit: starting pipe in background')
   startPipe({
     input,
     output,
     signal: pumpAbort.signal,
-    onFirstFrame: () => emit('ready', undefined),
+    onFirstFrame: () => {
+      log('first frame through pipe; emitting ready')
+      emit('ready', undefined)
+    },
+  }).then(() => {
+    log('pipe completed (input ended)')
   }).catch(err => {
-    if (pumpAbort?.signal.aborted) return        // expected on destroy
+    if (pumpAbort?.signal.aborted) {
+      log('pipe aborted (expected on destroy)')
+      return
+    }
+    log('pipe FAILED:', err)
     emit('error', { message: `pipe failed: ${(err as Error).message}`, recoverable: false })
   })
 
+  log('handleInit: done; returning InitResponse')
   return {
     resolvedPreset:  preset,
     resolvedBackend: setup.resolvedBackend,

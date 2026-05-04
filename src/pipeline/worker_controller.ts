@@ -21,6 +21,8 @@ import type {
 
 export type EventHandler<E extends EventName> = (data: EventMap[E]) => void
 
+const log = (...args: unknown[]) => console.log('[longpipe/worker_controller]', ...args)
+
 export class WorkerController {
   private worker: Worker
   private listeners: Map<string, (data: unknown) => void> = new Map()
@@ -29,11 +31,13 @@ export class WorkerController {
   constructor(worker: Worker) {
     this.worker = worker
     this.worker.addEventListener('message', this.handleMessage.bind(this))
+    log('constructed; message listener attached')
   }
 
   private handleMessage(event: MessageEvent<WorkerResponse | WorkerEvent>): void {
     const { request_id, res } = event.data
     const handler = this.listeners.get(request_id)
+    log('msg received: request_id=', request_id, 'handler?', !!handler, 'persistent?', this.persistentEvents.has(request_id))
     if (!handler) return
     handler(res)
     if (!this.persistentEvents.has(request_id)) {
@@ -44,6 +48,7 @@ export class WorkerController {
   addPersistentListener<E extends EventName>(name: E, handler: EventHandler<E>): void {
     this.persistentEvents.add(name)
     this.listeners.set(name, handler as (data: unknown) => void)
+    log('addPersistentListener:', name)
   }
 
   removePersistentListener(name: EventName): void {
@@ -57,6 +62,7 @@ export class WorkerController {
     transfer: Transferable[] = [],
   ): Promise<CmdResponseMap[C]> {
     const request_id = crypto.randomUUID()
+    log('sendMessage:', cmd, 'request_id=', request_id, 'transferables=', transfer.length)
     return new Promise((resolve) => {
       this.listeners.set(request_id, (res) => resolve(res as CmdResponseMap[C]))
       const message: WorkerRequest<C> = { cmd, data, request_id }

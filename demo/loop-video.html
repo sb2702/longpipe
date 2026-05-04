@@ -143,8 +143,12 @@
 
         // 4. UI wiring.
         let enabled = true
+
+        console.log('[loop-video]', inputStream)
         $toggle.addEventListener('click', () => {
           enabled = !enabled
+
+          console.log(`Enabled ${enabled}`)
           pipeline.setEnabled(enabled)
           $toggle.textContent = enabled ? 'Disable effect' : 'Enable effect'
         })
