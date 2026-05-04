@@ -30,10 +30,15 @@ const log = (...args: unknown[]) => console.log('[longpipe/autotune]', ...args)
 interface NetworkLike { readonly output: Tensor; run(): void }
 type NetworkCtor = new (b: Backend, i: Tensor, w: ModelWeights) => NetworkLike
 
-// xs / small2 not yet ported from training to TS — autotune skips them.
+// xs / small2 / medium share architectures with `small` / `large` (per
+// docs/MODEL_PLAN.md) — only the input resolution and dtype differ, which
+// flow in via the input Tensor and backend respectively, not the class.
 const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
+  xs:      EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
+  small2:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   small:   EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   compact: EfficientNetLiteMattingCompact as unknown as NetworkCtor,
+  medium:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   large:   EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   xl:      EfficientNetLiteMattingXL      as unknown as NetworkCtor,
 }
@@ -75,10 +80,13 @@ export async function autotunePreset(
 // (tensor/upload/readback) pass through unchanged via spread.
 
 function synthBackend(backend: Backend): Backend {
-  return {
-    ...backend,
-    ops: {
-      ...backend.ops,
+  // Object.create rather than spread: backend is a class instance, so
+  // methods (tensor / upload / sync / readback) live on the prototype.
+  // Spread would only copy own properties, leaving the wrapper without
+  // those methods. Object.create preserves the prototype chain.
+  const wrapped = Object.create(backend) as Backend
+  wrapped.ops = {
+    ...backend.ops,
       Conv2d: (input, _w, params: Conv2dParams) => {
         const synth: Conv2DWeights = {
           weights: new Float32Array(params.kernel * params.kernel * input.c * params.outChannels),
@@ -107,8 +115,8 @@ function synthBackend(backend: Backend): Backend {
         }
         return backend.ops.UpsampleConv1x1(input, synth, params)
       },
-    },
-  }
+    }
+  return wrapped
 }
 
 // Recursive Proxy that returns itself on any property/index access. Lets

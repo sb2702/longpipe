@@ -30,12 +30,15 @@ export interface RendererOptions {
 interface NetworkLike { readonly output: Tensor; run(): void }
 type NetworkCtor = new (backend: Backend, input: Tensor, w: ModelWeights) => NetworkLike
 
-// Registry of model name → network constructor. xs / small2 not yet ported
-// from training to TS — handleInit / setPreset will throw a clear error if
-// the requested preset references one.
+// xs / small2 / medium share architectures with `small` / `large` (per
+// docs/MODEL_PLAN.md) — only the input resolution and dtype differ, which
+// flow in via the input Tensor and backend respectively, not the class.
 const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
+  xs:      EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
+  small2:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   small:   EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   compact: EfficientNetLiteMattingCompact as unknown as NetworkCtor,
+  medium:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   large:   EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   xl:      EfficientNetLiteMattingXL      as unknown as NetworkCtor,
 }
