@@ -20,23 +20,35 @@ import { setupPostMessageInput }    from './transports/input_postmessage'
 import { setupBitmapShuttleOutput } from './transports/output_bitmap_shuttle'
 
 export interface PipelineOptions {
-  effect:   EffectConfig
-  weights:  ArrayBuffer                       // raw .bin (or .f16.bin) — see docs/WEIGHTS_FORMAT.md
-  preset?:  PresetName | ManualPreset         // default: 'auto'
-  audio?:   AudioMode                          // default: 'passthrough'
-  enabled?: boolean                            // default: true
-  onReady?: () => void
+  effect:          EffectConfig
+  preset?:         PresetName | ManualPreset    // default: 'balanced' ('auto' maps until autotune lands)
+  weightsBaseUrl?: string                       // default: DEFAULT_WEIGHTS_BASE_URL
+  audio?:          AudioMode                    // default: 'passthrough'
+  enabled?:        boolean                      // default: true
+  onReady?:        () => void
 }
 
+// Public CDN where Longpipe hosts its own model weights. Versioned in the
+// path so SDK upgrades that change weight shapes can move to a new prefix
+// without breaking older SDKs in the wild.
+const DEFAULT_WEIGHTS_BASE_URL = 'https://cdn.longpipe.dev/models/v/0.0.1/'
+
 const DEFAULTS = {
-  preset:  'auto'         as PresetName,
-  audio:   'passthrough'  as AudioMode,
-  enabled: true,
+  preset:         'balanced'                  as PresetName,
+  weightsBaseUrl: DEFAULT_WEIGHTS_BASE_URL,
+  audio:          'passthrough'               as AudioMode,
+  enabled:        true,
 }
 
 // Output canvas size for non-transfer-capture topologies. TODO: surface as
 // a PipelineOption so callers can pick their output resolution.
 const DEFAULT_CANVAS = { w: 1280, h: 720 }
+
+// Build the full weights URL for a resolved preset. Convention matches
+// the training pipeline's binary export naming (model_${name}.bin).
+function weightsUrlFor(baseUrl: string, model: string): string {
+  return `${baseUrl.replace(/\/$/, '')}/model_${model}.bin`
+}
 
 export class Pipeline implements PromiseLike<Pipeline> {
   readonly stream: MediaStream
@@ -93,24 +105,57 @@ export class Pipeline implements PromiseLike<Pipeline> {
       })
     })
 
-    // Send init. Transferables (ports) move ownership to the worker.
-    // Fire-and-forget here — success is reported via the 'ready' event,
-    // failure via the 'error' event (both wired above).
+    // Two-phase init: send 'init' (no weights) → await InitResponse with
+    // resolved preset → fetch weights from baseUrl based on resolved
+    // preset → send 'startRender' with weights → worker constructs
+    // renderer + starts pipe → 'ready' event fires on first frame.
     const initData: InitData = {
       topology,
       preset:     opts.preset,
       effect:     opts.effect,
       enabled:    opts.enabled,
-      weights:    opts.weights,
       backend:    'auto',
       dtype:      'f16',
       inputPort:  inputSetup.port,
       outputPort: outputSetup.port,
     }
-    void this.controller.sendMessage('init', initData, [
+    const transferList: Transferable[] = [
       ...inputSetup.transferList,
       ...outputSetup.transferList,
-    ])
+    ]
+
+    void this.bootstrap(initData, transferList, opts.weightsBaseUrl)
+  }
+
+  // Async second half of construction: init handshake → fetch weights →
+  // startRender. Errors are emitted via 'error' event (which the ready
+  // promise listens to and rejects on).
+  private async bootstrap(
+    initData:       InitData,
+    transferList:   Transferable[],
+    weightsBaseUrl: string,
+  ): Promise<void> {
+    try {
+      console.log('[longpipe/pipeline] sending init…')
+      const initRes = await this.controller.sendMessage('init', initData, transferList)
+      console.log('[longpipe/pipeline] init resolved:', initRes)
+
+      const url = weightsUrlFor(weightsBaseUrl, initRes.resolvedPreset.model)
+      console.log('[longpipe/pipeline] fetching weights:', url)
+      const r = await fetch(url)
+      if (!r.ok) throw new Error(`weights fetch failed: ${r.status} ${url}`)
+      const weights = await r.arrayBuffer()
+      console.log('[longpipe/pipeline] weights bytes:', weights.byteLength)
+
+      console.log('[longpipe/pipeline] sending startRender…')
+      await this.controller.sendMessage('startRender', { weights }, [weights])
+      console.log('[longpipe/pipeline] startRender resolved; awaiting first frame')
+    } catch (err) {
+      console.error('[longpipe/pipeline] bootstrap failed:', err)
+      this.controller['handleMessage'].call(this.controller, {
+        data: { request_id: 'error', res: { message: (err as Error).message ?? String(err), recoverable: false } },
+      } as MessageEvent)
+    }
   }
 
   // Thenable — `await pipeline` resolves to `this` once ready. Wraps

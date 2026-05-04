@@ -37,6 +37,14 @@ import { startPipe }         from './pipe'
 let renderer:  Renderer        | null = null
 let pumpAbort: AbortController | null = null
 
+// State held between handleInit and handleStartRender — the latter needs
+// access to what the former resolved, plus the input data (transports).
+let initState: {
+  data:   InitData
+  setup:  Awaited<ReturnType<typeof setupBackend>>
+  preset: ManualPreset
+} | null = null
+
 // Default canvas size for non-transfer-capture topologies. For transfer-
 // capture, main supplies the canvas and this is unused. TODO: let main
 // pass a desired output resolution via InitData; 720p is a reasonable
@@ -58,19 +66,20 @@ self.onmessage = async function (event: MessageEvent<WorkerRequest>) {
 
 async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
   switch (cmd) {
-    case 'init':       return handleInit(data as InitData)
-    case 'setEffect':  return handleSetEffect(data as EffectConfig)
-    case 'setEnabled': return handleSetEnabled((data as CmdDataMap['setEnabled']).enabled)
-    case 'setPreset':  return handleSetPreset(data as CmdDataMap['setPreset'])
-    case 'getStats':   return renderer?.getStats() ?? null
-    case 'destroy':    return handleDestroy()
+    case 'init':        return handleInit(data as InitData)
+    case 'startRender': return handleStartRender((data as CmdDataMap['startRender']).weights)
+    case 'setEffect':   return handleSetEffect(data as EffectConfig)
+    case 'setEnabled':  return handleSetEnabled((data as CmdDataMap['setEnabled']).enabled)
+    case 'setPreset':   return handleSetPreset(data as CmdDataMap['setPreset'])
+    case 'getStats':    return renderer?.getStats() ?? null
+    case 'destroy':     return handleDestroy()
     default: throw new Error(`unknown cmd: ${cmd}`)
   }
 }
 
 async function handleInit(data: InitData): Promise<InitResponse> {
   log('handleInit: start; topology=', data.topology, 'preset=', data.preset, 'backend=', data.backend, 'dtype=', data.dtype)
-  if (renderer) throw new Error('handleInit: already initialized')
+  if (initState) throw new Error('handleInit: already initialized')
 
   log('handleInit: setupBackend…')
   const setup = await setupBackend(data, DEFAULT_CANVAS)
@@ -80,29 +89,42 @@ async function handleInit(data: InitData): Promise<InitResponse> {
   const preset = await resolvePreset(data.preset, setup.resolvedDtype, setup.backend)
   log('handleInit: preset resolved:', preset)
 
-  if (!data.weights) {
-    throw new Error("handleInit: weights required (v0.1 has no deferred-fetch path for preset='auto')")
-  }
-  log('handleInit: weights bytes:', data.weights.byteLength)
+  // Stash for handleStartRender — main fetches weights for `preset` and
+  // calls back with them.
+  initState = { data, setup, preset }
 
-  log('handleInit: constructing Renderer…')
+  log('handleInit: done; returning InitResponse, awaiting startRender')
+  return {
+    resolvedPreset:  preset,
+    resolvedBackend: setup.resolvedBackend,
+    resolvedDtype:   setup.resolvedDtype,
+  }
+}
+
+async function handleStartRender(weights: ArrayBuffer): Promise<void> {
+  log('handleStartRender: start; weights bytes:', weights.byteLength)
+  if (!initState) throw new Error('handleStartRender: handleInit not called yet')
+  if (renderer)   throw new Error('handleStartRender: already started')
+  const { data, setup, preset } = initState
+
+  log('handleStartRender: constructing Renderer…')
   renderer = new Renderer({
     backend: setup.backend,
     canvas:  setup.canvas,
     preset,
-    weights: data.weights,
+    weights,
     effect:  data.effect,
     enabled: data.enabled,
   })
-  log('handleInit: Renderer constructed')
+  log('handleStartRender: Renderer constructed')
 
   pumpAbort = new AbortController()
-  log('handleInit: createInputStream…')
+  log('handleStartRender: createInputStream…')
   const input  = createInputStream(data)
-  log('handleInit: createOutputSink…')
+  log('handleStartRender: createOutputSink…')
   const output = createOutputSink(data, renderer, pumpAbort.signal)
 
-  log('handleInit: starting pipe in background')
+  log('handleStartRender: starting pipe in background')
   startPipe({
     input,
     output,
@@ -122,12 +144,7 @@ async function handleInit(data: InitData): Promise<InitResponse> {
     emit('error', { message: `pipe failed: ${(err as Error).message}`, recoverable: false })
   })
 
-  log('handleInit: done; returning InitResponse')
-  return {
-    resolvedPreset:  preset,
-    resolvedBackend: setup.resolvedBackend,
-    resolvedDtype:   setup.resolvedDtype,
-  }
+  log('handleStartRender: done')
 }
 
 async function handleSetEffect(config: EffectConfig): Promise<void> {

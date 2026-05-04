@@ -112,16 +112,9 @@
         // 2. captureStream from the input <video> — that's our input MediaStream.
         const inputStream = $input.captureStream()
 
-        setStatus('fetching weights…')
-        const weights = await fetch('/model_large.bin').then(r => {
-          if (!r.ok) throw new Error('weights fetch failed: ' + r.status)
-          return r.arrayBuffer()
-        })
-
-        setStatus('constructing pipeline…')
+        setStatus('constructing pipeline (weights fetched from default CDN by SDK)…')
         const pipeline = new Pipeline(inputStream, {
           effect: { effect: 'background', config: currentBgConfig() ?? { blur: { sigma: 8 } } },
-          weights,
           // Manual preset to skip the still-stubbed 'auto' microbench.
           preset: { model: 'large', dtype: 'f32', resolution: { w: 256, h: 144 }, modelFps: 15 },
           audio:  'drop',

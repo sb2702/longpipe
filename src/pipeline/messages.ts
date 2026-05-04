@@ -13,21 +13,23 @@ import type { Topology } from './topology'
 // Type-safe sendMessage<C>(cmd, data) → Promise<response>.
 
 export interface CmdDataMap {
-  init:       InitData
-  setEffect:  EffectConfig
-  setEnabled: { enabled: boolean }
-  setPreset:  { preset: PresetName | ManualPreset; weights?: ArrayBuffer }
-  getStats:   Record<string, never>
-  destroy:    Record<string, never>
+  init:        InitData
+  startRender: { weights: ArrayBuffer }
+  setEffect:   EffectConfig
+  setEnabled:  { enabled: boolean }
+  setPreset:   { preset: PresetName | ManualPreset; weights?: ArrayBuffer }
+  getStats:    Record<string, never>
+  destroy:     Record<string, never>
 }
 
 export interface CmdResponseMap {
-  init:       InitResponse
-  setEffect:  void
-  setEnabled: void
-  setPreset:  PresetSwapResult
-  getStats:   RendererStats
-  destroy:    void
+  init:        InitResponse
+  startRender: void
+  setEffect:   void
+  setEnabled:  void
+  setPreset:   PresetSwapResult
+  getStats:    RendererStats
+  destroy:     void
 }
 
 export type CmdName = keyof CmdDataMap
@@ -39,7 +41,6 @@ export interface InitData {
   preset:   PresetName | ManualPreset
   effect:   EffectConfig
   enabled:  boolean
-  weights:  ArrayBuffer | null   // initial preset's weights (null when preset === 'auto')
 
   // Backend + dtype are *preferences*. Worker's setup_backend honors them
   // when possible and falls back when not. 'auto' = pick the best available
@@ -47,6 +48,12 @@ export interface InitData {
   // InitResponse so main can log/display what's actually running.
   backend:  'webgpu' | 'webgl' | 'auto'
   dtype:    Dtype
+
+  // Note: weights are NOT in InitData. Two-phase init: 'init' resolves
+  // backend + preset and returns InitResponse; main then fetches weights
+  // for the resolved preset and sends them via 'startRender'. This lets
+  // autotune (when implemented) pick the preset before main commits to a
+  // weights URL.
 
   // Transport endpoints — presence depends on topology. Transferred via
   // the postMessage transfer list at init time.
