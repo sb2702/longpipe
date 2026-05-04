@@ -8,23 +8,26 @@ export interface ManualPreset {
   model:      ModelName
   dtype:      Dtype
   resolution: { w: number; h: number }
-  modelFps:   number       // per docs/MODEL_PLAN.md: skipFrames=0 → 30; skipFrames=1 → 15
+  // Number of input frames the model SKIPS between runs. 0 = run every
+  // frame, 1 = every other frame, etc. The compositor still runs every
+  // frame using whatever's in the alpha tensor. See docs/MODEL_PLAN.md.
+  skipFrames: number
 }
 
-// Linear ordering: index 0 = fastest per second, last = slowest per second.
-// Adaptive switching (v0.2) walks this index up/down.
+// Linear ordering: index 0 = cheapest per source frame, last = most
+// expensive. Adaptive switching (v0.2) walks this index up/down.
 //
-// Per-second cost = per-frame cost × modelFps. xl/large run every frame
-// (modelFps=30) so their per-second cost is ~2× their per-frame cost; the
-// other presets skip every other frame (modelFps=15). See docs/MODEL_PLAN.md.
+// Per-source-frame cost = per-run cost / (skipFrames + 1). xl/large run
+// every frame (skipFrames=0); the others skip every other frame
+// (skipFrames=1).
 export const PRESETS: ManualPreset[] = [
-  { model: 'xs',      dtype: 'f16', resolution: { w: 192, h: 108 }, modelFps: 15 },
-  { model: 'small2',  dtype: 'f16', resolution: { w: 192, h: 108 }, modelFps: 15 },
-  { model: 'small',   dtype: 'f16', resolution: { w: 256, h: 144 }, modelFps: 15 },
-  { model: 'compact', dtype: 'f16', resolution: { w: 256, h: 144 }, modelFps: 15 },
-  { model: 'medium',  dtype: 'f16', resolution: { w: 256, h: 144 }, modelFps: 15 },
-  { model: 'large',   dtype: 'f32', resolution: { w: 256, h: 144 }, modelFps: 30 },
-  { model: 'xl',      dtype: 'f32', resolution: { w: 512, h: 288 }, modelFps: 30 },
+  { model: 'xs',      dtype: 'f16', resolution: { w: 192, h: 108 }, skipFrames: 1 },
+  { model: 'small2',  dtype: 'f16', resolution: { w: 192, h: 108 }, skipFrames: 1 },
+  { model: 'small',   dtype: 'f16', resolution: { w: 256, h: 144 }, skipFrames: 1 },
+  { model: 'compact', dtype: 'f16', resolution: { w: 256, h: 144 }, skipFrames: 1 },
+  { model: 'medium',  dtype: 'f16', resolution: { w: 256, h: 144 }, skipFrames: 1 },
+  { model: 'large',   dtype: 'f32', resolution: { w: 256, h: 144 }, skipFrames: 0 },
+  { model: 'xl',      dtype: 'f32', resolution: { w: 512, h: 288 }, skipFrames: 0 },
 ]
 
 // Named shortcuts → index into PRESETS. 'auto' resolved via microbench at init.

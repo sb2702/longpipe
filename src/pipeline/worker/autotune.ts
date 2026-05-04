@@ -21,9 +21,15 @@ import { EfficientNetLiteMattingCompact } from '~/model/networks/efficientnetlit
 import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small'
 import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl'
 
-const SAFETY_MARGIN = 0.7
+// Frame budget = (1000 / sourceFps) × SAFETY_MARGIN. The model gets at
+// most this fraction of each input frame; the rest is reserved for
+// compositor + transport + main-thread headroom. 0.5 = "model takes at
+// most half the frame", which keeps xl/large from being picked just
+// because they squeak under the 33ms wall.
+const SAFETY_MARGIN = 0.3
 const WARMUP_ITERS  = 3
 const TIMED_ITERS   = 10
+const DEFAULT_SOURCE_FPS = 30
 
 const log = (...args: unknown[]) => console.log('[longpipe/autotune]', ...args)
 
@@ -44,32 +50,36 @@ const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
 }
 
 export async function autotunePreset(
-  backend:        Backend,
-  modelFpsTarget: number = 15,
+  backend:         Backend,
+  sourceFpsTarget: number = DEFAULT_SOURCE_FPS,
 ): Promise<ManualPreset> {
-  const budgetMs = (1000 / modelFpsTarget) * SAFETY_MARGIN
-  log('start; budget per model run:', budgetMs.toFixed(1), 'ms (target', modelFpsTarget, 'fps,', SAFETY_MARGIN, 'safety)')
+  const budgetMs = (1000 / sourceFpsTarget) * SAFETY_MARGIN
+  log(`start; budget per source frame: ${budgetMs.toFixed(1)}ms (source ${sourceFpsTarget}fps × ${SAFETY_MARGIN} safety)`)
   log('backend dtype:', backend.dtype)
 
-  let best: ManualPreset = PRESETS[0]
+  let best: ManualPreset | null = null
   for (const preset of PRESETS) {
     if (!NETWORK_CTORS[preset.model]) {
       log('skip', preset.model, '(network class not implemented in TS yet)')
       continue
     }
     try {
-      log('bench', preset.model, '@', `${preset.resolution.w}×${preset.resolution.h}`, '…')
+      log(`bench ${preset.model} @ ${preset.resolution.w}×${preset.resolution.h} skipFrames=${preset.skipFrames} …`)
       const ms = await microbench(backend, preset)
       const ok = ms <= budgetMs
-      log(`  ${preset.model}: ${ms.toFixed(1)}ms ${ok ? '✓ within budget' : '✗ over budget'}`)
-      if (ok) best = preset
-      else break    // monotonic: larger presets will also miss budget
+      log(`  ${preset.model}: ${ms.toFixed(1)}ms / source frame ${ok ? '✓ within budget' : '✗ over budget'}`)
+      // Keep the cheapest implementable preset as a floor in case nothing
+      // else fits. Once we hit one that's over budget, larger presets at
+      // the same skip-rate are also over — break.
+      if (ok || best === null) best = preset
+      if (!ok) break
     } catch (err) {
       log('  bench failed for', preset.model, ':', err)
       break
     }
   }
 
+  if (!best) throw new Error('autotune: no implementable preset available')
   log('picked', best.model)
   return best
 }
@@ -149,9 +159,15 @@ async function microbench(backend: Backend, preset: ManualPreset): Promise<numbe
   // end, divide by N. Avoids per-iter sync overhead skewing small-model
   // numbers; backend's queue serialises dispatches so total wall time is
   // a clean sum of per-run cost.
+  // Bench loop simulates `TIMED_ITERS` source-frame ticks. The model only
+  // runs on 1 of every (skipFrames + 1) ticks, matching the renderer's
+  // actual skip pattern. Returns avg cost per source frame, so a preset
+  // that runs the model every other frame is fairly compared against one
+  // that runs every frame.
+  const stride = preset.skipFrames + 1
   const t0 = performance.now()
   for (let i = 0; i < TIMED_ITERS; i++) {
-    network.run()
+    if (i % stride === 0) network.run()
   }
   await backend.sync()
   const total = performance.now() - t0

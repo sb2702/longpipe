@@ -58,9 +58,11 @@ export class Renderer {
   // Persistent Input op for 'image' background mode; rebuilt when image changes.
   private bgImageInput: InputOp | null = null
 
-  // Frame-skipping: model runs at preset.modelFps; display always runs.
-  // VideoFrame.timestamp is in microseconds.
-  private lastModelRunUs: number = -Infinity
+  // Frame-skipping: counter-based per preset.skipFrames. Model runs when
+  // counter hits 0; counter is reset to skipFrames after each run and
+  // decremented every other frame. Counter starts at 0 so first frame
+  // always runs the model (warm alpha tensor for compositor).
+  private skipCounter: number = 0
 
   // Stats — rolling windows trimmed to STATS_WINDOW_MS
   private framesRenderedAt: number[] = []
@@ -93,8 +95,7 @@ export class Renderer {
       return
     }
 
-    const tsUs = frame.timestamp ?? performance.now() * 1000
-    if (this.shouldRunModel(tsUs)) {
+    if (this.shouldRunModel()) {
       const t = performance.now()
       this.renderOp.runModel()
       this.modelRunsMs.push(performance.now() - t)
@@ -109,12 +110,12 @@ export class Renderer {
     this.trim(this.framesRenderedAt)
   }
 
-  private shouldRunModel(timestampUs: number): boolean {
-    const intervalUs = 1_000_000 / this.preset.modelFps
-    if (timestampUs - this.lastModelRunUs >= intervalUs) {
-      this.lastModelRunUs = timestampUs
+  private shouldRunModel(): boolean {
+    if (this.skipCounter === 0) {
+      this.skipCounter = this.preset.skipFrames
       return true
     }
+    this.skipCounter--
     return false
   }
 
@@ -141,7 +142,7 @@ export class Renderer {
     this.renderOp     = renderOp
     this.networkInput = networkInput
     this.preset       = preset
-    this.lastModelRunUs = -Infinity
+    this.skipCounter  = 0
   }
 
   getStats(): RendererStats {
