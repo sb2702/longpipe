@@ -15,6 +15,12 @@ export interface Op {
   run(): void;
 }
 
+// Renders to the backend's canvas (no Tensor output). Each backend's factory
+// hides per-frame setup (e.g. WebGPU swapchain texture acquisition).
+export interface Presenter {
+  run(): void;
+}
+
 export type Activation = "none" | "relu6";
 
 export interface Conv2dParams {
@@ -65,6 +71,11 @@ export interface Backend {
     UpsampleConcat:  (a: Tensor, b: Tensor, params: UpsampleParams) => Op;
     UpsampleConv1x1: (input: Tensor, weights: Conv2DWeights,                  params: UpsampleConv1x1Params) => Op;
     UpsampleSigmoid: (input: Tensor, params: UpsampleParams) => Op;
+  };
+
+  // Render-to-display ops. Produce no Tensor — write directly to the canvas.
+  presenters: {
+    CompositeSolid: (image: Tensor, alpha: Tensor, bgColor: [number, number, number]) => Presenter;
   };
 
   // Read tensor data back to host. The tensor must have been allocated by this backend.

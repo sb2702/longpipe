@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import type { Backend, Tensor } from '~/model/backend'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
-import { WebGLBackend } from '~/model/backends/webgl/index'
 import { EfficientNetLiteMattingLarge } from '~/model/networks/efficientnetlite_matting_large'
 import type { ModelWeights } from '~/model/weights'
 
@@ -10,10 +8,7 @@ import fixture from '../fixtures/model_large.json'
 // Accumulated FP error across ~75 ops — matches 03_full_model threshold
 const THRESHOLD = 1e-3
 
-const BACKENDS: Array<{ name: string; create: () => Promise<Backend> }> = [
-  { name: 'WebGPU', create: () => WebGPUBackend.create() },
-  { name: 'WebGL',  create: async () => WebGLBackend.create() },
-]
+import { BACKENDS } from '../helpers/backends'
 
 describe.each(BACKENDS)('EfficientNetLiteMattingLarge ($name)', ({ create }) => {
   it('layer-by-layer outputs match PyTorch reference', async () => {

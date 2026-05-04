@@ -1,4 +1,4 @@
-// 2× bilinear upsample — general ratio, align_corners=False (matches PyTorch default).
+// Bilinear upsample (arbitrary ratio), align_corners=False (matches PyTorch default).
 // Input/output in NHWC vec4 format: index = y*W*(C/4) + x*(C/4) + c_group.
 // Each thread computes one output pixel for one channel group (vec4 = 4 channels).
 

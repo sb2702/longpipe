@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WebGLBackend } from '~/model/backends/webgl/index'
+import { createWebGLBackend } from '../helpers/backends'
 import type { WebGLTensor } from '~/model/backends/webgl/base_webgl_op'
 
 import fixture from '../fixtures/channel_concat.json'
@@ -8,7 +8,7 @@ const THRESHOLD = 1e-4
 
 describe('ChannelConcat (WebGL)', () => {
   it('cat(a, b, dim=channel) matches PyTorch', async () => {
-    const backend = WebGLBackend.create()
+    const backend = createWebGLBackend()
 
     const [, , H, W] = fixture.input_shape
     const a = backend.tensor(H, W, fixture.a_channels, new Float32Array(fixture.input_a))

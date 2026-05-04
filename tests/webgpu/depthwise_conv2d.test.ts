@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
+import { createWebGPUBackend } from '../helpers/backends'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
 import depthwise_3x3 from '../fixtures/depthwise_3x3.json'
@@ -21,7 +21,7 @@ interface DepthwiseFixture {
 describe('DepthwiseConv2d', () => {
   it('3x3 matches PyTorch', async () => {
     const fixture = depthwise_3x3 as DepthwiseFixture
-    const backend = await WebGPUBackend.create()
+    const backend = await createWebGPUBackend()
 
     const [, C, H, W] = fixture.input_shape
     const input = backend.tensor(H, W, C, new Float32Array(fixture.input))

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WebGLBackend } from '~/model/backends/webgl/index'
+import { createWebGLBackend } from '../helpers/backends'
 import type { WebGLTensor } from '~/model/backends/webgl/base_webgl_op'
 
 import elementwise_add from '../fixtures/elementwise_add.json'
@@ -17,7 +17,7 @@ interface AddFixture {
 describe('Add (WebGL)', () => {
   it('elementwise add matches PyTorch', async () => {
     const fixture = elementwise_add as AddFixture
-    const backend = WebGLBackend.create()
+    const backend = createWebGLBackend()
 
     const [, C, H, W] = fixture.input_shape
     const a = backend.tensor(H, W, C, new Float32Array(fixture.input1))

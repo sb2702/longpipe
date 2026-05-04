@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
+import { createWebGPUBackend } from '../helpers/backends'
 import { SigmoidWebGPU } from '~/model/backends/webgpu/ops/sigmoid'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
@@ -9,7 +9,7 @@ const THRESHOLD = 1e-4
 
 describe('Sigmoid (WebGPU)', () => {
   it('matches PyTorch', async () => {
-    const backend = await WebGPUBackend.create()
+    const backend = await createWebGPUBackend()
 
     const [, C, H, W] = fixture.input_shape
     const input = backend.tensor(H, W, C, new Float32Array(fixture.input))

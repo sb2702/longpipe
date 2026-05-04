@@ -1,17 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import type { Backend } from '~/model/backend'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
-import { WebGLBackend } from '~/model/backends/webgl/index'
 import { DecoderBlock } from '~/model/blocks/decoder_block'
 
 import fixture from '../fixtures/decoder_block.json'
 
 const THRESHOLD = 1e-4
 
-const BACKENDS: Array<{ name: string; create: () => Promise<Backend> }> = [
-  { name: 'WebGPU', create: () => WebGPUBackend.create() },
-  { name: 'WebGL',  create: async () => WebGLBackend.create() },
-]
+import { BACKENDS } from '../helpers/backends'
 
 describe.each(BACKENDS)('DecoderBlock ($name)', ({ create }) => {
   it('upsample+concat+2×conv matches PyTorch', async () => {

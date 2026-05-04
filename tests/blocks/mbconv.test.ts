@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import type { Backend } from '~/model/backend'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
-import { WebGLBackend } from '~/model/backends/webgl/index'
 import { MBConv } from '~/model/blocks/mbconv'
 
 import mbconv_s1 from '../fixtures/mbconv_k3_s1_residual.json'
@@ -27,10 +25,7 @@ interface MBConvFixture {
   expected_output: number[]
 }
 
-const BACKENDS: Array<{ name: string; create: () => Promise<Backend> }> = [
-  { name: 'WebGPU', create: () => WebGPUBackend.create() },
-  { name: 'WebGL',  create: async () => WebGLBackend.create() },
-]
+import { BACKENDS } from '../helpers/backends'
 
 async function runFixture(backend: Backend, fixture: MBConvFixture) {
   const [, C, H, W] = fixture.input_shape

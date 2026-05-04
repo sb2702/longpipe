@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
+import { createWebGPUBackend } from '../helpers/backends'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
 import fixture from '../fixtures/upsample_concat.json'
@@ -8,7 +8,7 @@ const THRESHOLD = 1e-4
 
 describe('UpsampleConcat (WebGPU)', () => {
   it('upsample(a) + concat(b) matches PyTorch', async () => {
-    const backend = await WebGPUBackend.create()
+    const backend = await createWebGPUBackend()
 
     const a = backend.tensor(fixture.in_h,  fixture.in_w,  fixture.a_channels, new Float32Array(fixture.input_a))
     const b = backend.tensor(fixture.out_h, fixture.out_w, fixture.b_channels, new Float32Array(fixture.input_b))

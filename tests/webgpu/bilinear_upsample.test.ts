@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
+import { createWebGPUBackend } from '../helpers/backends'
 import { BilinearUpsampleWebGPU } from '~/model/backends/webgpu/ops/bilinear_upsample'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
@@ -9,7 +9,7 @@ const THRESHOLD = 1e-4
 
 describe('BilinearUpsample (WebGPU)', () => {
   it('2× matches PyTorch align_corners=False', async () => {
-    const backend = await WebGPUBackend.create()
+    const backend = await createWebGPUBackend()
 
     const [, C, H, W] = fixture.input_shape
     const [,, outH, outW] = fixture.output_shape

@@ -1,17 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import type { Backend } from '~/model/backend'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
-import { WebGLBackend } from '~/model/backends/webgl/index'
 import { DepthwiseSeparable } from '~/model/blocks/depthwise_separable'
 
 import fixture from '../fixtures/depthwise_separable.json'
 
 const THRESHOLD = 1e-4
 
-const BACKENDS: Array<{ name: string; create: () => Promise<Backend> }> = [
-  { name: 'WebGPU', create: () => WebGPUBackend.create() },
-  { name: 'WebGL',  create: async () => WebGLBackend.create() },
-]
+import { BACKENDS } from '../helpers/backends'
 
 describe.each(BACKENDS)('DepthwiseSeparable ($name)', ({ create }) => {
   it('dw+relu6+pw matches PyTorch', async () => {

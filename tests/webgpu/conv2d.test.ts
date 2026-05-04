@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
+import { createWebGPUBackend } from '../helpers/backends'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
 import conv2d_1x1      from '../fixtures/conv2d_1x1.json'
@@ -22,7 +22,7 @@ interface Conv2dFixture {
 }
 
 async function runFixture(fixture: Conv2dFixture) {
-  const backend = await WebGPUBackend.create()
+  const backend = await createWebGPUBackend()
 
   const [, C, H, W] = fixture.input_shape
   const input = backend.tensor(H, W, C, new Float32Array(fixture.input))

@@ -13,3 +13,4 @@ weights/
 test-results/
 playwright-report/
 coverage/
+demo/public

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WebGLBackend } from '~/model/backends/webgl/index'
+import { createWebGLBackend } from '../helpers/backends'
 import type { WebGLTensor } from '~/model/backends/webgl/base_webgl_op'
 
 import fixture from '../fixtures/upsample_conv1x1.json'
@@ -8,7 +8,7 @@ const THRESHOLD = 1e-4
 
 describe('UpsampleConv1x1 (WebGL)', () => {
   it('upsample + 1x1 conv matches PyTorch', async () => {
-    const backend = WebGLBackend.create()
+    const backend = createWebGLBackend()
 
     const [, C, H, W] = fixture.input_shape
     const input = backend.tensor(H, W, C, new Float32Array(fixture.input))

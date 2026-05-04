@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import type { Backend, Tensor } from '~/model/backend'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
-import { WebGLBackend } from '~/model/backends/webgl/index'
 import { EfficientNetLiteMattingLarge } from '~/model/networks/efficientnetlite_matting_large'
 import type { ModelWeights } from '~/model/weights'
 
@@ -9,10 +7,7 @@ import fixture from '../fixtures/model_small2.json'
 
 const THRESHOLD = 1e-3
 
-const BACKENDS: Array<{ name: string; create: () => Promise<Backend> }> = [
-  { name: 'WebGPU', create: () => WebGPUBackend.create() },
-  { name: 'WebGL',  create: async () => WebGLBackend.create() },
-]
+import { BACKENDS } from '../helpers/backends'
 
 // small2 has the same architecture as large (full encoder, standard decoder),
 // only the input shape differs (192×108 vs 256×144).

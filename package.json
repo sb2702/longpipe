@@ -17,7 +17,8 @@
     "build": "tsup src/index.ts --format esm,cjs --dts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dev": "vite --config demo/vite.config.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

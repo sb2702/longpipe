@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import type { Backend, Tensor } from '~/model/backend'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
-import { WebGLBackend } from '~/model/backends/webgl/index'
 import { EfficientNetLiteMattingSmall } from '~/model/networks/efficientnetlite_matting_small'
 import type { ModelWeights } from '~/model/weights'
 
@@ -9,10 +7,7 @@ import fixture from '../fixtures/model_xs.json'
 
 const THRESHOLD = 1e-3
 
-const BACKENDS: Array<{ name: string; create: () => Promise<Backend> }> = [
-  { name: 'WebGPU', create: () => WebGPUBackend.create() },
-  { name: 'WebGL',  create: async () => WebGLBackend.create() },
-]
+import { BACKENDS } from '../helpers/backends'
 
 // xs has the same architecture as small (small encoder, standard decoder trimmed),
 // only the input shape differs (192×108 vs 256×144).

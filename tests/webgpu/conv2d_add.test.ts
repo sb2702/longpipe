@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
+import { createWebGPUBackend } from '../helpers/backends'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
 import fixture from '../fixtures/conv2d_add.json'
@@ -8,7 +8,7 @@ const THRESHOLD = 1e-4
 
 describe('Conv2dAdd (WebGPU)', () => {
   it('conv + skip add matches PyTorch', async () => {
-    const backend = await WebGPUBackend.create()
+    const backend = await createWebGPUBackend()
 
     const [, C, H, W] = fixture.input_shape
     const input = backend.tensor(H, W, C, new Float32Array(fixture.input))

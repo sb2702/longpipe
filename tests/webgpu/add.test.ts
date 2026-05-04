@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { WebGPUBackend } from '~/model/backends/webgpu/index'
+import { createWebGPUBackend } from '../helpers/backends'
 import { AddWebGPU } from '~/model/backends/webgpu/ops/add'
 import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
 
@@ -18,7 +18,7 @@ interface AddFixture {
 describe('Add', () => {
   it('elementwise add matches PyTorch', async () => {
     const fixture = elementwise_add as AddFixture
-    const backend = await WebGPUBackend.create()
+    const backend = await createWebGPUBackend()
 
     const [, C, H, W] = fixture.input_shape
     const a = backend.tensor(H, W, C, new Float32Array(fixture.input1))
