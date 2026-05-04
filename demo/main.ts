@@ -4,6 +4,7 @@ import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { WebGLBackend } from '~/model/backends/webgl/index'
 import { EfficientNetLiteMattingLarge } from '~/model/networks/efficientnetlite_matting_large'
 import { BilinearUpscaler } from '~/model/effects/upscale_bilinear'
+import { BicubicUpscaler  } from '~/model/effects/upscale_bicubic'
 import { CompositorSolid } from '~/model/effects/compositor_solid'
 import { CompositorImage } from '~/model/effects/compositor_image'
 import { CompositorBlur }  from '~/model/effects/compositor_blur'
@@ -74,8 +75,9 @@ function parseHexColor(hex: string): [number, number, number] {
 // ── Pipeline ──────────────────────────────────────────────────────────────
 
 async function run() {
-  const backendName = (document.getElementById('backend') as HTMLSelectElement).value
-  const bgMode      = (document.getElementById('bgMode')  as HTMLSelectElement).value
+  const backendName  = (document.getElementById('backend')  as HTMLSelectElement).value
+  const upscalerMode = (document.getElementById('upscaler') as HTMLSelectElement).value
+  const bgMode       = (document.getElementById('bgMode')   as HTMLSelectElement).value
   const bgHex       = (document.getElementById('bgColor') as HTMLInputElement).value
   const sigma       = parseFloat((document.getElementById('bgSigma') as HTMLInputElement).value)
   const bgColor     = parseHexColor(bgHex)
@@ -139,8 +141,10 @@ async function run() {
   model.run()
   const tNet = performance.now() - t0
 
-  status('upscaling alpha…')
-  const upscaler = new BilinearUpscaler(backend, model.output, dispH, dispW)
+  status(`upscaling alpha (${upscalerMode})…`)
+  const upscaler = upscalerMode === 'bicubic'
+    ? new BicubicUpscaler(backend,  model.output, dispH, dispW)
+    : new BilinearUpscaler(backend, model.output, dispH, dispW)
   upscaler.run()
 
   status(`compositing (${bgMode})…`)
@@ -157,7 +161,7 @@ async function run() {
   }
   const tComp = performance.now() - tComp0
 
-  status(`done. network=${tNet.toFixed(1)}ms · compose=${tComp.toFixed(1)}ms · canvas=${dispW}×${dispH} · bg=${bgMode}`)
+  status(`done. network=${tNet.toFixed(1)}ms · compose=${tComp.toFixed(1)}ms · canvas=${dispW}×${dispH} · upscale=${upscalerMode} · bg=${bgMode}`)
 }
 
 // ── UI wiring ─────────────────────────────────────────────────────────────

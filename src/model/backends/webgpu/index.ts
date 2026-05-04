@@ -5,6 +5,7 @@ import { DepthwiseConv2DWebGPU } from "~/model/backends/webgpu/ops/depthwise_con
 import { AddWebGPU } from "~/model/backends/webgpu/ops/add";
 import { SigmoidWebGPU } from "~/model/backends/webgpu/ops/sigmoid";
 import { BilinearUpsampleWebGPU } from "~/model/backends/webgpu/ops/bilinear_upsample";
+import { BicubicUpsampleWebGPU  } from "~/model/backends/webgpu/ops/bicubic_upsample";
 import { ChannelConcatWebGPU } from "~/model/backends/webgpu/ops/channel_concat";
 import { Conv2dAddWebGPU } from "~/model/backends/webgpu/ops/conv2d_add";
 import { UpsampleConcatWebGPU } from "~/model/backends/webgpu/ops/upsample_concat";
@@ -47,6 +48,7 @@ export class WebGPUBackend implements Backend {
       Add:              (a, b)                          => new AddWebGPU(this, a, b),
       Sigmoid:          (input)                         => new SigmoidWebGPU(this, input),
       BilinearUpsample: (input, params)                 => new BilinearUpsampleWebGPU(this, input, params),
+      BicubicUpsample:  (input, params)                 => new BicubicUpsampleWebGPU(this, input, params),
       ChannelConcat:    (a, b)                          => new ChannelConcatWebGPU(this, a, b),
       Conv2dAdd:        (input, skip, weights, params)  => new Conv2dAddWebGPU(this, input, skip, weights, params),
       UpsampleConcat:   (a, b, params)                  => new UpsampleConcatWebGPU(this, a, b, params),

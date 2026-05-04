@@ -5,6 +5,7 @@ import { DepthwiseConv2DWebGL } from '~/model/backends/webgl/ops/depthwise_conv2
 import { AddWebGL } from '~/model/backends/webgl/ops/add'
 import { SigmoidWebGL } from '~/model/backends/webgl/ops/sigmoid'
 import { BilinearUpsampleWebGL } from '~/model/backends/webgl/ops/bilinear_upsample'
+import { BicubicUpsampleWebGL  } from '~/model/backends/webgl/ops/bicubic_upsample'
 import { ChannelConcatWebGL } from '~/model/backends/webgl/ops/channel_concat'
 import { UpsampleSigmoidWebGL } from '~/model/backends/webgl/ops/upsample_sigmoid'
 import { UpsampleConcatWebGL } from '~/model/backends/webgl/ops/upsample_concat'
@@ -35,6 +36,7 @@ export class WebGLBackend implements Backend {
       Add:              (a, b)                         => new AddWebGL(this, a, b),
       Sigmoid:          (input)                          => new SigmoidWebGL(this, input),
       BilinearUpsample: (input, params)                => new BilinearUpsampleWebGL(this, input, params),
+      BicubicUpsample:  (input, params)                => new BicubicUpsampleWebGL(this, input, params),
       ChannelConcat:    (a, b)                           => new ChannelConcatWebGL(this, a, b),
       Conv2dAdd:        (input, skip, weights, params)   => new Conv2dAddWebGL(this, input, skip, weights, params),
       UpsampleConcat:   (a, b, params)                   => new UpsampleConcatWebGL(this, a, b, params),

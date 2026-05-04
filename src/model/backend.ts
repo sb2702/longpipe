@@ -69,6 +69,7 @@ export interface Backend {
     Add:             (a: Tensor, b: Tensor) => Op;
     Sigmoid:         (input: Tensor) => Op;
     BilinearUpsample:(input: Tensor, params: UpsampleParams) => Op;
+    BicubicUpsample: (input: Tensor, params: UpsampleParams) => Op;
     ChannelConcat:   (a: Tensor, b: Tensor) => Op;
 
     // Fused — eliminate intermediate buffers between paired ops
