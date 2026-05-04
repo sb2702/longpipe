@@ -115,12 +115,13 @@ async function handleStartRender(weights: ArrayBuffer): Promise<void> {
 
   log('handleStartRender: constructing Renderer…')
   renderer = new Renderer({
-    backend: setup.backend,
-    canvas:  setup.canvas,
+    backend:     setup.backend,
+    backendKind: setup.resolvedBackend,   // 'webgpu' | 'webgl' — gates GPU-time sampling
+    canvas:      setup.canvas,
     preset,
     weights,
-    effect:  data.effect,
-    enabled: data.enabled,
+    effect:      data.effect,
+    enabled:     data.enabled,
   })
   log('handleStartRender: Renderer constructed')
 

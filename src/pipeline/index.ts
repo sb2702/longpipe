@@ -8,7 +8,8 @@
 // delegates to a submodule (topology selection, transport setup, audio
 // passthrough, worker spawn). See docs/PIPELINE.md.
 
-import type { ManualPreset, PresetName } from './presets'
+import type { ManualPreset, PresetName, ModelName } from './presets'
+import { PRESETS } from './presets'
 import type { EffectConfig, BackgroundConfig } from './effects'
 import type { AudioMode } from './audio'
 import type { InitData } from './messages'
@@ -44,6 +45,16 @@ const DEFAULTS = {
 // a PipelineOption so callers can pick their output resolution.
 const DEFAULT_CANVAS = { w: 1280, h: 720 }
 
+// Adaptive controller knobs. TODO: surface as PipelineOptions when we
+// learn what callers actually want to tune.
+const ADAPTIVE_INTERVAL_MS    = 2000   // how often to poll getStats
+const ADAPTIVE_COOLDOWN_MS    = 10000  // min gap between swaps
+const ADAPTIVE_SOURCE_FPS     = 30     // assumed source rate for budget calc
+const ADAPTIVE_MIN_FPS        = 15     // fps below this for OVERSHOOT_MS → downgrade
+const ADAPTIVE_OVERSHOOT_MS   = 5000
+const ADAPTIVE_HEADROOM_FRAC  = 0.3    // modelMs / frame budget below this for HEADROOM_MS → upgrade
+const ADAPTIVE_HEADROOM_MS    = 15000  // upgrade is more conservative than downgrade
+
 // Build the full weights URL for a resolved preset. Convention matches
 // the training pipeline's binary export naming (model_${name}.bin).
 function weightsUrlFor(baseUrl: string, model: string): string {
@@ -66,6 +77,16 @@ export class Pipeline implements PromiseLike<Pipeline> {
   private worker:        Worker
   private inputCleanup:  () => void
   private outputCleanup: () => void
+
+  // Adaptive controller state — only set if caller passed preset:'auto'
+  // (explicit preset choice is respected, never overridden).
+  private adaptiveTimer:    ReturnType<typeof setInterval> | null = null
+  private adaptiveBackend:  'webgpu' | 'webgl' | null = null
+  private adaptiveBaseUrl:  string | null = null
+  private currentPresetIdx: number = -1
+  private lastSwapAt:       number = 0
+  private overshootStart:   number = 0    // first time fps < threshold; reset when fps recovers
+  private headroomStart:    number = 0    // first time modelMs comfortable; reset when modelMs spikes
 
   constructor(inputStream: MediaStream, options: PipelineOptions) {
     const opts = { ...DEFAULTS, ...options }
@@ -150,6 +171,12 @@ export class Pipeline implements PromiseLike<Pipeline> {
       console.log('[longpipe/pipeline] sending startRender…')
       await this.controller.sendMessage('startRender', { weights }, [weights])
       console.log('[longpipe/pipeline] startRender resolved; awaiting first frame')
+
+      // Wire adaptive controller — only when caller used 'auto'. Explicit
+      // preset choices are respected and never auto-overridden.
+      if (initData.preset === 'auto') {
+        this.startAdaptive(initRes.resolvedBackend, initRes.resolvedPreset.model, weightsBaseUrl)
+      }
     } catch (err) {
       console.error('[longpipe/pipeline] bootstrap failed:', err)
       this.controller['handleMessage'].call(this.controller, {
@@ -195,7 +222,95 @@ export class Pipeline implements PromiseLike<Pipeline> {
     return this.controller.sendMessage('getStats', {} as Record<string, never>)
   }
 
+  // ── Adaptive controller ────────────────────────────────────────────────
+  // Polls getStats() every ADAPTIVE_INTERVAL_MS; downgrades when fps is
+  // consistently below ADAPTIVE_MIN_FPS for ADAPTIVE_OVERSHOOT_MS;
+  // upgrades (WebGPU only) when modelMs is consistently below
+  // (frameBudget × ADAPTIVE_HEADROOM_FRAC) for ADAPTIVE_HEADROOM_MS. After
+  // any swap, COOLDOWN_MS before considering another. Skips polls when
+  // the document is hidden so background-tab throttling doesn't trigger
+  // bogus downgrades.
+
+  private startAdaptive(backend: 'webgpu' | 'webgl', initialModel: ModelName, baseUrl: string): void {
+    this.adaptiveBackend  = backend
+    this.adaptiveBaseUrl  = baseUrl
+    this.currentPresetIdx = PRESETS.findIndex(p => p.model === initialModel)
+    this.lastSwapAt       = performance.now()
+    console.log(`[longpipe/adaptive] started; backend=${backend} initial=${initialModel} idx=${this.currentPresetIdx}`)
+    this.adaptiveTimer = setInterval(() => {
+      this.adaptiveTick().catch(err => console.warn('[longpipe/adaptive] tick failed:', err))
+    }, ADAPTIVE_INTERVAL_MS)
+  }
+
+  private async adaptiveTick(): Promise<void> {
+    if (typeof document !== 'undefined' && document.hidden) return
+    const now = performance.now()
+    if (now - this.lastSwapAt < ADAPTIVE_COOLDOWN_MS) return
+
+    const stats = await this.getStats()
+
+    // Downgrade — works on both backends, FPS-based.
+    if (stats.fps < ADAPTIVE_MIN_FPS) {
+      if (this.overshootStart === 0) this.overshootStart = now
+      if (now - this.overshootStart >= ADAPTIVE_OVERSHOOT_MS) {
+        this.tryDowngrade(stats.fps)
+      }
+    } else {
+      this.overshootStart = 0
+    }
+
+    // Upgrade — WebGPU only, modelMs-based. Need real GPU timing which
+    // WebGL's stats don't provide (sync overhead too high to sample).
+    if (this.adaptiveBackend === 'webgpu' && stats.modelMs > 0) {
+      const budgetMs = (1000 / ADAPTIVE_SOURCE_FPS) * ADAPTIVE_HEADROOM_FRAC
+      if (stats.modelMs < budgetMs) {
+        if (this.headroomStart === 0) this.headroomStart = now
+        if (now - this.headroomStart >= ADAPTIVE_HEADROOM_MS) {
+          this.tryUpgrade(stats.modelMs, budgetMs)
+        }
+      } else {
+        this.headroomStart = 0
+      }
+    }
+  }
+
+  private tryDowngrade(fps: number): void {
+    if (this.currentPresetIdx <= 0) return  // already at the floor
+    const next = this.currentPresetIdx - 1
+    console.log(`[longpipe/adaptive] downgrade ${PRESETS[this.currentPresetIdx].model} → ${PRESETS[next].model} (fps=${fps})`)
+    void this.swapToPreset(next)
+  }
+
+  private tryUpgrade(modelMs: number, budgetMs: number): void {
+    if (this.currentPresetIdx >= PRESETS.length - 1) return  // already at the ceiling
+    const next = this.currentPresetIdx + 1
+    console.log(`[longpipe/adaptive] upgrade ${PRESETS[this.currentPresetIdx].model} → ${PRESETS[next].model} (modelMs=${modelMs.toFixed(1)} < ${budgetMs.toFixed(1)})`)
+    void this.swapToPreset(next)
+  }
+
+  private async swapToPreset(idx: number): Promise<void> {
+    const preset = PRESETS[idx]
+    this.lastSwapAt     = performance.now()    // start cooldown immediately so next tick won't re-trigger
+    this.overshootStart = 0
+    this.headroomStart  = 0
+    try {
+      const url = weightsUrlFor(this.adaptiveBaseUrl!, preset.model)
+      const r   = await fetch(url)
+      if (!r.ok) throw new Error(`weights fetch failed: ${r.status} ${url}`)
+      const weights = await r.arrayBuffer()
+      await this.controller.sendMessage('setPreset', { preset: preset.model as PresetName, weights }, [weights])
+      this.currentPresetIdx = idx
+      console.log(`[longpipe/adaptive] swap to ${preset.model} done`)
+    } catch (err) {
+      console.warn('[longpipe/adaptive] swap failed:', err)
+      // Leave currentPresetIdx unchanged; cooldown still applies so we
+      // don't immediately retry.
+    }
+  }
+
   destroy(): void {
+    if (this.adaptiveTimer) clearInterval(this.adaptiveTimer)
+    this.adaptiveTimer = null
     void this.controller.sendMessage('destroy', {} as Record<string, never>)
     this.controller.terminate()
     this.inputCleanup()

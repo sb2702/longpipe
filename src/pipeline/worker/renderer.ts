@@ -19,13 +19,21 @@ import type { EffectConfig, BackgroundConfig } from '../effects'
 import type { RendererStats } from '../messages'
 
 export interface RendererOptions {
-  backend: Backend
-  canvas:  OffscreenCanvas
-  preset:  ManualPreset
-  weights: ArrayBuffer
-  effect:  EffectConfig
-  enabled: boolean
+  backend:     Backend
+  backendKind: 'webgpu' | 'webgl'    // gates GPU-time sampling (WebGL's fence polling is too heavy for per-frame use)
+  canvas:      OffscreenCanvas
+  preset:      ManualPreset
+  weights:     ArrayBuffer
+  effect:      EffectConfig
+  enabled:     boolean
 }
+
+// Only sample real GPU-time every Nth model run, and only on WebGPU.
+// WebGPU sync is one native promise per call (cheap); WebGL sync is a
+// setTimeout(1ms) polling loop per call (multiple in flight = many
+// concurrent loops). Sampling 1-in-5 keeps the adaptive logic fed without
+// adding measurement overhead that would itself perturb the measurement.
+const MODEL_TIMING_SAMPLE_INTERVAL = 5
 
 interface NetworkLike { readonly output: Tensor; run(): void }
 type NetworkCtor = new (backend: Backend, input: Tensor, w: ModelWeights) => NetworkLike
@@ -49,9 +57,15 @@ const DEFAULT_BLUR_SIGMA = 8
 export class Renderer {
   readonly canvas: OffscreenCanvas
 
-  private readonly backend: Backend
+  private readonly backend:     Backend
+  private readonly backendKind: 'webgpu' | 'webgl'
   private preset:  ManualPreset
   private enabled: boolean
+  // Current effect tracked here so setPreset can rebuild the RenderOp
+  // with the same background (otherwise an adaptive swap would flash to
+  // a hardcoded fallback).
+  private currentEffect: EffectConfig
+  private modelTimingCounter: number = 0
 
   private renderOp:     RenderOp
   private networkInput: InputOp
@@ -64,18 +78,23 @@ export class Renderer {
   // always runs the model (warm alpha tensor for compositor).
   private skipCounter: number = 0
 
-  // Stats — rolling windows trimmed to STATS_WINDOW_MS
-  private framesRenderedAt: number[] = []
-  private modelRunsAt:      number[] = []
-  private modelRunsMs:      number[] = []
-  private displayRunsMs:    number[] = []
-  private skippedCount:     number   = 0
+  // Stats — rolling windows trimmed to STATS_WINDOW_MS. Duration arrays
+  // are stored as { ts, ms } pairs so the trim-by-time logic can compare
+  // against a timestamp; previous shape (raw ms numbers) was getting
+  // wiped every poll because trimRecent treated the durations as
+  // timestamps and dropped them all.
+  private framesRenderedAt: number[]                       = []
+  private modelRunSamples:   { ts: number; ms: number }[]   = []
+  private displayRunSamples: { ts: number; ms: number }[]   = []
+  private skippedCount:      number                          = 0
 
   constructor(opts: RendererOptions) {
-    this.backend = opts.backend
-    this.canvas  = opts.canvas
-    this.preset  = opts.preset
-    this.enabled = opts.enabled
+    this.backend       = opts.backend
+    this.backendKind   = opts.backendKind
+    this.canvas        = opts.canvas
+    this.preset        = opts.preset
+    this.enabled       = opts.enabled
+    this.currentEffect = opts.effect
 
     const weights      = loadWeightsFromBinary(opts.weights)
     const { renderOp, networkInput } = this.buildRenderChain(opts.preset, weights, opts.effect)
@@ -100,19 +119,26 @@ export class Renderer {
     if (this.shouldRunModel()) {
       const t = performance.now()
       this.renderOp.runModel()
-      const dt = performance.now() - t
-      this.modelRunsMs.push(dt)
-      this.modelRunsAt.push(performance.now())
-      this.trim(this.modelRunsMs)
-      this.trim(this.modelRunsAt)
+      // GPU-time sampling: WebGPU only (cheap native promise per sync;
+      // WebGL's setTimeout-polling fence is too heavy at per-frame rate).
+      // Even on WebGPU, sample 1 in N runs to keep concurrent in-flight
+      // syncs bounded. The adaptive controller only needs a few samples
+      // per second to drive its decisions.
+      if (this.backendKind === 'webgpu' && this.modelTimingCounter % MODEL_TIMING_SAMPLE_INTERVAL === 0) {
+        this.backend.sync().then(() => {
+          this.modelRunSamples.push({ ts: performance.now(), ms: performance.now() - t })
+          this.trimSamples(this.modelRunSamples)
+        }).catch(() => { /* sync errors during shutdown are expected */ })
+      }
+      this.modelTimingCounter++
     } else {
       this.skippedCount++
     }
 
     const td = performance.now()
     this.renderOp.runDisplay()
-    this.displayRunsMs.push(performance.now() - td)
-    this.trim(this.displayRunsMs)
+    this.displayRunSamples.push({ ts: performance.now(), ms: performance.now() - td })
+    this.trimSamples(this.displayRunSamples)
 
     this.framesRenderedAt.push(performance.now())
     this.trim(this.framesRenderedAt)
@@ -129,6 +155,7 @@ export class Renderer {
 
   setEffect(config: EffectConfig): void {
     if (config.effect !== 'background') return    // only background in v0.1
+    this.currentEffect = config                    // remember for setPreset rebuilds
     this.renderOp.setBackground(this.translateBackground(config.config))
   }
 
@@ -140,13 +167,10 @@ export class Renderer {
   // is designed to support this from day one — no constructor-frozen state.
   setPreset(preset: ManualPreset, weightsBuf: ArrayBuffer): void {
     const weights = loadWeightsFromBinary(weightsBuf)
-    // Reuse the current background as-is; translate from the renderOp's
-    // current config if needed. For now we re-derive from the most recent
-    // effect by passing through a 'solid black' baseline; setEffect is
-    // expected to be called immediately after if the caller wants a
-    // specific background. Keeps the swap cheap and atomic.
-    const fallbackEffect: EffectConfig = { effect: 'background', config: { color: [0, 0, 0] } }
-    const { renderOp, networkInput } = this.buildRenderChain(preset, weights, fallbackEffect)
+    // Preserve current effect across the swap — adaptive logic shouldn't
+    // visually flash to a fallback background. The new RenderOp gets the
+    // same background config the user last selected.
+    const { renderOp, networkInput } = this.buildRenderChain(preset, weights, this.currentEffect)
     this.renderOp     = renderOp
     this.networkInput = networkInput
     this.preset       = preset
@@ -156,15 +180,14 @@ export class Renderer {
   getStats(): RendererStats {
     const now = performance.now()
     this.trimRecent(this.framesRenderedAt, now)
-    this.trimRecent(this.modelRunsAt,      now)
-    this.trimRecent(this.modelRunsMs,      now)
-    this.trimRecent(this.displayRunsMs,    now)
+    this.trimSamplesAt(this.modelRunSamples,   now)
+    this.trimSamplesAt(this.displayRunSamples, now)
     return {
       // window is 1s, so length = events-per-second
       fps:        this.framesRenderedAt.length,
-      modelFps:   this.modelRunsAt.length,
-      modelMs:    median(this.modelRunsMs),
-      displayMs:  median(this.displayRunsMs),
+      modelFps:   this.modelRunSamples.length,
+      modelMs:    median(this.modelRunSamples.map(s => s.ms)),
+      displayMs:  median(this.displayRunSamples.map(s => s.ms)),
       skipped:    this.skippedCount,
       preset:     this.preset.model,
       skipFrames: this.preset.skipFrames,
@@ -207,15 +230,27 @@ export class Renderer {
     return { mode: 'image', image: this.bgImageInput.output }
   }
 
-  // Drop entries older than STATS_WINDOW_MS. Cheap O(n); arrays stay small.
+  // Hard-cap helpers: bound buffer sizes so stale data can't grow without
+  // bound between getStats() calls.
   private trim(arr: number[]): void {
-    if (arr.length > 240) arr.splice(0, arr.length - 240)   // hard cap
+    if (arr.length > 240) arr.splice(0, arr.length - 240)
+  }
+  private trimSamples(arr: { ts: number; ms: number }[]): void {
+    if (arr.length > 240) arr.splice(0, arr.length - 240)
   }
 
+  // Trim by time. Compares against the entry's ts field for sample arrays
+  // and against the value itself for raw timestamp arrays.
   private trimRecent(arr: number[], now: number): void {
     const cutoff = now - STATS_WINDOW_MS
     let i = 0
     while (i < arr.length && arr[i] < cutoff) i++
+    if (i > 0) arr.splice(0, i)
+  }
+  private trimSamplesAt(arr: { ts: number; ms: number }[], now: number): void {
+    const cutoff = now - STATS_WINDOW_MS
+    let i = 0
+    while (i < arr.length && arr[i].ts < cutoff) i++
     if (i > 0) arr.splice(0, i)
   }
 }
