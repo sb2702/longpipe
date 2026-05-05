@@ -42,6 +42,7 @@
       <label>background:
         <select id="bgMode">
           <option value="image" selected>image (demo.jpg)</option>
+          <option value="video">video (hero-small.mp4)</option>
           <option value="blur">blur</option>
           <option value="solid">solid color</option>
         </select>
@@ -88,10 +89,13 @@
         ]
       }
 
+      const VIDEO_BG_URL = 'https://katana.video/files/hero-small.mp4'
+
       function currentBgConfig() {
         const mode = $bgMode.value
         if (mode === 'blur')  return { blur: { sigma: parseFloat($bgSigma.value) } }
         if (mode === 'solid') return { color: parseHex($bgColor.value) }
+        if (mode === 'video') return { video: VIDEO_BG_URL }
         return null   // image — handled async
       }
 

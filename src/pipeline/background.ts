@@ -1,9 +1,17 @@
 // Background option parsing — main-thread boundary between the wide public
 // input surface and the narrow canonical form the worker consumes.
 //
-// All async loading (URL fetch, Blob → ImageBitmap decode) happens here so
-// the worker only ever sees fully-resolved data. Pipeline.bootstrap()
-// awaits normalizeBackground() before sending startRender to the worker.
+// All async loading (URL fetch, Blob → ImageBitmap decode, video element
+// setup) happens here so the worker only ever sees fully-resolved data
+// and ports it can use directly. Pipeline.bootstrap() awaits
+// normalizeBackground() before sending startRender to the worker.
+//
+// For kinds that own resources (video element, MessagePort), the
+// normalizer also returns a `transferList` (handed to postMessage so
+// the port crosses zero-copy) and a `cleanup` callback (Pipeline calls
+// it when this background is replaced or the pipeline is destroyed).
+
+import { setupVideoSource, type VideoSourceInput } from './video_source'
 
 const SIGMA_LOW    = 4
 const SIGMA_MEDIUM = 8
@@ -45,24 +53,39 @@ export type Background =
   | { kind: 'color'; rgb: [number, number, number] }
   | { kind: 'blur';  sigma: number }
   | { kind: 'image'; bitmap: ImageBitmap }
+  | { kind: 'video'; port:   MessagePort }
+
+// ---- Parser result wrapper ----
+//
+// `transferList` is included for kinds whose canonical form holds a
+// transferable (the video MessagePort). `cleanup` is included when the
+// normalizer constructed a resource that needs lifecycle management
+// (the hidden video element + rVFC loop for video kind). Pipeline owns
+// the cleanup and calls it on bg replacement / pipeline destroy.
+
+export interface NormalizedBackground {
+  background:    Background
+  transferList?: Transferable[]
+  cleanup?:      () => void
+}
 
 // ---- Parser ----
 
-export async function normalizeBackground(input: BackgroundInput): Promise<Background> {
+export async function normalizeBackground(input: BackgroundInput): Promise<NormalizedBackground> {
   if (typeof input === 'string') {
-    if (input === 'none') return { kind: 'none' }
-    if (input === 'blur') return { kind: 'blur', sigma: SIGMA_MEDIUM }
-    return { kind: 'image', bitmap: await loadImageFromUrl(input) }
+    if (input === 'none') return { background: { kind: 'none' } }
+    if (input === 'blur') return { background: { kind: 'blur', sigma: SIGMA_MEDIUM } }
+    return { background: { kind: 'image', bitmap: await loadImageFromUrl(input) } }
   }
 
   if (input instanceof ImageBitmap) {
-    return { kind: 'image', bitmap: input }
+    return { background: { kind: 'image', bitmap: input } }
   }
   if (typeof HTMLImageElement !== 'undefined' && input instanceof HTMLImageElement) {
-    return { kind: 'image', bitmap: await createImageBitmap(input) }
+    return { background: { kind: 'image', bitmap: await createImageBitmap(input) } }
   }
   if (typeof HTMLVideoElement !== 'undefined' && input instanceof HTMLVideoElement) {
-    throw new Error('background: video element input is not yet implemented')
+    return await parseVideo(input)
   }
 
   // Cast to the object-form union: by this point we've ruled out strings
@@ -70,12 +93,36 @@ export async function normalizeBackground(input: BackgroundInput): Promise<Backg
   // are conservative (HTMLImageElement etc. have `.blur()` methods that
   // confuse `'blur' in input`).
   const obj = input as { color?: [number, number, number]; blur?: BlurInput; image?: ImageInput; video?: VideoInput }
-  if (obj.color) return { kind: 'color', rgb: obj.color }
-  if (obj.blur  !== undefined) return { kind: 'blur',  sigma: parseBlur(obj.blur) }
-  if (obj.image !== undefined) return { kind: 'image', bitmap: await parseImage(obj.image) }
-  if (obj.video !== undefined) throw new Error('background: video input is not yet implemented')
+  if (obj.color)               return { background: { kind: 'color', rgb: obj.color } }
+  if (obj.blur  !== undefined) return { background: { kind: 'blur',  sigma: parseBlur(obj.blur) } }
+  if (obj.image !== undefined) return { background: { kind: 'image', bitmap: await parseImage(obj.image) } }
+  if (obj.video !== undefined) return await parseVideo(obj.video)
 
   throw new Error(`background: unrecognized input shape — ${describe(input)}`)
+}
+
+async function parseVideo(input: VideoInput): Promise<NormalizedBackground> {
+  // Coerce the public VideoInput shape into setupVideoSource's input
+  // (HTMLVideoElement | string | Blob). The { data, type } object form
+  // wraps to a Blob first; everything else is passed through.
+  let src: VideoSourceInput
+  if (typeof input === 'string') {
+    src = input
+  } else if (typeof HTMLVideoElement !== 'undefined' && input instanceof HTMLVideoElement) {
+    src = input
+  } else if (input && typeof input === 'object' && 'data' in input && 'type' in input) {
+    src = input.data instanceof Blob
+      ? input.data
+      : new Blob([input.data as BlobPart], { type: input.type })
+  } else {
+    throw new Error(`background.video: unrecognized shape — ${describe(input)}`)
+  }
+  const setup = await setupVideoSource(src)
+  return {
+    background:   { kind: 'video', port: setup.port },
+    transferList: setup.transferList,
+    cleanup:      setup.cleanup,
+  }
 }
 
 function parseBlur(b: BlurInput): number {

@@ -83,6 +83,12 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // adaptive option isn't explicitly disabled.
   private adaptive: AdaptiveController | null = null
 
+  // Cleanup callback for the current background. Set by normalizeBackground
+  // for kinds that own resources (currently: video, which holds a hidden
+  // <video> element + rVFC loop + MessageChannel). Called when bg is
+  // replaced or the pipeline is destroyed.
+  private bgCleanup: (() => void) | null = null
+
   constructor(inputStream: MediaStream, options: PipelineOptions) {
     const opts = { ...DEFAULTS, ...options }
 
@@ -159,11 +165,13 @@ export class Pipeline implements PromiseLike<Pipeline> {
   ): Promise<void> {
     try {
       console.log('[longpipe/pipeline] normalizing background…')
-      const background = await normalizeBackground(rawBackground)
-      const initData: InitData = { ...partialInit, background }
+      const norm = await normalizeBackground(rawBackground)
+      this.bgCleanup = norm.cleanup ?? null
+      const initData: InitData = { ...partialInit, background: norm.background }
+      const initTransferList = [...transferList, ...(norm.transferList ?? [])]
 
       console.log('[longpipe/pipeline] sending init…')
-      const initRes = await this.controller.sendMessage('init', initData, transferList)
+      const initRes = await this.controller.sendMessage('init', initData, initTransferList)
       console.log('[longpipe/pipeline] init resolved:', initRes)
 
       const url = weightsUrlFor(weightsBaseUrl, initRes.resolvedPreset.model)
@@ -215,11 +223,17 @@ export class Pipeline implements PromiseLike<Pipeline> {
 
   // Swap the background at runtime. Same wide input surface as construction;
   // returns a Promise that resolves once the new background has been
-  // normalized (URL fetched, bitmap decoded, etc.) and the worker has
-  // applied it. Throws on parse errors / failed loads.
+  // normalized (URL fetched, bitmap decoded, video setup, etc.) and the
+  // worker has applied it. Throws on parse errors / failed loads.
+  // The previous background's resources (e.g. video element) are cleaned
+  // up after the worker confirms the new background is in place — earlier
+  // teardown could leave the worker reading from a torn-down port.
   async setBackground(input: BackgroundInput): Promise<void> {
-    const bg = await normalizeBackground(input)
-    await this.controller.sendMessage('setBackground', bg)
+    const norm = await normalizeBackground(input)
+    const previousCleanup = this.bgCleanup
+    this.bgCleanup = norm.cleanup ?? null
+    await this.controller.sendMessage('setBackground', norm.background, norm.transferList)
+    previousCleanup?.()
   }
 
   setPreset(p: PresetName | ManualPreset, weights?: ArrayBuffer): void {
@@ -243,6 +257,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
   destroy(): void {
     this.adaptive?.stop()
     this.adaptive = null
+    this.bgCleanup?.()
+    this.bgCleanup = null
     void this.controller.sendMessage('destroy', {} as Record<string, never>)
     this.controller.terminate()
     this.inputCleanup()

@@ -79,6 +79,13 @@ export class Renderer {
   private renderOp:     RenderOp
   // Persistent Input op for 'image' background mode; rebuilt when image changes.
   private bgImageInput: InputOp | null = null
+  // Persistent Input op + port for 'video' background mode. The port
+  // receives a fresh VideoFrame from main on every video-frame; we
+  // upload it into bgVideoInput's tensor and close the frame. The
+  // compositor reads from bgVideoInput.output every render — no
+  // synchronization needed (last write wins).
+  private bgVideoInput: InputOp     | null = null
+  private bgVideoPort:  MessagePort | null = null
 
   // Frame-skipping: counter-based per preset.skipFrames. Model runs when
   // counter hits 0; counter is reset to skipFrames after each run and
@@ -219,6 +226,13 @@ export class Renderer {
   // ── internals ─────────────────────────────────────────────────────────────
 
   private translateBackground(bg: Background): RenderOpBackgroundConfig {
+    // Switching away from video — close the prior port. Frames in flight
+    // get dropped, which is fine.
+    if (bg.kind !== 'video' && this.bgVideoPort) {
+      this.bgVideoPort.close()
+      this.bgVideoPort = null
+    }
+
     switch (bg.kind) {
       case 'none':
         // RenderOp always builds a compositor; we pass a stub solid-black
@@ -236,6 +250,26 @@ export class Renderer {
         this.bgImageInput.setSource(bg.bitmap)
         this.bgImageInput.run()
         return { mode: 'image', image: this.bgImageInput.output }
+      case 'video': {
+        if (!this.bgVideoInput) {
+          this.bgVideoInput = this.backend.ops.Input(this.canvas.height, this.canvas.width)
+        }
+        // If switching from one video to another, close the prior port.
+        if (this.bgVideoPort) this.bgVideoPort.close()
+        this.bgVideoPort = bg.port
+        const input = this.bgVideoInput
+        bg.port.onmessage = (e: MessageEvent<{ frame: VideoFrame }>) => {
+          const frame = e.data.frame
+          try {
+            input.setSource(frame)
+            input.run()
+          } finally {
+            frame.close()
+          }
+        }
+        bg.port.start?.()
+        return { mode: 'image', image: this.bgVideoInput.output }
+      }
     }
   }
 
