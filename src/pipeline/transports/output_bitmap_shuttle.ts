@@ -19,6 +19,11 @@ export interface BitmapShuttleOutputSetup {
   videoTrack:   MediaStreamTrack
   port:         MessagePort           // hand this to worker via transfer list
   transferList: Transferable[]
+  // Stream input frames straight to the output canvas while the worker is
+  // initializing (autotune + weight fetch + first frame can take 1-3s).
+  // Auto-stops the moment the worker posts its first bitmap so the handoff
+  // is seamless. Safe to call once; no-op on subsequent calls.
+  startPassthrough: (inputStream: MediaStream) => void
   cleanup:      () => void
 }
 
@@ -48,7 +53,15 @@ export function setupBitmapShuttleOutput(
   const mainPort   = channel.port1
   const workerPort = channel.port2
 
+  // Passthrough state — only relevant between startPassthrough() and the
+  // first worker bitmap. Closure-captured so it can be torn down from
+  // either trigger point.
+  let passthroughActive = false
+  let passthroughVideo: HTMLVideoElement | null = null
+  let stopPassthrough: () => void = () => {}
+
   mainPort.onmessage = (e: MessageEvent<{ bmp: ImageBitmap }>) => {
+    if (passthroughActive) stopPassthrough()
     try {
       ctx.transferFromImageBitmap(e.data.bmp)
     } catch (err) {
@@ -59,7 +72,61 @@ export function setupBitmapShuttleOutput(
   }
   mainPort.start()
 
+  const startPassthrough = (inputStream: MediaStream) => {
+    if (passthroughActive) return
+    passthroughActive = true
+
+    const video = document.createElement('video')
+    video.srcObject  = inputStream
+    video.muted      = true
+    video.playsInline = true
+    void video.play().catch(() => {})
+    passthroughVideo = video
+
+    // Per-frame: createImageBitmap (with resize to canvas size for stable
+    // captureStream output dims) → transferFromImageBitmap. Each iteration
+    // schedules the next via rVFC (or rAF fallback for browsers without
+    // rVFC on <video>; rare in our targets).
+    const schedule: (cb: () => void) => void =
+      'requestVideoFrameCallback' in video
+        ? (cb) => { video.requestVideoFrameCallback(cb) }
+        : (cb) => { requestAnimationFrame(cb) }
+
+    const tick = () => {
+      if (!passthroughActive) return
+      if (video.videoWidth === 0) {
+        // input not ready yet — try again next frame
+        schedule(tick)
+        return
+      }
+      createImageBitmap(video, {
+        resizeWidth:   canvas.width,
+        resizeHeight:  canvas.height,
+        resizeQuality: 'medium',
+      }).then(bmp => {
+        if (!passthroughActive) { bmp.close(); return }
+        try { ctx.transferFromImageBitmap(bmp) } catch { /* drop */ }
+        schedule(tick)
+      }).catch(() => {
+        // createImageBitmap can fail mid-stream (e.g., paused source).
+        // Don't propagate — just retry.
+        schedule(tick)
+      })
+    }
+    schedule(tick)
+
+    stopPassthrough = () => {
+      passthroughActive = false
+      if (passthroughVideo) {
+        passthroughVideo.srcObject = null
+        passthroughVideo.pause()
+        passthroughVideo = null
+      }
+    }
+  }
+
   const cleanup = () => {
+    stopPassthrough()
     mainPort.onmessage = null
     mainPort.close()
     videoTrack.stop()
@@ -69,6 +136,7 @@ export function setupBitmapShuttleOutput(
     videoTrack,
     port:         workerPort,
     transferList: [workerPort],
+    startPassthrough,
     cleanup,
   }
 }

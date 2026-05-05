@@ -99,11 +99,14 @@ export class Pipeline implements PromiseLike<Pipeline> {
     this.inputCleanup  = inputSetup.cleanup
     this.outputCleanup = outputSetup.cleanup
 
-    // Output MediaStream available synchronously. Until the worker emits
-    // 'ready' on first processed frame, the captureStream-fed track will
-    // simply emit nothing (consumer will see a frozen / black frame).
+    // Output MediaStream available synchronously. While the worker boots
+    // (autotune + weight fetch + first frame can take 1-3s), the bitmap-
+    // shuttle transport pumps input frames straight to the output canvas
+    // so the consumer sees live video immediately. The transport auto-
+    // stops passthrough the moment the worker posts its first bitmap.
     // Audio passthrough wires the input's audio tracks if requested.
     this.stream = buildOutputStream(outputSetup.videoTrack, inputStream, opts.audio)
+    outputSetup.startPassthrough(inputStream)
 
     // Worker spawn — `new URL(..., import.meta.url)` is the standard ESM
     // worker pattern; bundlers (vite, webpack, rollup) handle it.
