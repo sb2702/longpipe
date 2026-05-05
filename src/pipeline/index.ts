@@ -27,7 +27,7 @@ export interface PipelineOptions {
   // Resolved on the main thread by normalizeBackground() before init.
   // Default: 'none' (passthrough).
   background?:     BackgroundInput
-  preset?:         PresetName | ManualPreset    // default: 'balanced' ('auto' maps until autotune lands)
+  preset?:         PresetName | ManualPreset    // default: 'auto' (worker microbenches, picks best fit)
   weightsBaseUrl?: string                       // default: DEFAULT_WEIGHTS_BASE_URL
   audio?:          AudioMode                    // default: 'passthrough'
   enabled?:        boolean                      // default: true
