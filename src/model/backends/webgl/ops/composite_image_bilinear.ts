@@ -1,6 +1,6 @@
-import type { Tensor } from '~/model/backend'
-import type { WebGLBackend } from '~/model/backends/webgl/index'
-import type { WebGLTensor } from '~/model/backends/webgl/base_webgl_op'
+import type { Tensor } from '~/model/backend.ts'
+import type { WebGLBackend } from '~/model/backends/webgl/index.ts'
+import type { WebGLTensor } from '~/model/backends/webgl/base_webgl_op.ts'
 import compositeBilinearSrc from '~/model/backends/webgl/shaders/composite_image_bilinear.glsl'
 
 const QUAD_VERT = `#version 300 es

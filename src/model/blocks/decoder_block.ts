@@ -1,5 +1,5 @@
-import type { Backend, Tensor, Op } from '~/model/backend'
-import type { DecoderBlockWeights } from '~/model/weights'
+import type { Backend, Tensor, Op } from '~/model/backend.ts'
+import type { DecoderBlockWeights } from '~/model/weights.ts'
 
 export interface DecoderBlockParams {
   outChannels: number

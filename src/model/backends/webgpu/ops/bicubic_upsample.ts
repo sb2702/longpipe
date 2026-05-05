@@ -1,6 +1,6 @@
-import type { Tensor, MLBuffer, UpsampleParams } from '~/model/backend'
-import type { WebGPUBackend } from '~/model/backends/webgpu/index'
-import { WebGPUTensor, WebGPUOp } from '~/model/backends/webgpu/base_webgpu_op'
+import type { Tensor, MLBuffer, UpsampleParams } from '~/model/backend.ts'
+import type { WebGPUBackend } from '~/model/backends/webgpu/index.ts'
+import { WebGPUTensor, WebGPUOp } from '~/model/backends/webgpu/base_webgpu_op.ts'
 import bicubicF32Src from '~/model/backends/webgpu/shaders/bicubic_upsample.wgsl'
 import bicubicF16Src from '~/model/backends/webgpu/shaders/bicubic_upsample_f16.wgsl'
 

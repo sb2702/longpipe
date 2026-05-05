@@ -4,7 +4,7 @@
 // dedicated MessagePorts and is NOT modeled here — that bypass is
 // intentional, to avoid UUID/Promise overhead per frame.
 
-import type { Dtype } from '~/model/backend'
+import type { Dtype } from '~/model/backend.ts'
 import type { ManualPreset, PresetName } from './presets'
 import type { Background } from './background'
 import type { Topology } from './topology'

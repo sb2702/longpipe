@@ -1,4 +1,4 @@
-import type { Dtype } from '~/model/backend'
+import type { Dtype } from '~/model/backend.ts'
 
 export type ModelName = 'xxs' | 'xs' | 'small' | 'compact' | 'medium' | 'large' | 'xl'
 

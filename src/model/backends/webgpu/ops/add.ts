@@ -1,6 +1,6 @@
-import type { Tensor, MLBuffer } from "~/model/backend";
-import type { WebGPUBackend } from "~/model/backends/webgpu/index";
-import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op";
+import type { Tensor, MLBuffer } from "~/model/backend.ts";
+import type { WebGPUBackend } from "~/model/backends/webgpu/index.ts";
+import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op.ts";
 import addF32Src from "~/model/backends/webgpu/shaders/add.wgsl";
 import addF16Src from "~/model/backends/webgpu/shaders/add_f16.wgsl";
 

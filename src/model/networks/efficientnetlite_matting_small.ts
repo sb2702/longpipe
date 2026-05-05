@@ -1,8 +1,8 @@
-import type { Backend, Tensor, Op } from '~/model/backend'
-import type { ModelWeights } from '~/model/weights'
-import { DepthwiseSeparable } from '~/model/blocks/depthwise_separable'
-import { MBConv } from '~/model/blocks/mbconv'
-import { DecoderBlock } from '~/model/blocks/decoder_block'
+import type { Backend, Tensor, Op } from '~/model/backend.ts'
+import type { ModelWeights } from '~/model/weights.ts'
+import { DepthwiseSeparable } from '~/model/blocks/depthwise_separable.ts'
+import { MBConv } from '~/model/blocks/mbconv.ts'
+import { DecoderBlock } from '~/model/blocks/decoder_block.ts'
 
 // Small encoder (tf_efficientnet_lite0, out_indices=(1,2,3) — stops at stage 4),
 // standard decoder trimmed to 2 skips: dec_ch=(128,64,32). Used by small + xs presets.

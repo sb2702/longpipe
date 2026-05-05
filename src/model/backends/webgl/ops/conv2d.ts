@@ -1,10 +1,10 @@
-import type { Tensor, MLBuffer, Conv2dParams } from '~/model/backend'
-import type { Conv2DWeights } from '~/model/weights'
-import type { WebGLBackend } from '~/model/backends/webgl/index'
-import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op'
+import type { Tensor, MLBuffer, Conv2dParams } from '~/model/backend.ts'
+import type { Conv2DWeights } from '~/model/weights.ts'
+import type { WebGLBackend } from '~/model/backends/webgl/index.ts'
+import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op.ts'
 import conv2dSrc from '~/model/backends/webgl/shaders/conv2d.glsl'
-import { convOutSize, resolvePad } from '~/model/backends/webgpu/ops/conv_utils'
-import { toUploadView } from '~/utils/weights'
+import { convOutSize, resolvePad } from '~/model/backends/webgpu/ops/conv_utils.ts'
+import { toUploadView } from '~/utils/weights.ts'
 
 export class Conv2DWebGL extends WebGLOp {
   readonly inputs: Tensor[]

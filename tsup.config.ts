@@ -12,6 +12,10 @@ export default defineConfig({
   esbuildPlugins: [
     {
       name: 'tilde-alias',
+      // All `~/...` imports include explicit extensions (`.ts`, `.wgsl`,
+      // `.glsl`), so this plugin just rewrites the prefix and hands the
+      // fully-qualified path to esbuild. No extension/index resolution
+      // needed — that responsibility lives at the import site.
       setup(build) {
         build.onResolve({ filter: /^~\// }, args => ({
           path: resolve(__dirname, 'src', args.path.slice(2)),

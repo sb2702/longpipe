@@ -13,14 +13,14 @@
 import type {
   Backend, Tensor,
   Conv2dParams, DepthwiseParams, UpsampleConv1x1Params,
-} from '~/model/backend'
-import type { Conv2DWeights, DepthwiseWeights, ModelWeights } from '~/model/weights'
+} from '~/model/backend.ts'
+import type { Conv2DWeights, DepthwiseWeights, ModelWeights } from '~/model/weights.ts'
 import { PRESETS, type ManualPreset, type ModelName } from '../presets'
-import { EfficientNetLiteMattingLarge }   from '~/model/networks/efficientnetlite_matting_large'
-import { EfficientNetLiteMattingCompact } from '~/model/networks/efficientnetlite_matting_compact'
-import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small'
-import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl'
-import {WebGLBackend} from "~/model/backends/webgl";
+import { EfficientNetLiteMattingLarge }   from '~/model/networks/efficientnetlite_matting_large.ts'
+import { EfficientNetLiteMattingCompact } from '~/model/networks/efficientnetlite_matting_compact.ts'
+import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small.ts'
+import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl.ts'
+import {WebGLBackend} from "~/model/backends/webgl/index.ts";
 
 // Frame budget = (1000 / sourceFps) × SAFETY_MARGIN. The model gets at
 // most this fraction of each input frame; the rest is reserved for

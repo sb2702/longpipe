@@ -1,6 +1,6 @@
-import type { Tensor, UpsampleParams } from '~/model/backend'
-import type { WebGLBackend } from '~/model/backends/webgl/index'
-import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op'
+import type { Tensor, UpsampleParams } from '~/model/backend.ts'
+import type { WebGLBackend } from '~/model/backends/webgl/index.ts'
+import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op.ts'
 import upsampleSigmoidSrc from '~/model/backends/webgl/shaders/upsample_sigmoid.glsl'
 
 export class UpsampleSigmoidWebGL extends WebGLOp {

@@ -2,18 +2,18 @@
 // with frame-skipping logic. Adapters call process(frame) per input frame;
 // renderer decides whether to run the model this frame.
 
-import type { Backend, Tensor, InputOp } from '~/model/backend'
+import type { Backend, Tensor, InputOp } from '~/model/backend.ts'
 // Note: this file builds the GPU compute chain (network + RenderOp). The
 // Streams API pipe chain (inputReadable → transform → outputWritable) is
 // wired in worker/index.ts handleInit() where transport adapters are
 // composed with this renderer.
-import type { ModelWeights } from '~/model/weights'
-import { RenderOp, type BackgroundConfig as RenderOpBackgroundConfig } from '~/model/render_op'
-import { loadWeightsFromBinary } from '~/utils/loadWeights'
-import { EfficientNetLiteMattingLarge }   from '~/model/networks/efficientnetlite_matting_large'
-import { EfficientNetLiteMattingCompact } from '~/model/networks/efficientnetlite_matting_compact'
-import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small'
-import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl'
+import type { ModelWeights } from '~/model/weights.ts'
+import { RenderOp, type BackgroundConfig as RenderOpBackgroundConfig } from '~/model/render_op.ts'
+import { loadWeightsFromBinary } from '~/utils/loadWeights.ts'
+import { EfficientNetLiteMattingLarge }   from '~/model/networks/efficientnetlite_matting_large.ts'
+import { EfficientNetLiteMattingCompact } from '~/model/networks/efficientnetlite_matting_compact.ts'
+import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small.ts'
+import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl.ts'
 import type { ManualPreset, ModelName } from '../presets'
 import type { Background } from '../background'
 import type { RendererStats } from '../messages'

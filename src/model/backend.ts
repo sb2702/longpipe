@@ -1,4 +1,4 @@
-import type { Conv2DWeights, DepthwiseWeights } from '~/model/weights'
+import type { Conv2DWeights, DepthwiseWeights } from '~/model/weights.ts'
 
 export type Dtype = 'f32' | 'f16'
 

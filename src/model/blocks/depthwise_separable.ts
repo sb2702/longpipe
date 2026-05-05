@@ -1,5 +1,5 @@
-import type { Backend, Tensor, Op } from '~/model/backend'
-import type { DepthwiseSeparableWeights } from '~/model/weights'
+import type { Backend, Tensor, Op } from '~/model/backend.ts'
+import type { DepthwiseSeparableWeights } from '~/model/weights.ts'
 
 export interface DepthwiseSeparableParams {
   outChannels: number

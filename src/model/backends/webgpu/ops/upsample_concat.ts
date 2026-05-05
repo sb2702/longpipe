@@ -1,6 +1,6 @@
-import type { Tensor, MLBuffer, UpsampleParams } from "~/model/backend";
-import type { WebGPUBackend } from "~/model/backends/webgpu/index";
-import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op";
+import type { Tensor, MLBuffer, UpsampleParams } from "~/model/backend.ts";
+import type { WebGPUBackend } from "~/model/backends/webgpu/index.ts";
+import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op.ts";
 import upsampleConcatF32Src from "~/model/backends/webgpu/shaders/upsample_concat.wgsl";
 import upsampleConcatF16Src from "~/model/backends/webgpu/shaders/upsample_concat_f16.wgsl";
 

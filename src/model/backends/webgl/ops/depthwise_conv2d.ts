@@ -1,10 +1,10 @@
-import type { Tensor, MLBuffer, DepthwiseParams } from '~/model/backend'
-import type { DepthwiseWeights } from '~/model/weights'
-import type { WebGLBackend } from '~/model/backends/webgl/index'
-import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op'
+import type { Tensor, MLBuffer, DepthwiseParams } from '~/model/backend.ts'
+import type { DepthwiseWeights } from '~/model/weights.ts'
+import type { WebGLBackend } from '~/model/backends/webgl/index.ts'
+import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op.ts'
 import depthwiseSrc from '~/model/backends/webgl/shaders/depthwise_conv2d.glsl'
-import { convOutSize, resolvePad } from '~/model/backends/webgpu/ops/conv_utils'
-import { toUploadView } from '~/utils/weights'
+import { convOutSize, resolvePad } from '~/model/backends/webgpu/ops/conv_utils.ts'
+import { toUploadView } from '~/utils/weights.ts'
 
 export class DepthwiseConv2DWebGL extends WebGLOp {
   readonly inputs: Tensor[]

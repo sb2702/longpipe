@@ -1,5 +1,5 @@
-import type { Backend, Tensor, Presenter } from '~/model/backend'
-import { BlurPyramid } from '~/model/effects/blur_pyramid'
+import type { Backend, Tensor, Presenter } from '~/model/backend.ts'
+import { BlurPyramid } from '~/model/effects/blur_pyramid.ts'
 
 // Background-blur composite: blurs the input image with a pyramid (output
 // stops at half input resolution) and composites it as the bg via the

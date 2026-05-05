@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Op } from '~/model/backend'
+import type { Backend, Tensor, Op } from '~/model/backend.ts'
 
 // Bicubic upscale (Keys cubic, a=-0.75, align_corners=False) of a Tensor to
 // an arbitrary output resolution. Backend-agnostic — wraps the per-backend

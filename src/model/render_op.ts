@@ -1,9 +1,9 @@
-import type { Backend, Tensor, InputOp, ImageSource } from '~/model/backend'
-import { BilinearUpscaler } from '~/model/effects/upscale_bilinear'
-import { BicubicUpscaler  } from '~/model/effects/upscale_bicubic'
-import { CompositorSolid } from '~/model/effects/compositor_solid'
-import { CompositorImage } from '~/model/effects/compositor_image'
-import { CompositorBlur }  from '~/model/effects/compositor_blur'
+import type { Backend, Tensor, InputOp, ImageSource } from '~/model/backend.ts'
+import { BilinearUpscaler } from '~/model/effects/upscale_bilinear.ts'
+import { BicubicUpscaler  } from '~/model/effects/upscale_bicubic.ts'
+import { CompositorSolid } from '~/model/effects/compositor_solid.ts'
+import { CompositorImage } from '~/model/effects/compositor_image.ts'
+import { CompositorBlur }  from '~/model/effects/compositor_blur.ts'
 
 export type UpscalerMode = 'bilinear' | 'bicubic'
 

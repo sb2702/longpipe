@@ -1,6 +1,6 @@
-import type { ImageSource, InputOp } from '~/model/backend'
-import type { WebGLBackend } from '~/model/backends/webgl/index'
-import type { WebGLTensor } from '~/model/backends/webgl/base_webgl_op'
+import type { ImageSource, InputOp } from '~/model/backend.ts'
+import type { WebGLBackend } from '~/model/backends/webgl/index.ts'
+import type { WebGLTensor } from '~/model/backends/webgl/base_webgl_op.ts'
 import inputSrc from '~/model/backends/webgl/shaders/input.glsl'
 
 const QUAD_VERT = `#version 300 es

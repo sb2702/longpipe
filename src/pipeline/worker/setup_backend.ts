@@ -18,9 +18,9 @@
 // that same canvas will probably also throw. For non-transfer-capture
 // topologies the worker owns a fresh OffscreenCanvas per attempt.
 
-import type { Backend, Dtype } from '~/model/backend'
-import { WebGPUBackend } from '~/model/backends/webgpu'
-import { WebGLBackend }  from '~/model/backends/webgl'
+import type { Backend, Dtype } from '~/model/backend.ts'
+import { WebGPUBackend } from '~/model/backends/webgpu/index.ts'
+import { WebGLBackend }  from '~/model/backends/webgl/index.ts'
 import type { InitData } from '../messages'
 
 export interface BackendSetup {

@@ -1,9 +1,9 @@
-import type { Tensor, MLBuffer, UpsampleConv1x1Params } from '~/model/backend'
-import type { Conv2DWeights } from '~/model/weights'
-import type { WebGLBackend } from '~/model/backends/webgl/index'
-import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op'
+import type { Tensor, MLBuffer, UpsampleConv1x1Params } from '~/model/backend.ts'
+import type { Conv2DWeights } from '~/model/weights.ts'
+import type { WebGLBackend } from '~/model/backends/webgl/index.ts'
+import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op.ts'
 import upsampleConv1x1Src from '~/model/backends/webgl/shaders/upsample_conv1x1.glsl'
-import { toUploadView } from '~/utils/weights'
+import { toUploadView } from '~/utils/weights.ts'
 
 export class UpsampleConv1x1WebGL extends WebGLOp {
   readonly inputs: Tensor[]

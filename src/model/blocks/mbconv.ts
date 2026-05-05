@@ -1,5 +1,5 @@
-import type { Backend, Tensor, Op } from '~/model/backend'
-import type { MBConvWeights } from '~/model/weights'
+import type { Backend, Tensor, Op } from '~/model/backend.ts'
+import type { MBConvWeights } from '~/model/weights.ts'
 
 export interface MBConvParams {
   inChannels:  number

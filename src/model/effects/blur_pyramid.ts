@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Op } from '~/model/backend'
+import type { Backend, Tensor, Op } from '~/model/backend.ts'
 
 // Pyramid blur — cascading 2× bilinear downsamples followed by 2× bilinear
 // upsamples. Each bilinear pass is a 2×2 box filter; stacking N of them and

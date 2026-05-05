@@ -1,5 +1,5 @@
-import type { ModelWeights } from '~/model/weights'
-import type { Dtype } from '~/model/backend'
+import type { ModelWeights } from '~/model/weights.ts'
+import type { Dtype } from '~/model/backend.ts'
 
 // Binary pack format (see sdk/WEIGHTS_FORMAT.md):
 //   [0..4)        uint32 LE: header JSON length

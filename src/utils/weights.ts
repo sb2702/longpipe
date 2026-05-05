@@ -1,4 +1,4 @@
-import type { DataView_ } from '~/model/backend'
+import type { DataView_ } from '~/model/backend.ts'
 
 // Coerce a weight-blob leaf (as stored on Conv2DWeights / DepthwiseWeights) to
 // a typed view ready for backend.upload(). Float32Array stays as-is; Uint16Array

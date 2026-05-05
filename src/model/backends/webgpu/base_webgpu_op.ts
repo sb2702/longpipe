@@ -1,5 +1,5 @@
-import type { Tensor, MLBuffer, Op } from '~/model/backend'
-import type { WebGPUBackend } from '~/model/backends/webgpu/index'
+import type { Tensor, MLBuffer, Op } from '~/model/backend.ts'
+import type { WebGPUBackend } from '~/model/backends/webgpu/index.ts'
 
 export interface WebGPUTensor extends Tensor {
   readonly buffer: GPUBuffer

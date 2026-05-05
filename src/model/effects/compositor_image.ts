@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Presenter } from '~/model/backend'
+import type { Backend, Tensor, Presenter } from '~/model/backend.ts'
 
 // Composites an RGBA image over a background image (also as a Tensor) using a
 // 1-channel alpha mask, rendering to the backend's canvas. Used for virtual

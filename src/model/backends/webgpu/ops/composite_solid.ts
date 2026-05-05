@@ -1,6 +1,6 @@
-import type { Tensor } from '~/model/backend'
-import type { WebGPUBackend } from '~/model/backends/webgpu/index'
-import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op'
+import type { Tensor } from '~/model/backend.ts'
+import type { WebGPUBackend } from '~/model/backends/webgpu/index.ts'
+import type { WebGPUTensor } from '~/model/backends/webgpu/base_webgpu_op.ts'
 import compositeSolidF32Src from '~/model/backends/webgpu/shaders/composite_solid.wgsl'
 import compositeSolidF16Src from '~/model/backends/webgpu/shaders/composite_solid_f16.wgsl'
 

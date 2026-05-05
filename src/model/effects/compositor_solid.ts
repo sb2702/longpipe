@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Presenter } from '~/model/backend'
+import type { Backend, Tensor, Presenter } from '~/model/backend.ts'
 
 // Composites an RGBA image over a solid background color using a 1-channel
 // alpha mask, rendering to the backend's canvas. Backend-agnostic — sits

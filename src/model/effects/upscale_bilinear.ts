@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Op } from '~/model/backend'
+import type { Backend, Tensor, Op } from '~/model/backend.ts'
 
 // Bilinear upscale (align_corners=False) of a Tensor to an arbitrary
 // output resolution. Backend-agnostic — wraps backend.ops.BilinearUpsample,

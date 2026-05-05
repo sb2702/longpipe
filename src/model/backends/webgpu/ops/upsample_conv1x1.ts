@@ -1,10 +1,10 @@
-import type { Tensor, MLBuffer, UpsampleConv1x1Params } from "~/model/backend";
-import type { Conv2DWeights } from "~/model/weights";
-import type { WebGPUBackend } from "~/model/backends/webgpu/index";
-import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op";
+import type { Tensor, MLBuffer, UpsampleConv1x1Params } from "~/model/backend.ts";
+import type { Conv2DWeights } from "~/model/weights.ts";
+import type { WebGPUBackend } from "~/model/backends/webgpu/index.ts";
+import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op.ts";
 import upsampleConv1x1F32Src from "~/model/backends/webgpu/shaders/upsample_conv1x1.wgsl";
 import upsampleConv1x1F16Src from "~/model/backends/webgpu/shaders/upsample_conv1x1_f16.wgsl";
-import { toUploadView } from "~/utils/weights";
+import { toUploadView } from "~/utils/weights.ts";
 
 export class UpsampleConv1x1WebGPU extends WebGPUOp {
   readonly inputs: Tensor[];

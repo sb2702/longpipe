@@ -1,6 +1,6 @@
-import type { ImageSource, InputOp, Dtype } from "~/model/backend";
-import type { WebGPUBackend } from "~/model/backends/webgpu/index";
-import type { WebGPUTensor } from "~/model/backends/webgpu/base_webgpu_op";
+import type { ImageSource, InputOp, Dtype } from "~/model/backend.ts";
+import type { WebGPUBackend } from "~/model/backends/webgpu/index.ts";
+import type { WebGPUTensor } from "~/model/backends/webgpu/base_webgpu_op.ts";
 import input2dF32Src        from "~/model/backends/webgpu/shaders/input_2d.wgsl";
 import input2dF16Src        from "~/model/backends/webgpu/shaders/input_2d_f16.wgsl";
 import inputExternalF32Src  from "~/model/backends/webgpu/shaders/input_external.wgsl";

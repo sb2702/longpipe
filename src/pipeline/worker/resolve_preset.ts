@@ -10,7 +10,7 @@
 // In all three cases, if resolvedDtype differs from preset.dtype, we
 // return a copy with dtype patched.
 
-import type { Backend, Dtype } from '~/model/backend'
+import type { Backend, Dtype } from '~/model/backend.ts'
 import { resolveNamedPreset, type ManualPreset, type PresetName } from '../presets'
 import { autotunePreset } from './autotune'
 

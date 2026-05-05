@@ -1,5 +1,5 @@
-import type { Tensor, MLBuffer, Op, DataView_ } from '~/model/backend'
-import type { WebGLBackend } from '~/model/backends/webgl/index'
+import type { Tensor, MLBuffer, Op, DataView_ } from '~/model/backend.ts'
+import type { WebGLBackend } from '~/model/backends/webgl/index.ts'
 
 export interface WebGLTensor extends Tensor {
   readonly texture: WebGLTexture
