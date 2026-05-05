@@ -203,6 +203,18 @@ export class Renderer {
     this.skipCounter = 0
   }
 
+  // Release everything: close any open background ports (worker-side
+  // listeners stop firing) and destroy the backend (WebGPU device.destroy
+  // releases all GPU buffers/textures/pipelines; WebGL loseContext does
+  // the equivalent). After destroy(), this Renderer is unusable.
+  destroy(): void {
+    if (this.bgVideoPort) {
+      this.bgVideoPort.close()
+      this.bgVideoPort = null
+    }
+    this.backend.destroy()
+  }
+
   getStats(): RendererStats {
     const now = performance.now()
     this.trimRecent(this.framesRenderedAt, now)

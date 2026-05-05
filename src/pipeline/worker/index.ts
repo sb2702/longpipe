@@ -182,11 +182,14 @@ async function handleSetPreset(
 }
 
 async function handleDestroy(): Promise<void> {
+  // Order matters: abort the pipe first so no more frames flow into the
+  // renderer, THEN destroy the renderer (releases backend / GPU).
+  // Reversed order can fire process() on a destroyed backend.
   pumpAbort?.abort()
   pumpAbort = null
-  // TODO: backend.destroy() to release GPU resources (no destroy() on
-  // Backend interface yet — add when we wire actual teardown).
+  renderer?.destroy()
   renderer = null
+  resolvedPreset = null
 }
 
 function throwUnknown(name: PresetName): never {

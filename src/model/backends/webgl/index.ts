@@ -204,6 +204,18 @@ export class WebGLBackend implements Backend {
   }
 
   destroy(): void {
+    // WEBGL_lose_context.loseContext() releases the entire context and
+    // all resources allocated from it (textures, programs, buffers,
+    // framebuffers) in one shot — far simpler and more thorough than
+    // tracking and individually deleting each object.
+    //
+    // Browsers cap simultaneous WebGL contexts (~16 in Chrome); failing
+    // to release here means a long-lived SPA that creates/destroys
+    // multiple Pipelines will eventually fail to create new contexts.
+    //
+    // Extension is broadly supported but not universal; if missing, the
+    // context will be reclaimed by GC eventually (just less promptly).
     this.gl.deleteFramebuffer(this.fbo)
+    this.gl.getExtension('WEBGL_lose_context')?.loseContext()
   }
 }
