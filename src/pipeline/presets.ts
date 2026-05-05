@@ -15,7 +15,7 @@ export interface ManualPreset {
 }
 
 // Linear ordering: index 0 = cheapest per source frame, last = most
-// expensive. Adaptive switching (v0.2) walks this index up/down.
+// expensive. The adaptive controller walks this index up/down at runtime.
 //
 // Per-source-frame cost = per-run cost / (skipFrames + 1). xl/large run
 // every frame (skipFrames=0); the others skip every other frame

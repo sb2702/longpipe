@@ -37,9 +37,10 @@ const log = (...args: unknown[]) => console.log('[longpipe/autotune]', ...args)
 interface NetworkLike { readonly output: Tensor; run(): void }
 type NetworkCtor = new (b: Backend, i: Tensor, w: ModelWeights) => NetworkLike
 
-// xs / small2 / medium share architectures with `small` / `large` (per
-// docs/MODEL_PLAN.md) — only the input resolution and dtype differ, which
-// flow in via the input Tensor and backend respectively, not the class.
+// xxs / xs share the Small architecture and medium shares the Large
+// architecture (per docs/MODEL_PLAN.md) — only the input resolution and
+// dtype differ, which flow in via the input Tensor and backend
+// respectively, not the class.
 const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
   xxs:     EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   xs:      EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
