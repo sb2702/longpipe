@@ -40,14 +40,20 @@ export interface PipelineOptions {
   // are always respected. Default: true.
   adaptive?:       boolean
   onReady?:        () => void
-  // Async / runtime errors after the pipeline is constructed:
-  //   - GPU context loss (WebGL or WebGPU)
-  //   - Worker uncaught failures
-  //   - Adaptive preset swap failures (recoverable: true)
+  // Fires for ALL async / runtime errors after the constructor returns:
+  //   - Init failures (weights 404, normalizeBackground URL fail, worker
+  //     init exception) — also reject `pipeline.ready` for backwards
+  //     compatibility, but onError fires too
+  //   - GPU context loss (WebGL webglcontextlost / WebGPU device.lost)
+  //   - Worker uncaught failures (pipe broken, command threw)
+  //   - Adaptive preset swap failures (recoverable: true; pipeline keeps
+  //     running on the prior preset)
   //   - Background runtime issues
-  // Init failures still reject `pipeline.ready` (the natural surface for
-  // construction errors); onError handles things that happen after
-  // ready resolves OR fatal errors detected during init runtime.
+  //
+  // Does NOT fire for synchronous constructor errors (no input video
+  // track, transport setup throws, etc.) — those propagate out of
+  // `new Pipeline()` directly. Wrap construction in try/catch if you
+  // want to handle those too.
   onError?:        (err: PipelineError) => void
 }
 
