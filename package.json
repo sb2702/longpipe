@@ -1,9 +1,36 @@
 {
   "name": "longpipe",
-  "version": "0.1.0",
-  "description": "Open-source WebGPU/WebGL2 video effects SDK",
+  "version": "0.0.1",
+  "description": "Open-source WebGPU/WebGL2 video effects SDK — virtual backgrounds, background blur, portrait matting in real time in the browser.",
   "type": "module",
   "sideEffects": false,
+  "license": "MIT",
+  "author": "Sam Bhattacharyya",
+  "homepage": "https://longpipe.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sb2702/longpipe.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sb2702/longpipe/issues"
+  },
+  "keywords": [
+    "webgpu",
+    "webgl",
+    "virtual-background",
+    "background-blur",
+    "background-removal",
+    "portrait-matting",
+    "video-effects",
+    "webrtc",
+    "real-time",
+    "ml"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,7 +46,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "vite --config demo/vite.config.ts"
+    "dev": "vite --config demo/vite.config.ts",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
