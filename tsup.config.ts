@@ -5,6 +5,10 @@ export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm', 'cjs'],
   dts: true,
+  minify: true,
+  // Treeshake unused exports — `~/...` paths are fully resolved so esbuild
+  // can statically analyze the graph. Trims dead branches in shipped builds.
+  treeshake: true,
   loader: {
     '.wgsl': 'text',
     '.glsl': 'text',
