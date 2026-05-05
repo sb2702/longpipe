@@ -46,11 +46,6 @@ let pumpAbort: AbortController | null = null
 // renderer.setPreset alongside the weights main fetched).
 let resolvedPreset: ManualPreset | null = null
 
-// Default canvas size for non-transfer-capture topologies. For transfer-
-// capture, main supplies the canvas and this is unused. TODO: let main
-// pass a desired output resolution via InitData; 720p is a reasonable
-// default for video-call output but power users will want to override.
-const DEFAULT_CANVAS = { w: 1280, h: 720 }
 
 self.onmessage = async function (event: MessageEvent<WorkerRequest>) {
   const { cmd, data, request_id } = event.data
@@ -94,7 +89,7 @@ async function handleInit(data: InitData): Promise<InitResponse> {
   // preset, but bench timings underestimate the cost of large/xl on
   // devices that would otherwise need f32. Acceptable for v0.1.
   log('handleInit: setupBackend…')
-  const setup = await setupBackend(data, DEFAULT_CANVAS, {
+  const setup = await setupBackend(data, data.canvasSize, {
     onContextLost: (err) => {
       log('GPU context lost:', err.message)
       emit('error', err)

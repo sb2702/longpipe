@@ -27,7 +27,7 @@ let _canTransferCache: boolean | null = null
 
 export function canTransferCanvasAndCapture(): boolean {
   if (_canTransferCache !== null) return _canTransferCache
-  // TODO: real probe — create canvas, captureStream(), transferControlToOffscreen,
+  // Probe would cause it to fail, just use userAgent
   // catch DOMException. For now use UA inference (safe lower bound).
   _canTransferCache = !/Firefox/.test(navigator.userAgent)
   return _canTransferCache

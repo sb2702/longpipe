@@ -41,6 +41,11 @@ export interface InitData {
   preset:     PresetName | ManualPreset
   background: Background
   enabled:    boolean
+  // Output canvas dimensions. For transfer-capture topology this is
+  // redundant with outputCanvas (the transferred OffscreenCanvas
+  // already has its size); for MSTG and bitmap-shuttle the worker
+  // allocates its own OffscreenCanvas and uses these dimensions.
+  canvasSize: { w: number; h: number }
 
   // Backend + dtype are *preferences*. Worker's setup_backend honors them
   // when possible and falls back when not. 'auto' = pick the best available

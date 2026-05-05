@@ -185,6 +185,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
       enabled:    opts.enabled,
       backend:    'auto' as const,
       dtype:      'f16'  as const,
+      canvasSize: outputSize,
       ...inputSetup.initFields,
       ...outputSetup.initFields,
     }
