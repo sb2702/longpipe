@@ -9,7 +9,7 @@
 
 import type { ModelName, PresetName } from './presets'
 import { PRESETS } from './presets'
-import type { RendererStats } from './messages'
+import type { RendererStats, PipelineError } from './messages'
 
 const log = (...args: unknown[]) => console.log('[longpipe/adaptive]', ...args)
 
@@ -32,6 +32,10 @@ export interface AdaptiveOptions {
   // Caller is responsible for the actual setPreset wire-up; adaptive
   // just hands over fresh weights and the new preset name.
   swapPreset:      (preset: PresetName, weights: ArrayBuffer) => Promise<void>
+  // Surfaced when a swap attempt fails (weights fetch 404, etc.).
+  // Adaptive keeps running on the previous preset; cooldown still
+  // applies so we don't immediately retry. Recoverable.
+  onError?:        (err: PipelineError) => void
 }
 
 export class AdaptiveController {
@@ -122,6 +126,12 @@ export class AdaptiveController {
       log('swap failed:', err)
       // Leave currentPresetIdx unchanged; cooldown still applies so we
       // don't immediately retry.
+      this.opts.onError?.({
+        message:     `adaptive preset swap failed: ${(err as Error).message ?? String(err)}`,
+        source:      'adaptive',
+        recoverable: true,
+        cause:       err,
+      })
     }
   }
 }

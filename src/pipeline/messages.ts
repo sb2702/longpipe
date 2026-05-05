@@ -93,12 +93,34 @@ export interface RendererStats {
   outputPath:    string    // 'mstg' | 'transfer-capture' | 'bitmap-shuttle'
 }
 
+// ── Public error type — surfaced to callers via PipelineOptions.onError ─────
+
+// `source` categorizes where the error originated so callers can branch
+// (e.g. log differently, surface UI, retry only certain kinds). 'unknown'
+// is the catchall for errors that don't fit a narrower bucket.
+export type ErrorSource =
+  | 'backend-lost'   // WebGL context lost / WebGPU device lost
+  | 'worker'         // generic worker / pipe failure
+  | 'adaptive'       // adaptive preset swap failed
+  | 'background'    // background setup or runtime issue (e.g. video track ended)
+  | 'unknown'
+
+export interface PipelineError {
+  message:     string
+  source:      ErrorSource
+  // false = the pipeline cannot continue; caller should destroy() + recreate.
+  // true  = transient; pipeline keeps running in degraded state.
+  recoverable: boolean
+  // Original Error / DOMException / etc. — opaque, for debugging.
+  cause?:      unknown
+}
+
 // ── Persistent events from worker → main ────────────────────────────────────
 
 export interface EventMap {
   ready: void
   stats: RendererStats
-  error: { message: string; recoverable: boolean }
+  error: PipelineError
 }
 
 export type EventName = keyof EventMap

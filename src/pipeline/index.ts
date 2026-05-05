@@ -13,7 +13,7 @@ import { AdaptiveController } from './adaptive'
 import type { BackgroundInput, Background } from './background'
 import { normalizeBackground } from './background'
 import type { AudioMode } from './audio'
-import type { InitData } from './messages'
+import type { InitData, PipelineError } from './messages'
 import { selectTopology } from './topology'
 import { buildOutputStream } from './audio'
 import { WorkerController } from './worker_controller'
@@ -40,6 +40,15 @@ export interface PipelineOptions {
   // are always respected. Default: true.
   adaptive?:       boolean
   onReady?:        () => void
+  // Async / runtime errors after the pipeline is constructed:
+  //   - GPU context loss (WebGL or WebGPU)
+  //   - Worker uncaught failures
+  //   - Adaptive preset swap failures (recoverable: true)
+  //   - Background runtime issues
+  // Init failures still reject `pipeline.ready` (the natural surface for
+  // construction errors); onError handles things that happen after
+  // ready resolves OR fatal errors detected during init runtime.
+  onError?:        (err: PipelineError) => void
 }
 
 // Public CDN where Longpipe hosts its own model weights. Versioned in the
@@ -150,8 +159,12 @@ export class Pipeline implements PromiseLike<Pipeline> {
         resolve()
       })
       this.controller.addPersistentListener('error', (info) => {
-        console.error('[longpipe/pipeline] worker error:', info.message)
+        console.error(`[longpipe/pipeline] error (${info.source}):`, info.message)
+        // Init-phase fatal errors reject the ready promise (the natural
+        // surface for construction failures). Errors after ready resolved
+        // can't reject it (already settled) but DO go through onError.
         if (!info.recoverable) reject(new Error(info.message))
+        opts.onError?.(info)
       })
     })
 
@@ -174,7 +187,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
       ...outputSetup.transferList,
     ]
 
-    void this.bootstrap(partialInit, opts.background, transferList, opts.weightsBaseUrl, opts.adaptive)
+    void this.bootstrap(partialInit, opts.background, transferList, opts.weightsBaseUrl, opts.adaptive, opts.onError)
   }
 
   // Async second half of construction: normalize background → init handshake
@@ -186,6 +199,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     transferList:   Transferable[],
     weightsBaseUrl: string,
     adaptive:       boolean,
+    onError?:       (err: PipelineError) => void,
   ): Promise<void> {
     try {
       console.log('[longpipe/pipeline] normalizing background…')
@@ -222,13 +236,23 @@ export class Pipeline implements PromiseLike<Pipeline> {
           swapPreset:      async (preset, weights) => {
             await this.controller.sendMessage('setPreset', { preset, weights }, [weights])
           },
+          onError,
         })
         this.adaptive.start()
       }
     } catch (err) {
       console.error('[longpipe/pipeline] bootstrap failed:', err)
+      // Inject a synthetic 'error' event so the ready promise rejects
+      // through the same listener path as worker-emitted errors. Bracket
+      // access to handleMessage is intentional — it's private but this
+      // is the cleanest re-entry point.
       this.controller['handleMessage'].call(this.controller, {
-        data: { request_id: 'error', res: { message: (err as Error).message ?? String(err), recoverable: false } },
+        data: { request_id: 'error', res: {
+          message:     (err as Error).message ?? String(err),
+          source:      'worker',
+          recoverable: false,
+          cause:       err,
+        } },
       } as MessageEvent)
     }
   }
@@ -297,3 +321,4 @@ export type {
 }                                                             from './background'
 export type { PresetName, ManualPreset, ModelName }           from './presets'
 export type { AudioMode }                                     from './audio'
+export type { PipelineError, ErrorSource }                    from './messages'

@@ -61,7 +61,12 @@ self.onmessage = async function (event: MessageEvent<WorkerRequest>) {
     respond(request_id, res)
   } catch (err) {
     log('cmd FAILED:', cmd, err)
-    emit('error', { message: (err as Error).message ?? String(err), recoverable: false })
+    emit('error', {
+      message:     `${cmd} failed: ${(err as Error).message ?? String(err)}`,
+      source:      'worker',
+      recoverable: false,
+      cause:       err,
+    })
   }
 }
 
@@ -89,7 +94,12 @@ async function handleInit(data: InitData): Promise<InitResponse> {
   // preset, but bench timings underestimate the cost of large/xl on
   // devices that would otherwise need f32. Acceptable for v0.1.
   log('handleInit: setupBackend…')
-  const setup = await setupBackend(data, DEFAULT_CANVAS)
+  const setup = await setupBackend(data, DEFAULT_CANVAS, {
+    onContextLost: (err) => {
+      log('GPU context lost:', err.message)
+      emit('error', err)
+    },
+  })
   log('handleInit: backend ready:', setup.resolvedBackend, setup.resolvedDtype, 'canvas:', setup.canvas.width, 'x', setup.canvas.height)
 
   // Construct Renderer in boot mode (no preset, no weights, no network).
@@ -123,7 +133,12 @@ async function handleInit(data: InitData): Promise<InitResponse> {
       return
     }
     log('pipe FAILED:', err)
-    emit('error', { message: `pipe failed: ${(err as Error).message}`, recoverable: false })
+    emit('error', {
+      message:     `pipe failed: ${(err as Error).message}`,
+      source:      'worker',
+      recoverable: false,
+      cause:       err,
+    })
   })
 
   // Autotune (or named-preset lookup). Pipe is already pumping passthrough,
