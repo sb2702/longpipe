@@ -1,2 +1,15 @@
+// Public surface — `Pipeline` internally, exported as `EffectsPipeline` so
+// the import site reads as what it does (`import { EffectsPipeline } from
+// 'longpipe'`). Internal code keeps the shorter `Pipeline` name.
+export { Pipeline as EffectsPipeline } from '~/pipeline/index.ts'
+export type {
+  PipelineOptions,
+  BackgroundInput, Background, BlurInput, ImageInput, VideoInput,
+  PresetName, ManualPreset, ModelName,
+  AudioMode,
+  PipelineError, ErrorSource,
+} from '~/pipeline/index.ts'
+
+// Lower-level types for callers building on top of the backend directly.
 export type { Backend, Tensor, Op, Activation, Conv2dParams, DepthwiseParams } from '~/model/backend.ts'
 export { WebGPUBackend } from '~/model/backends/webgpu/index.ts'
