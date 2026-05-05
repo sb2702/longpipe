@@ -1,13 +1,14 @@
-// Public-facing effect configuration. Translated to renderer-internal
-// types (which use Tensors instead of ImageBitmaps) inside the worker.
-// Shared between main + worker; lives in its own file to keep messages.ts
-// and pipeline.ts from forming a circular import.
+// Re-exports the public effect-configuration types. Currently `background`
+// is the only effect; future top-level effects (touchup, lighting, …) will
+// each get their own module parallel to background.ts and be re-exported
+// from here. The previous `EffectConfig` wrapper has been removed —
+// effects are top-level keys on PipelineOptions, not nested under an
+// `effect:` discriminator.
 
-export type EffectConfig =
-  | { effect: 'background'; config: BackgroundConfig }
-  // | { effect: 'touchup';    config: TouchupConfig }    // future
-
-export type BackgroundConfig =
-  | { blur:  true | { sigma: number } }
-  | { image: ImageBitmap | VideoFrame }
-  | { color: [number, number, number] }
+export type {
+  BackgroundInput,
+  Background,
+  BlurInput,
+  ImageInput,
+  VideoInput,
+} from './background'

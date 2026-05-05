@@ -1,6 +1,6 @@
 // Worker entry point. Two responsibilities:
 //
-//   1. Dispatch incoming control-plane messages (init / setEffect /
+//   1. Dispatch incoming control-plane messages (init / setBackground /
 //      setEnabled / setPreset / getStats / destroy) to typed handlers.
 //   2. handleInit: orchestrate one-time setup by composing the worker
 //      submodules — setupBackend, resolvePreset, Renderer, createInputStream,
@@ -24,7 +24,7 @@ import type {
   EventMap,
   RendererStats,
 } from '../messages'
-import type { EffectConfig } from '../effects'
+import type { Background } from '../background'
 import type { ManualPreset, PresetName } from '../presets'
 import { resolveNamedPreset } from '../presets'
 import { Renderer } from './renderer'
@@ -66,10 +66,10 @@ self.onmessage = async function (event: MessageEvent<WorkerRequest>) {
 
 async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
   switch (cmd) {
-    case 'init':        return handleInit(data as InitData)
-    case 'startRender': return handleStartRender((data as CmdDataMap['startRender']).weights)
-    case 'setEffect':   return handleSetEffect(data as EffectConfig)
-    case 'setEnabled':  return handleSetEnabled((data as CmdDataMap['setEnabled']).enabled)
+    case 'init':          return handleInit(data as InitData)
+    case 'startRender':   return handleStartRender((data as CmdDataMap['startRender']).weights)
+    case 'setBackground': return handleSetBackground(data as Background)
+    case 'setEnabled':    return handleSetEnabled((data as CmdDataMap['setEnabled']).enabled)
     case 'setPreset':   return handleSetPreset(data as CmdDataMap['setPreset'])
     case 'getStats':    return renderer?.getStats() ?? null
     case 'destroy':     return handleDestroy()
@@ -120,7 +120,7 @@ async function handleStartRender(weights: ArrayBuffer): Promise<void> {
     canvas:      setup.canvas,
     preset,
     weights,
-    effect:      data.effect,
+    background:  data.background,
     enabled:     data.enabled,
   })
   log('handleStartRender: Renderer constructed')
@@ -154,8 +154,8 @@ async function handleStartRender(weights: ArrayBuffer): Promise<void> {
   log('handleStartRender: done')
 }
 
-async function handleSetEffect(config: EffectConfig): Promise<void> {
-  renderer?.setEffect(config)
+async function handleSetBackground(bg: Background): Promise<void> {
+  renderer?.setBackground(bg)
 }
 
 async function handleSetEnabled(on: boolean): Promise<void> {

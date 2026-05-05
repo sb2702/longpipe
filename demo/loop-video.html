@@ -122,9 +122,9 @@
 
         setStatus('constructing pipeline (autotune + weights fetched from default CDN by SDK)…')
         const pipeline = new Pipeline(inputStream, {
-          effect: { effect: 'background', config: initialBgConfig },
-          preset: 'auto',   // worker microbenches each preset, picks largest that fits 15fps budget
-          audio:  'drop',
+          background: initialBgConfig,
+          preset:     'auto',   // worker microbenches each preset, picks largest that fits 15fps budget
+          audio:      'drop',
         })
 
         // 3. Hook output stream BEFORE awaiting ready — pipeline.stream is

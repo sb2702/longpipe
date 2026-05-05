@@ -15,7 +15,7 @@ import { EfficientNetLiteMattingCompact } from '~/model/networks/efficientnetlit
 import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small'
 import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl'
 import type { ManualPreset, ModelName } from '../presets'
-import type { EffectConfig, BackgroundConfig } from '../effects'
+import type { Background } from '../background'
 import type { RendererStats } from '../messages'
 
 export interface RendererOptions {
@@ -24,7 +24,7 @@ export interface RendererOptions {
   canvas:      OffscreenCanvas
   preset:      ManualPreset
   weights:     ArrayBuffer
-  effect:      EffectConfig
+  background:  Background
   enabled:     boolean
 }
 
@@ -52,7 +52,6 @@ const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
 }
 
 const STATS_WINDOW_MS = 1000
-const DEFAULT_BLUR_SIGMA = 8
 
 export class Renderer {
   readonly canvas: OffscreenCanvas
@@ -61,10 +60,10 @@ export class Renderer {
   private readonly backendKind: 'webgpu' | 'webgl'
   private preset:  ManualPreset
   private enabled: boolean
-  // Current effect tracked here so setPreset can rebuild the RenderOp
+  // Current background tracked here so setPreset can rebuild the RenderOp
   // with the same background (otherwise an adaptive swap would flash to
   // a hardcoded fallback).
-  private currentEffect: EffectConfig
+  private currentBackground: Background
   private modelTimingCounter: number = 0
 
   private renderOp:     RenderOp
@@ -89,15 +88,15 @@ export class Renderer {
   private skippedCount:      number                          = 0
 
   constructor(opts: RendererOptions) {
-    this.backend       = opts.backend
-    this.backendKind   = opts.backendKind
-    this.canvas        = opts.canvas
-    this.preset        = opts.preset
-    this.enabled       = opts.enabled
-    this.currentEffect = opts.effect
+    this.backend           = opts.backend
+    this.backendKind       = opts.backendKind
+    this.canvas            = opts.canvas
+    this.preset            = opts.preset
+    this.enabled           = opts.enabled
+    this.currentBackground = opts.background
 
     const weights      = loadWeightsFromBinary(opts.weights)
-    const { renderOp, networkInput } = this.buildRenderChain(opts.preset, weights, opts.effect)
+    const { renderOp, networkInput } = this.buildRenderChain(opts.preset, weights, opts.background)
     this.renderOp     = renderOp
     this.networkInput = networkInput
   }
@@ -106,10 +105,13 @@ export class Renderer {
   process(frame: VideoFrame): void {
     this.renderOp.setSource(frame)
 
-    if (!this.enabled) {
+    if (!this.enabled || this.currentBackground.kind === 'none') {
       // True passthrough at the GPU level: input image written directly to
       // canvas, no model, no alpha math. Output stream / MSTG / shuttle
       // path picks up the unmodified frame as if no pipeline existed.
+      // Triggered by `enabled: false` (whole SDK paused) OR by
+      // `background: 'none'` (no bg-related effect to render — for v0.1
+      // these look identical because background is the only effect).
       this.renderOp.runPassthrough()
       this.framesRenderedAt.push(performance.now())
       this.trim(this.framesRenderedAt)
@@ -153,10 +155,9 @@ export class Renderer {
     return false
   }
 
-  setEffect(config: EffectConfig): void {
-    if (config.effect !== 'background') return    // only background in v0.1
-    this.currentEffect = config                    // remember for setPreset rebuilds
-    this.renderOp.setBackground(this.translateBackground(config.config))
+  setBackground(bg: Background): void {
+    this.currentBackground = bg
+    this.renderOp.setBackground(this.translateBackground(bg))
   }
 
   setEnabled(on: boolean): void {
@@ -170,7 +171,7 @@ export class Renderer {
     // Preserve current effect across the swap — adaptive logic shouldn't
     // visually flash to a fallback background. The new RenderOp gets the
     // same background config the user last selected.
-    const { renderOp, networkInput } = this.buildRenderChain(preset, weights, this.currentEffect)
+    const { renderOp, networkInput } = this.buildRenderChain(preset, weights, this.currentBackground)
     this.renderOp     = renderOp
     this.networkInput = networkInput
     this.preset       = preset
@@ -200,7 +201,7 @@ export class Renderer {
   private buildRenderChain(
     preset:  ManualPreset,
     weights: ModelWeights,
-    effect:  EffectConfig,
+    bg:      Background,
   ): { renderOp: RenderOp; networkInput: InputOp } {
     const Ctor = NETWORK_CTORS[preset.model]
     if (!Ctor) throw new Error(`renderer: model '${preset.model}' not implemented in src/model/networks/`)
@@ -210,24 +211,30 @@ export class Renderer {
 
     const renderOp = new RenderOp(this.backend, network, networkInput, {
       upscaler:   'bilinear',
-      background: this.translateBackground(effect.effect === 'background' ? effect.config : { color: [0, 0, 0] }),
+      background: this.translateBackground(bg),
     })
     return { renderOp, networkInput }
   }
 
-  private translateBackground(c: BackgroundConfig): RenderOpBackgroundConfig {
-    if ('color' in c) return { mode: 'solid', color: c.color }
-    if ('blur'  in c) {
-      const sigma = c.blur === true ? DEFAULT_BLUR_SIGMA : c.blur.sigma
-      return { mode: 'blur', sigma }
+  private translateBackground(bg: Background): RenderOpBackgroundConfig {
+    switch (bg.kind) {
+      case 'none':
+        // RenderOp always builds a compositor; we pass a stub solid-black
+        // config that never runs because process() short-circuits to
+        // runPassthrough() when kind === 'none'.
+        return { mode: 'solid', color: [0, 0, 0] }
+      case 'color':
+        return { mode: 'solid', color: bg.rgb }
+      case 'blur':
+        return { mode: 'blur', sigma: bg.sigma }
+      case 'image':
+        if (!this.bgImageInput) {
+          this.bgImageInput = this.backend.ops.Input(this.canvas.height, this.canvas.width)
+        }
+        this.bgImageInput.setSource(bg.bitmap)
+        this.bgImageInput.run()
+        return { mode: 'image', image: this.bgImageInput.output }
     }
-    // image — ingest bitmap/frame into a canvas-sized tensor.
-    if (!this.bgImageInput) {
-      this.bgImageInput = this.backend.ops.Input(this.canvas.height, this.canvas.width)
-    }
-    this.bgImageInput.setSource(c.image)
-    this.bgImageInput.run()
-    return { mode: 'image', image: this.bgImageInput.output }
   }
 
   // Hard-cap helpers: bound buffer sizes so stale data can't grow without

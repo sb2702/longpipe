@@ -6,30 +6,30 @@
 
 import type { Dtype } from '~/model/backend'
 import type { ManualPreset, PresetName } from './presets'
-import type { EffectConfig } from './effects'
+import type { Background } from './background'
 import type { Topology } from './topology'
 
 // ── Command-keyed maps ──────────────────────────────────────────────────────
 // Type-safe sendMessage<C>(cmd, data) → Promise<response>.
 
 export interface CmdDataMap {
-  init:        InitData
-  startRender: { weights: ArrayBuffer }
-  setEffect:   EffectConfig
-  setEnabled:  { enabled: boolean }
-  setPreset:   { preset: PresetName | ManualPreset; weights?: ArrayBuffer }
-  getStats:    Record<string, never>
-  destroy:     Record<string, never>
+  init:          InitData
+  startRender:   { weights: ArrayBuffer }
+  setBackground: Background
+  setEnabled:    { enabled: boolean }
+  setPreset:     { preset: PresetName | ManualPreset; weights?: ArrayBuffer }
+  getStats:      Record<string, never>
+  destroy:       Record<string, never>
 }
 
 export interface CmdResponseMap {
-  init:        InitResponse
-  startRender: void
-  setEffect:   void
-  setEnabled:  void
-  setPreset:   PresetSwapResult
-  getStats:    RendererStats
-  destroy:     void
+  init:          InitResponse
+  startRender:   void
+  setBackground: void
+  setEnabled:    void
+  setPreset:     PresetSwapResult
+  getStats:      RendererStats
+  destroy:       void
 }
 
 export type CmdName = keyof CmdDataMap
@@ -37,10 +37,10 @@ export type CmdName = keyof CmdDataMap
 // ── Init payload — transport endpoints + initial config ─────────────────────
 
 export interface InitData {
-  topology: Topology
-  preset:   PresetName | ManualPreset
-  effect:   EffectConfig
-  enabled:  boolean
+  topology:   Topology
+  preset:     PresetName | ManualPreset
+  background: Background
+  enabled:    boolean
 
   // Backend + dtype are *preferences*. Worker's setup_backend honors them
   // when possible and falls back when not. 'auto' = pick the best available

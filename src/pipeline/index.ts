@@ -10,7 +10,8 @@
 
 import type { ManualPreset, PresetName } from './presets'
 import { AdaptiveController } from './adaptive'
-import type { EffectConfig, BackgroundConfig } from './effects'
+import type { BackgroundInput, Background } from './background'
+import { normalizeBackground } from './background'
 import type { AudioMode } from './audio'
 import type { InitData } from './messages'
 import type { Topology } from './topology'
@@ -21,7 +22,11 @@ import { setupPostMessageInput }    from './transports/input_postmessage'
 import { setupBitmapShuttleOutput } from './transports/output_bitmap_shuttle'
 
 export interface PipelineOptions {
-  effect:          EffectConfig
+  // Background effect. Wide input surface (string keyword, URL, ImageBitmap,
+  // <img> element, structured object) — see BackgroundInput in background.ts.
+  // Resolved on the main thread by normalizeBackground() before init.
+  // Default: 'none' (passthrough).
+  background?:     BackgroundInput
   preset?:         PresetName | ManualPreset    // default: 'balanced' ('auto' maps until autotune lands)
   weightsBaseUrl?: string                       // default: DEFAULT_WEIGHTS_BASE_URL
   audio?:          AudioMode                    // default: 'passthrough'
@@ -40,7 +45,8 @@ export interface PipelineOptions {
 const DEFAULT_WEIGHTS_BASE_URL = 'https://cdn.longpipe.dev/models/v/0.0.1/'
 
 const DEFAULTS = {
-  preset:         'balanced'                  as PresetName,
+  background:     'blur'                      as BackgroundInput,
+  preset:         'auto'                  as PresetName,
   weightsBaseUrl: DEFAULT_WEIGHTS_BASE_URL,
   audio:          'passthrough'               as AudioMode,
   enabled:        true,
@@ -116,17 +122,17 @@ export class Pipeline implements PromiseLike<Pipeline> {
       })
     })
 
-    // Two-phase init: send 'init' (no weights) → await InitResponse with
-    // resolved preset → fetch weights from baseUrl based on resolved
-    // preset → send 'startRender' with weights → worker constructs
-    // renderer + starts pipe → 'ready' event fires on first frame.
-    const initData: InitData = {
+    // Two-phase init: normalize background (may fetch URLs) → send 'init'
+    // (no weights) → await InitResponse with resolved preset → fetch
+    // weights from baseUrl based on resolved preset → send 'startRender'
+    // with weights → worker constructs renderer + starts pipe → 'ready'
+    // event fires on first frame.
+    const partialInit = {
       topology,
       preset:     opts.preset,
-      effect:     opts.effect,
       enabled:    opts.enabled,
-      backend:    'auto',
-      dtype:      'f16',
+      backend:    'auto' as const,
+      dtype:      'f16'  as const,
       inputPort:  inputSetup.port,
       outputPort: outputSetup.port,
     }
@@ -135,19 +141,24 @@ export class Pipeline implements PromiseLike<Pipeline> {
       ...outputSetup.transferList,
     ]
 
-    void this.bootstrap(initData, transferList, opts.weightsBaseUrl, opts.adaptive)
+    void this.bootstrap(partialInit, opts.background, transferList, opts.weightsBaseUrl, opts.adaptive)
   }
 
-  // Async second half of construction: init handshake → fetch weights →
-  // startRender. Errors are emitted via 'error' event (which the ready
-  // promise listens to and rejects on).
+  // Async second half of construction: normalize background → init handshake
+  // → fetch weights → startRender. Errors are emitted via 'error' event
+  // (which the ready promise listens to and rejects on).
   private async bootstrap(
-    initData:       InitData,
+    partialInit:    Omit<InitData, 'background'>,
+    rawBackground:  BackgroundInput,
     transferList:   Transferable[],
     weightsBaseUrl: string,
     adaptive:       boolean,
   ): Promise<void> {
     try {
+      console.log('[longpipe/pipeline] normalizing background…')
+      const background = await normalizeBackground(rawBackground)
+      const initData: InitData = { ...partialInit, background }
+
       console.log('[longpipe/pipeline] sending init…')
       const initRes = await this.controller.sendMessage('init', initData, transferList)
       console.log('[longpipe/pipeline] init resolved:', initRes)
@@ -199,12 +210,13 @@ export class Pipeline implements PromiseLike<Pipeline> {
     )
   }
 
-  setEffect(e: EffectConfig): void {
-    void this.controller.sendMessage('setEffect', e)
-  }
-
-  setBackground(c: BackgroundConfig): void {
-    this.setEffect({ effect: 'background', config: c })
+  // Swap the background at runtime. Same wide input surface as construction;
+  // returns a Promise that resolves once the new background has been
+  // normalized (URL fetched, bitmap decoded, etc.) and the worker has
+  // applied it. Throws on parse errors / failed loads.
+  async setBackground(input: BackgroundInput): Promise<void> {
+    const bg = await normalizeBackground(input)
+    await this.controller.sendMessage('setBackground', bg)
   }
 
   setPreset(p: PresetName | ManualPreset, weights?: ArrayBuffer): void {
@@ -237,6 +249,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
 
 // Public type re-exports
 export type { PipelineOptions as Options }
-export type { EffectConfig, BackgroundConfig }                from './effects'
+export type {
+  BackgroundInput, Background, BlurInput, ImageInput, VideoInput,
+}                                                             from './background'
 export type { PresetName, ManualPreset, ModelName }           from './presets'
 export type { AudioMode }                                     from './audio'
