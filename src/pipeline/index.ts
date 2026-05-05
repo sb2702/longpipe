@@ -30,6 +30,10 @@ export interface PipelineOptions {
   weightsBaseUrl?: string                       // default: DEFAULT_WEIGHTS_BASE_URL
   audio?:          AudioMode                    // default: 'passthrough'
   enabled?:        boolean                      // default: true
+  // Output canvas dimensions. Default: matches the input video track's
+  // intrinsic size (preserves aspect ratio + avoids pointless rescale).
+  // Falls back to 1280×720 if the track hasn't reported its size yet.
+  outputResolution?: { w: number; h: number }
   // Whether the SDK should auto-adjust preset at runtime when fps drops
   // (downgrade) or modelMs has consistent headroom (upgrade, WebGPU only).
   // Only takes effect when `preset: 'auto'` — explicit preset choices
@@ -52,9 +56,28 @@ const DEFAULTS = {
   adaptive:       true,
 }
 
-// Output canvas size for non-transfer-capture topologies. TODO: surface as
-// a PipelineOption so callers can pick their output resolution.
-const DEFAULT_CANVAS = { w: 1280, h: 720 }
+// Fallback output canvas size — only used when neither the caller nor the
+// input track tells us a size. 720p is a reasonable safe default for video
+// call output.
+const FALLBACK_CANVAS = { w: 1280, h: 720 }
+
+// Pick the output canvas dimensions: explicit option > input track's
+// intrinsic size > fallback. Reading getSettings() can return empty
+// width/height if the track hasn't initialized yet (rare — happens for
+// captureStream'd <video> elements before metadata loads); we treat
+// 0/undefined as "not reported" and fall back.
+function pickOutputSize(
+  inputStream: MediaStream,
+  override?: { w: number; h: number },
+): { w: number; h: number } {
+  if (override) return override
+  const track    = inputStream.getVideoTracks()[0]
+  const settings = track?.getSettings() ?? {}
+  return {
+    w: settings.width  || FALLBACK_CANVAS.w,
+    h: settings.height || FALLBACK_CANVAS.h,
+  }
+}
 
 // Build the full weights URL for a resolved preset. Convention matches
 // the training pipeline's binary export naming (model_${name}.bin).
@@ -99,7 +122,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
     const topology = selectTopology()
 
     const inputSetup  = setupInput(topology.input,   inputStream)
-    const outputSetup = setupOutput(topology.output, DEFAULT_CANVAS)
+    const outputSize  = pickOutputSize(inputStream, opts.outputResolution)
+    const outputSetup = setupOutput(topology.output, outputSize)
     this.inputCleanup  = inputSetup.cleanup
     this.outputCleanup = outputSetup.cleanup
 
