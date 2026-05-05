@@ -17,16 +17,23 @@ import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlit
 import type { ManualPreset, ModelName } from '../presets'
 import type { Background } from '../background'
 import type { RendererStats } from '../messages'
+import type { Topology } from '../topology'
 
 export interface RendererOptions {
   backend:     Backend
   backendKind: 'webgpu' | 'webgl'    // gates GPU-time sampling (WebGL's fence polling is too heavy for per-frame use)
   canvas:      OffscreenCanvas
-  preset:      ManualPreset
-  weights:     ArrayBuffer
   background:  Background
   enabled:     boolean
+  topology:    Topology              // reported in stats for debug
 }
+
+// Renderer is constructed in boot mode (no preset / no weights / no network).
+// Pipeline starts processing frames immediately in passthrough — that lets
+// the consumer see live video during autotune + weight fetch (1-3s on
+// modest hardware). Call setPreset(preset, weights) once the choice is
+// resolved + weights are loaded; the renderer attaches the network in
+// place and switches to effect mode mid-pipe (no pipe restart needed).
 
 // Only sample real GPU-time every Nth model run, and only on WebGPU.
 // WebGPU sync is one native promise per call (cheap); WebGL sync is a
@@ -58,7 +65,10 @@ export class Renderer {
 
   private readonly backend:     Backend
   private readonly backendKind: 'webgpu' | 'webgl'
-  private preset:  ManualPreset
+  private readonly topology:    Topology
+  // null until the first setPreset call. Stats use a 'boot' placeholder
+  // while null; process() runs passthrough.
+  private preset:  ManualPreset | null = null
   private enabled: boolean
   // Current background tracked here so setPreset can rebuild the RenderOp
   // with the same background (otherwise an adaptive swap would flash to
@@ -67,7 +77,6 @@ export class Renderer {
   private modelTimingCounter: number = 0
 
   private renderOp:     RenderOp
-  private networkInput: InputOp
   // Persistent Input op for 'image' background mode; rebuilt when image changes.
   private bgImageInput: InputOp | null = null
 
@@ -91,27 +100,28 @@ export class Renderer {
     this.backend           = opts.backend
     this.backendKind       = opts.backendKind
     this.canvas            = opts.canvas
-    this.preset            = opts.preset
     this.enabled           = opts.enabled
     this.currentBackground = opts.background
+    this.topology          = opts.topology
 
-    const weights      = loadWeightsFromBinary(opts.weights)
-    const { renderOp, networkInput } = this.buildRenderChain(opts.preset, weights, opts.background)
-    this.renderOp     = renderOp
-    this.networkInput = networkInput
+    // Boot mode — RenderOp builds only displayInput + passthroughCompositor.
+    // The network is attached later via setPreset() once weights arrive.
+    this.renderOp = new RenderOp(this.backend)
   }
 
   // Per-frame entry point. Always cheap (display). Sometimes expensive (model).
   process(frame: VideoFrame): void {
     this.renderOp.setSource(frame)
 
-    if (!this.enabled || this.currentBackground.kind === 'none') {
+    if (!this.enabled || this.currentBackground.kind === 'none' || !this.renderOp.hasNetwork()) {
       // True passthrough at the GPU level: input image written directly to
       // canvas, no model, no alpha math. Output stream / MSTG / shuttle
       // path picks up the unmodified frame as if no pipeline existed.
-      // Triggered by `enabled: false` (whole SDK paused) OR by
-      // `background: 'none'` (no bg-related effect to render — for v0.1
-      // these look identical because background is the only effect).
+      // Triggered by:
+      //   - `enabled: false`        (whole SDK paused)
+      //   - `background: 'none'`    (no bg-related effect)
+      //   - no network attached yet (worker still booting — autotune /
+      //     weight fetch in flight; RenderOp is in boot mode)
       this.renderOp.runPassthrough()
       this.framesRenderedAt.push(performance.now())
       this.trim(this.framesRenderedAt)
@@ -148,7 +158,7 @@ export class Renderer {
 
   private shouldRunModel(): boolean {
     if (this.skipCounter === 0) {
-      this.skipCounter = this.preset.skipFrames
+      this.skipCounter = this.preset?.skipFrames ?? 0
       return true
     }
     this.skipCounter--
@@ -157,6 +167,8 @@ export class Renderer {
 
   setBackground(bg: Background): void {
     this.currentBackground = bg
+    // RenderOp.setBackground is a no-op when no network is attached
+    // (config gets stored, applied on next setPreset).
     this.renderOp.setBackground(this.translateBackground(bg))
   }
 
@@ -164,18 +176,24 @@ export class Renderer {
     this.enabled = on
   }
 
-  // Runtime preset swap (used by adaptive controller in v0.2). Renderer
-  // is designed to support this from day one — no constructor-frozen state.
+  // Attach the network — first call wires it from boot mode, subsequent
+  // calls swap presets at runtime (used by adaptive controller). The
+  // RenderOp instance is reused: only the network-dependent pieces
+  // (network, networkInput, upscaler, compositor) are rebuilt.
   setPreset(preset: ManualPreset, weightsBuf: ArrayBuffer): void {
-    const weights = loadWeightsFromBinary(weightsBuf)
-    // Preserve current effect across the swap — adaptive logic shouldn't
-    // visually flash to a fallback background. The new RenderOp gets the
-    // same background config the user last selected.
-    const { renderOp, networkInput } = this.buildRenderChain(preset, weights, this.currentBackground)
-    this.renderOp     = renderOp
-    this.networkInput = networkInput
-    this.preset       = preset
-    this.skipCounter  = 0
+    const Ctor = NETWORK_CTORS[preset.model]
+    if (!Ctor) throw new Error(`renderer: model '${preset.model}' not implemented in src/model/networks/`)
+
+    const weights      = loadWeightsFromBinary(weightsBuf)
+    const networkInput = this.backend.ops.Input(preset.resolution.h, preset.resolution.w)
+    const network      = new Ctor(this.backend, networkInput.output, weights)
+
+    this.renderOp.attachNetwork(network, networkInput, {
+      upscaler:   'bilinear',
+      background: this.translateBackground(this.currentBackground),
+    })
+    this.preset      = preset
+    this.skipCounter = 0
   }
 
   getStats(): RendererStats {
@@ -190,31 +208,15 @@ export class Renderer {
       modelMs:    median(this.modelRunSamples.map(s => s.ms)),
       displayMs:  median(this.displayRunSamples.map(s => s.ms)),
       skipped:    this.skippedCount,
-      preset:     this.preset.model,
-      skipFrames: this.preset.skipFrames,
+      preset:     this.preset?.model ?? 'boot',
+      skipFrames: this.preset?.skipFrames ?? 0,
       enabled:    this.enabled,
+      inputPath:  this.topology.input,
+      outputPath: this.topology.output,
     }
   }
 
   // ── internals ─────────────────────────────────────────────────────────────
-
-  private buildRenderChain(
-    preset:  ManualPreset,
-    weights: ModelWeights,
-    bg:      Background,
-  ): { renderOp: RenderOp; networkInput: InputOp } {
-    const Ctor = NETWORK_CTORS[preset.model]
-    if (!Ctor) throw new Error(`renderer: model '${preset.model}' not implemented in src/model/networks/`)
-
-    const networkInput = this.backend.ops.Input(preset.resolution.h, preset.resolution.w)
-    const network      = new Ctor(this.backend, networkInput.output, weights)
-
-    const renderOp = new RenderOp(this.backend, network, networkInput, {
-      upscaler:   'bilinear',
-      background: this.translateBackground(bg),
-    })
-    return { renderOp, networkInput }
-  }
 
   private translateBackground(bg: Background): RenderOpBackgroundConfig {
     switch (bg.kind) {

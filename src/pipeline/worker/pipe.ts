@@ -1,26 +1,26 @@
-// Wraps the input → output Streams pipe with first-frame detection and
-// abort handling. Returns a Promise that resolves when the pipe completes
-// cleanly (input ended), rejects on error, and short-circuits on abort.
+// Wraps the input → output Streams pipe with abort handling. Returns a
+// Promise that resolves when the pipe completes cleanly (input ended),
+// rejects on error, and short-circuits on abort.
 //
-// `onFirstFrame` fires the moment the first VideoFrame successfully
-// traverses the pipe — i.e., the renderer's process() returned without
-// throwing and the frame was enqueued toward the sink. That's the signal
-// for handleInit to emit the 'ready' event back to main.
-//
-// Implementation: insert a tiny TransformStream tap between input and
-// sink. Tap's transform() fires `onFirstFrame` once. Backpressure flows
-// through the tap unchanged.
+// `onFirstFrame` is optional — used when callers want a tap that fires
+// once on the first VideoFrame to traverse the pipe. Currently unused
+// (handleStartRender emits 'ready' directly after attaching the network
+// rather than waiting for a frame), but kept for future hooks.
 
 export interface PipeOptions {
-  input:        ReadableStream<VideoFrame>
-  output:       WritableStream<VideoFrame>
-  signal:       AbortSignal
-  onFirstFrame: () => void
+  input:         ReadableStream<VideoFrame>
+  output:        WritableStream<VideoFrame>
+  signal:        AbortSignal
+  onFirstFrame?: () => void
 }
 
 export function startPipe(opts: PipeOptions): Promise<void> {
-  let firstFrameSeen = false
+  if (!opts.onFirstFrame) {
+    return opts.input.pipeTo(opts.output, { signal: opts.signal })
+  }
 
+  let firstFrameSeen = false
+  const onFirstFrame = opts.onFirstFrame
   const tap = new TransformStream<VideoFrame, VideoFrame>({
     transform(frame, controller) {
       controller.enqueue(frame)
@@ -29,7 +29,7 @@ export function startPipe(opts: PipeOptions): Promise<void> {
         // Defer the callback so onFirstFrame's side effects (postMessage,
         // etc.) don't run inside the transform's microtask and risk
         // re-entrancy with the next frame's enqueue.
-        queueMicrotask(opts.onFirstFrame)
+        queueMicrotask(onFirstFrame)
       }
     },
   })

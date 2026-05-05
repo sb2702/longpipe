@@ -2,9 +2,13 @@
 //
 //   1. Dispatch incoming control-plane messages (init / setBackground /
 //      setEnabled / setPreset / getStats / destroy) to typed handlers.
-//   2. handleInit: orchestrate one-time setup by composing the worker
-//      submodules — setupBackend, resolvePreset, Renderer, createInputStream,
-//      createOutputSink, startPipe.
+//   2. handleInit: setupBackend → construct Renderer in boot mode →
+//      wire input + output + start pipe (passthrough flowing immediately)
+//      → resolvePreset (autotune; pipe keeps pumping passthrough during
+//      this) → return InitResponse.
+//   3. handleStartRender: renderer.setPreset(preset, weights) — attaches
+//      the network in place. Renderer flips from passthrough to effect
+//      mid-pipe; no pipe restart, no stream relock.
 //
 // All actual work lives in the submodules; this file should stay thin.
 
@@ -37,13 +41,10 @@ import { startPipe }         from './pipe'
 let renderer:  Renderer        | null = null
 let pumpAbort: AbortController | null = null
 
-// State held between handleInit and handleStartRender — the latter needs
-// access to what the former resolved, plus the input data (transports).
-let initState: {
-  data:   InitData
-  setup:  Awaited<ReturnType<typeof setupBackend>>
-  preset: ManualPreset
-} | null = null
+// State held between handleInit and handleStartRender — the latter only
+// needs to know which preset the autotune chose (so it can pass it to
+// renderer.setPreset alongside the weights main fetched).
+let resolvedPreset: ManualPreset | null = null
 
 // Default canvas size for non-transfer-capture topologies. For transfer-
 // capture, main supplies the canvas and this is unused. TODO: let main
@@ -79,7 +80,7 @@ async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
 
 async function handleInit(data: InitData): Promise<InitResponse> {
   log('handleInit: start; topology=', data.topology, 'preset=', data.preset, 'backend=', data.backend, 'dtype=', data.dtype)
-  if (initState) throw new Error('handleInit: already initialized')
+  if (renderer) throw new Error('handleInit: already initialized')
 
   // dtype: f16 if backend supports shader-f16, else f32. Preset's intended
   // dtype (e.g. PRESETS lists large/xl as f32 for accuracy) is only a
@@ -91,55 +92,29 @@ async function handleInit(data: InitData): Promise<InitResponse> {
   const setup = await setupBackend(data, DEFAULT_CANVAS)
   log('handleInit: backend ready:', setup.resolvedBackend, setup.resolvedDtype, 'canvas:', setup.canvas.width, 'x', setup.canvas.height)
 
-  log('handleInit: resolvePreset…')
-  const preset = await resolvePreset(data.preset, setup.resolvedDtype, setup.backend)
-  log('handleInit: preset resolved:', preset)
-
-  // Stash for handleStartRender — main fetches weights for `preset` and
-  // calls back with them.
-  initState = { data, setup, preset }
-
-  log('handleInit: done; returning InitResponse, awaiting startRender')
-  return {
-    resolvedPreset:  preset,
-    resolvedBackend: setup.resolvedBackend,
-    resolvedDtype:   setup.resolvedDtype,
-  }
-}
-
-async function handleStartRender(weights: ArrayBuffer): Promise<void> {
-  log('handleStartRender: start; weights bytes:', weights.byteLength)
-  if (!initState) throw new Error('handleStartRender: handleInit not called yet')
-  if (renderer)   throw new Error('handleStartRender: already started')
-  const { data, setup, preset } = initState
-
-  log('handleStartRender: constructing Renderer…')
+  // Construct Renderer in boot mode (no preset, no weights, no network).
+  // Pipe starts immediately so passthrough is flowing while autotune runs.
+  log('handleInit: constructing Renderer (boot mode)…')
   renderer = new Renderer({
     backend:     setup.backend,
-    backendKind: setup.resolvedBackend,   // 'webgpu' | 'webgl' — gates GPU-time sampling
+    backendKind: setup.resolvedBackend,
     canvas:      setup.canvas,
-    preset,
-    weights,
     background:  data.background,
     enabled:     data.enabled,
+    topology:    data.topology,
   })
-  log('handleStartRender: Renderer constructed')
 
   pumpAbort = new AbortController()
-  log('handleStartRender: createInputStream…')
+  log('handleInit: createInputStream…')
   const input  = createInputStream(data)
-  log('handleStartRender: createOutputSink…')
+  log('handleInit: createOutputSink…')
   const output = createOutputSink(data, renderer, pumpAbort.signal)
 
-  log('handleStartRender: starting pipe in background')
+  log('handleInit: starting pipe (passthrough)…')
   startPipe({
     input,
     output,
     signal: pumpAbort.signal,
-    onFirstFrame: () => {
-      log('first frame through pipe; emitting ready')
-      emit('ready', undefined)
-    },
   }).then(() => {
     log('pipe completed (input ended)')
   }).catch(err => {
@@ -151,7 +126,32 @@ async function handleStartRender(weights: ArrayBuffer): Promise<void> {
     emit('error', { message: `pipe failed: ${(err as Error).message}`, recoverable: false })
   })
 
-  log('handleStartRender: done')
+  // Autotune (or named-preset lookup). Pipe is already pumping passthrough,
+  // so the consumer sees live video while this runs (~1-2s on cold start).
+  // Note: autotune competes with passthrough for GPU; passthrough is cheap
+  // (one Input.run + one CompositePassthrough) so contention is minor.
+  log('handleInit: resolvePreset…')
+  const preset = await resolvePreset(data.preset, setup.resolvedDtype, setup.backend)
+  log('handleInit: preset resolved:', preset)
+  resolvedPreset = preset
+
+  log('handleInit: done; returning InitResponse, awaiting startRender')
+  return {
+    resolvedPreset:  preset,
+    resolvedBackend: setup.resolvedBackend,
+    resolvedDtype:   setup.resolvedDtype,
+  }
+}
+
+async function handleStartRender(weights: ArrayBuffer): Promise<void> {
+  log('handleStartRender: start; weights bytes:', weights.byteLength)
+  if (!renderer || !resolvedPreset) throw new Error('handleStartRender: handleInit not completed')
+
+  log('handleStartRender: attaching network via setPreset…')
+  renderer.setPreset(resolvedPreset, weights)
+
+  log('handleStartRender: ready (effect mode active)')
+  emit('ready', undefined)
 }
 
 async function handleSetBackground(bg: Background): Promise<void> {

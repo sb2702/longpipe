@@ -111,8 +111,24 @@
         })
         await $input.play().catch(err => console.warn('inputVideo.play() rejected:', err))
 
-        // 2. captureStream from the input <video> — that's our input MediaStream.
-        const inputStream = $input.captureStream()
+        // 2. Get a MediaStream from the looped video. Chrome/Firefox/Edge
+        //    support HTMLMediaElement.captureStream(); Safari doesn't, so
+        //    fall back to drawing the video into a canvas and using its
+        //    captureStream (universally supported).
+        const inputStream = typeof $input.captureStream === 'function'
+          ? $input.captureStream()
+          : (() => {
+              const c = document.createElement('canvas')
+              c.width  = $input.videoWidth
+              c.height = $input.videoHeight
+              const cctx = c.getContext('2d')
+              const tick = () => {
+                cctx.drawImage($input, 0, 0)
+                $input.requestVideoFrameCallback(tick)
+              }
+              $input.requestVideoFrameCallback(tick)
+              return c.captureStream()
+            })()
 
         // Resolve initial background config — image mode needs an async
         // bitmap fetch before construction.
@@ -148,6 +164,7 @@
             const s = await pipeline.getStats()
             $stats.textContent =
               `preset:    ${s.preset}  (skipFrames=${s.skipFrames})\n` +
+              `transport: ${s.inputPath} → ${s.outputPath}\n` +
               `enabled:   ${s.enabled}\n` +
               `fps:       ${s.fps}     (process() / sec)\n` +
               `modelFps:  ${s.modelFps}     (network runs / sec)\n` +

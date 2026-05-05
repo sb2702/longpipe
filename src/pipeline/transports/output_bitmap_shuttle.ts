@@ -54,14 +54,30 @@ export function setupBitmapShuttleOutput(
   const workerPort = channel.port2
 
   // Passthrough state — only relevant between startPassthrough() and the
-  // first worker bitmap. Closure-captured so it can be torn down from
-  // either trigger point.
+  // worker reaching steady state. Closure-captured so it can be torn down
+  // from either trigger point.
   let passthroughActive = false
   let passthroughVideo: HTMLVideoElement | null = null
   let stopPassthrough: () => void = () => {}
 
+  // Worker's first few effect frames are slow (GPU shader compilation +
+  // pipeline warmup). If we hand off on the very first bitmap, the
+  // captureStream re-emits that single bitmap for ~200-300ms while the
+  // worker grinds out frame 2, looking like a freeze. Keep passthrough
+  // alive until the worker has produced HANDOFF_AT_FRAME bitmaps so the
+  // handoff happens at steady-state cadence.
+  const HANDOFF_AT_FRAME = 3
+  let workerFramesReceived = 0
+
   mainPort.onmessage = (e: MessageEvent<{ bmp: ImageBitmap }>) => {
-    if (passthroughActive) stopPassthrough()
+    if (passthroughActive) {
+      workerFramesReceived++
+      if (workerFramesReceived < HANDOFF_AT_FRAME) {
+        e.data.bmp.close()
+        return
+      }
+      stopPassthrough()
+    }
     try {
       ctx.transferFromImageBitmap(e.data.bmp)
     } catch (err) {

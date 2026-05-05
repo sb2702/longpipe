@@ -14,12 +14,11 @@ import type { BackgroundInput, Background } from './background'
 import { normalizeBackground } from './background'
 import type { AudioMode } from './audio'
 import type { InitData } from './messages'
-import type { Topology } from './topology'
 import { selectTopology } from './topology'
 import { buildOutputStream } from './audio'
 import { WorkerController } from './worker_controller'
-import { setupPostMessageInput }    from './transports/input_postmessage'
-import { setupBitmapShuttleOutput } from './transports/output_bitmap_shuttle'
+import { setupInput }  from './setup_input'
+import { setupOutput } from './setup_output'
 
 export interface PipelineOptions {
   // Background effect. Wide input surface (string keyword, URL, ImageBitmap,
@@ -87,26 +86,27 @@ export class Pipeline implements PromiseLike<Pipeline> {
   constructor(inputStream: MediaStream, options: PipelineOptions) {
     const opts = { ...DEFAULTS, ...options }
 
-    // v0.1: only the universal path (rvfc-postmessage in + bitmap-shuttle
-    // out) has main-side helpers. Topology selection runs for forward
-    // compat but its result is ignored until other paths' main sides land.
-    const _topologyForLater = selectTopology()
-    void _topologyForLater
-    const topology: Topology = { input: 'rvfc-postmessage', output: 'bitmap-shuttle' }
+    // Pick the best transport pair for this browser. Each axis is chosen
+    // independently — the worker's renderer is identical across all 6
+    // combos. See pipeline/topology.ts for the selection logic and
+    // docs/PIPELINE.md for the empirical browser matrix.
+    const topology = selectTopology()
 
-    const inputSetup  = setupPostMessageInput(inputStream)
-    const outputSetup = setupBitmapShuttleOutput(DEFAULT_CANVAS)
+    const inputSetup  = setupInput(topology.input,   inputStream)
+    const outputSetup = setupOutput(topology.output, DEFAULT_CANVAS)
     this.inputCleanup  = inputSetup.cleanup
     this.outputCleanup = outputSetup.cleanup
 
     // Output MediaStream available synchronously. While the worker boots
-    // (autotune + weight fetch + first frame can take 1-3s), the bitmap-
-    // shuttle transport pumps input frames straight to the output canvas
-    // so the consumer sees live video immediately. The transport auto-
-    // stops passthrough the moment the worker posts its first bitmap.
+    // (autotune + weight fetch + first frame can take 1-3s), bitmap-shuttle
+    // can pump input frames straight to the output canvas so the consumer
+    // sees live video immediately (auto-stops the moment the worker posts
+    // its first bitmap). MSTG/transfer-capture write to surfaces main
+    // doesn't own, so passthrough is bitmap-shuttle-only — those topologies
+    // just emit nothing until the worker is ready.
     // Audio passthrough wires the input's audio tracks if requested.
     this.stream = buildOutputStream(outputSetup.videoTrack, inputStream, opts.audio)
-    outputSetup.startPassthrough(inputStream)
+    outputSetup.startPassthrough?.(inputStream)
 
     // Worker spawn — `new URL(..., import.meta.url)` is the standard ESM
     // worker pattern; bundlers (vite, webpack, rollup) handle it.
@@ -136,8 +136,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
       enabled:    opts.enabled,
       backend:    'auto' as const,
       dtype:      'f16'  as const,
-      inputPort:  inputSetup.port,
-      outputPort: outputSetup.port,
+      ...inputSetup.initFields,
+      ...outputSetup.initFields,
     }
     const transferList: Transferable[] = [
       ...inputSetup.transferList,

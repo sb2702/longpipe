@@ -86,6 +86,11 @@ export interface RendererStats {
   preset:        string    // resolved preset's model name
   skipFrames:    number    // resolved preset's skipFrames
   enabled:       boolean   // false = passthrough mode
+
+  // Transport identifiers — useful for debugging which paths the topology
+  // selector picked on a given browser. Static across the session.
+  inputPath:     string    // 'mstp' | 'rvfc-postmessage'
+  outputPath:    string    // 'mstg' | 'transfer-capture' | 'bitmap-shuttle'
 }
 
 // ── Persistent events from worker → main ────────────────────────────────────
