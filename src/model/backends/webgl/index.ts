@@ -14,8 +14,8 @@ import { UpsampleConv1x1WebGL } from '~/model/backends/webgl/ops/upsample_conv1x
 import { Conv2dAddWebGL } from '~/model/backends/webgl/ops/conv2d_add'
 import { CompositeSolidWebGL } from '~/model/backends/webgl/ops/composite_solid'
 import { CompositeImageWebGL } from '~/model/backends/webgl/ops/composite_image'
+import { CompositeImageBilinearWebGL } from '~/model/backends/webgl/ops/composite_image_bilinear'
 import { CompositePassthroughWebGL } from '~/model/backends/webgl/ops/composite_passthrough'
-import { GaussianBlur1DWebGL } from '~/model/backends/webgl/ops/gaussian_blur_1d'
 import { InputWebGL } from '~/model/backends/webgl/ops/input'
 
 export interface WebGLBackendOptions {
@@ -63,7 +63,6 @@ export class WebGLBackend implements Backend {
       UpsampleConcat:   (a, b, params)                   => new UpsampleConcatWebGL(this, a, b, params),
       UpsampleConv1x1:  (input, weights, params)         => new UpsampleConv1x1WebGL(this, input, weights, params),
       UpsampleSigmoid:  (input, params)                  => new UpsampleSigmoidWebGL(this, input, params),
-      GaussianBlur1D:   (input, params)                  => new GaussianBlur1DWebGL(this, input, params),
       Input:            (h, w)                           => new InputWebGL(this, h, w),
     }
     this.presenters = {
@@ -74,6 +73,8 @@ export class WebGLBackend implements Backend {
         new CompositeSolidWebGL(this, image, alpha, bgColor),
       CompositeImage: (image, alpha, bg) =>
         new CompositeImageWebGL(this, image, alpha, bg),
+      CompositeImageBilinear: (image, alpha, bg) =>
+        new CompositeImageBilinearWebGL(this, image, alpha, bg),
       CompositePassthrough: (image) =>
         new CompositePassthroughWebGL(this, image),
     }

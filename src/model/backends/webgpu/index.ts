@@ -14,8 +14,8 @@ import { UpsampleConv1x1WebGPU } from "~/model/backends/webgpu/ops/upsample_conv
 import { UpsampleSigmoidWebGPU } from "~/model/backends/webgpu/ops/upsample_sigmoid";
 import { CompositeSolidWebGPU } from "~/model/backends/webgpu/ops/composite_solid";
 import { CompositeImageWebGPU } from "~/model/backends/webgpu/ops/composite_image";
+import { CompositeImageBilinearWebGPU } from "~/model/backends/webgpu/ops/composite_image_bilinear";
 import { CompositePassthroughWebGPU } from "~/model/backends/webgpu/ops/composite_passthrough";
-import { GaussianBlur1DWebGPU } from "~/model/backends/webgpu/ops/gaussian_blur_1d";
 import { InputWebGPU } from "~/model/backends/webgpu/ops/input";
 
 const STORAGE = navigator.gpu ? GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST : 0;
@@ -64,7 +64,6 @@ export class WebGPUBackend implements Backend {
       UpsampleConcat:   (a, b, params)                  => new UpsampleConcatWebGPU(this, a, b, params),
       UpsampleConv1x1:  (input, weights, params)        => new UpsampleConv1x1WebGPU(this, input, weights, params),
       UpsampleSigmoid:  (input, params)                 => new UpsampleSigmoidWebGPU(this, input, params),
-      GaussianBlur1D:   (input, params)                 => new GaussianBlur1DWebGPU(this, input, params),
       Input:            (h, w)                          => new InputWebGPU(this, h, w),
     };
 
@@ -82,6 +81,15 @@ export class WebGPUBackend implements Backend {
       },
       CompositeImage: (image, alpha, bg) => {
         const op = new CompositeImageWebGPU(this, image, alpha, bg);
+        return {
+          run: () => {
+            op.setOutput(this.getCurrentDisplayTexture());
+            op.run();
+          },
+        };
+      },
+      CompositeImageBilinear: (image, alpha, bg) => {
+        const op = new CompositeImageBilinearWebGPU(this, image, alpha, bg);
         return {
           run: () => {
             op.setOutput(this.getCurrentDisplayTexture());

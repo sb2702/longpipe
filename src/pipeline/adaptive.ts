@@ -18,7 +18,7 @@ const log = (...args: unknown[]) => console.log('[longpipe/adaptive]', ...args)
 const POLL_INTERVAL_MS = 2000
 const COOLDOWN_MS      = 10000   // min gap between any two swaps
 const SOURCE_FPS       = 30      // assumed source rate for budget calc
-const MIN_FPS          = 15      // fps below this for OVERSHOOT_MS → downgrade
+const MIN_FPS          = 20      // fps below this for OVERSHOOT_MS → downgrade
 const OVERSHOOT_MS     = 5000
 const HEADROOM_FRAC    = 0.3     // modelMs / frame budget below this for HEADROOM_MS → upgrade
 const HEADROOM_MS      = 15000   // upgrade is more conservative than downgrade

@@ -1,21 +1,22 @@
-import type { Backend, Tensor } from '~/model/backend'
-import { BlurGaussian } from '~/model/effects/blur_gaussian'
-import { CompositorImage } from '~/model/effects/compositor_image'
+import type { Backend, Tensor, Presenter } from '~/model/backend'
+import { BlurPyramid } from '~/model/effects/blur_pyramid'
 
-// Background-blur composite: blurs the input image and uses that as the bg
-// for a composite_image pass. Caller invariants follow CompositorImage:
-// image, alpha, and the (internally produced) blurred image all share h × w.
+// Background-blur composite: blurs the input image with a pyramid (output
+// stops at half input resolution) and composites it as the bg via the
+// bilinear-sampling presenter. The presenter's final per-pixel scan
+// expands the half-res blurred bg back to canvas resolution for free —
+// avoiding the most expensive op a full pyramid would have.
 export class CompositorBlur {
-  private readonly blur: BlurGaussian
-  private readonly comp: CompositorImage
+  private readonly blur:      BlurPyramid
+  private readonly presenter: Presenter
 
   constructor(backend: Backend, image: Tensor, alpha: Tensor, sigma: number) {
-    this.blur = new BlurGaussian(backend, image, sigma)
-    this.comp = new CompositorImage(backend, image, alpha, this.blur.output)
+    this.blur      = new BlurPyramid(backend, image, sigma)
+    this.presenter = backend.presenters.CompositeImageBilinear(image, alpha, this.blur.output)
   }
 
   run(): void {
     this.blur.run()
-    this.comp.run()
+    this.presenter.run()
   }
 }

@@ -52,11 +52,6 @@ export interface UpsampleConv1x1Params {
   activation:  Activation;
 }
 
-export interface GaussianBlur1DParams {
-  direction: "horizontal" | "vertical";
-  sigma:     number;
-}
-
 // External image source for the Input op. ImageBitmap is the static / test
 // path (one-shot copy); VideoFrame is the production path (zero-copy on
 // WebGPU via importExternalTexture). Both work directly with WebGL2's
@@ -110,21 +105,22 @@ export interface Backend {
     UpsampleConv1x1: (input: Tensor, weights: Conv2DWeights,                  params: UpsampleConv1x1Params) => Op;
     UpsampleSigmoid: (input: Tensor, params: UpsampleParams) => Op;
 
-    // Effects
-    GaussianBlur1D:  (input: Tensor, params: GaussianBlur1DParams) => Op;
-
     // Image source ingestion. Bilinear-resamples the source down to (h, w, 4).
     Input:           (h: number, w: number) => InputOp;
   };
 
   // Render-to-display ops. Produce no Tensor — write directly to the canvas.
   presenters: {
-    CompositeSolid:       (image: Tensor, alpha: Tensor, bgColor: [number, number, number]) => Presenter;
-    CompositeImage:       (image: Tensor, alpha: Tensor, bg: Tensor) => Presenter;
+    CompositeSolid:          (image: Tensor, alpha: Tensor, bgColor: [number, number, number]) => Presenter;
+    CompositeImage:          (image: Tensor, alpha: Tensor, bg: Tensor) => Presenter;
+    // Same as CompositeImage but bg may be smaller than (image, alpha) — bg
+    // is bilinearly sampled. Used by CompositorBlur to absorb the final
+    // pyramid upsample into this pass for free.
+    CompositeImageBilinear:  (image: Tensor, alpha: Tensor, bg: Tensor) => Presenter;
     // Passthrough: writes image directly to canvas; no alpha, no bg. Used
     // by RenderOp when the renderer is disabled (true GPU-level passthrough
     // — input frame in, same frame on the canvas).
-    CompositePassthrough: (image: Tensor) => Presenter;
+    CompositePassthrough:    (image: Tensor) => Presenter;
   };
 
   // Read tensor data back to host as fp32. The tensor must have been allocated
