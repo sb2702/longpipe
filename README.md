@@ -42,7 +42,7 @@ await pipeline.ready                  // optional — resolves once the effect i
 `pipeline.stream` is wired synchronously and emits the unprocessed input until the model is ready (~1–3s on cold start, depending on hardware), so the consumer sees live video the whole time.
 
 
-## Models
+## Performance
 
 Longpipe uses custom-trained models built with an EfficientNetLite encoder, and a UNet style decoder, breaking it down into 7 different variations/performance presets, which vary number of channels, encoder size as well as input size. Even at 0.0.1, the first version of Longpipe (across all variants) have much higher segmentation accuracy than alternative open source models like Mediapipe and Bodypix, while also having much better real-world performance due to implmenting the model as pure WebGPU/WebGL shaders and using a zero-copy fully GPU pipeline.
 
@@ -51,7 +51,7 @@ Using average alpha pixel error on the P3M-10K valdation dataset (499 landscape 
 
 <img width="640" alt="lp-quality" src="https://github.com/user-attachments/assets/c7044937-95af-496f-893a-a05a50d7c914" />
 
-### Performance
+### Speed
 With the pure GPU zero copy pipeline, Longpipe achieves better real world performance than mediapipe using much larger models.
 
 <img width="640" alt="lp-speed" src="https://github.com/user-attachments/assets/ce658b8d-dc62-4d6b-90f8-cd62dfef2a59" />
