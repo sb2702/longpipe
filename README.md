@@ -157,8 +157,9 @@ Works on Chromium (Chrome, Edge), Firefox, and Safari (desktop and iOS). WebGPU 
 
 Two layers:
 
-- **Model** (`src/model/`) — EfficientNet-Lite-0 encoder with a U-Net decoder, written as TypeScript op classes. Each layer is a class; weights load as binary tensors at init; the backend (WebGPU or WebGL2) is injected at construction. BatchNorm is fused into conv weights at export — there is no BN op at inference. See [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) and [docs/MODEL_PLAN.md](../docs/MODEL_PLAN.md).
-- **Pipeline** (`src/pipeline/`) — capability detection, per-browser frame transport selection, worker spawn, audio passthrough, autotune, and the adaptive controller. Designed to absorb the browser/codec/canvas plumbing complexity so consumers don't have to. See [docs/PIPELINE.md](../docs/PIPELINE.md).
+- **Model** (`src/model/`) — EfficientNet-Lite-0 encoder with a U-Net decoder, written as TypeScript op classes. Each layer is a class; weights load as binary tensors at init; the backend (WebGPU or WebGL2) is injected at construction. BatchNorm is fused into conv weights at export — there is no BN op at inference.
+- 
+- **Pipeline** (`src/pipeline/`) — capability detection, per-browser frame transport selection, worker spawn, audio passthrough, autotune, and the adaptive controller. Designed to absorb the browser/codec/canvas plumbing complexity so consumers don't have to. 
 
 Six trained presets cover the hardware range:
 
