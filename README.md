@@ -2,6 +2,11 @@
 
 Hardware-accelerated real-time AI media processing in the browser.
 
+
+<img width="640" height="360" alt="0087" src="https://github.com/user-attachments/assets/525f983c-6b3d-43ff-aedf-b1203e2955c1" />
+
+
+
 Try the live demo: [longpipe.dev/demo](https://longpipe.dev/demo)
 
 > **Warning** — This project is very new (v0.0.1) and still under active development. Expect API changes between versions and bugs.
@@ -132,23 +137,21 @@ new EffectsPipeline(stream, {
 
 Works on Chromium (Chrome, Edge), Firefox, and Safari (desktop and iOS). WebGPU is used when available; WebGL2 is the fallback. Longpipe picks the optimal video frame transport for each browser internally — `MediaStreamTrackProcessor`, `transferControlToOffscreen` + `captureStream`, or an `ImageBitmap` shuttle as universal fallback — all invisible to the caller.
 
-## Problem
+## Models
 
-If you want real-time AI media processing in the browser — virtual backgrounds, background noise removal, face filters — one of the few open-source options is [MediaPipe](https://github.com/google-ai-edge/mediapipe). MediaPipe ships some great open-source models, but they all run in WebAssembly, and using them effectively still requires a fair amount of hardware-accelerated pre- and post-processing on top.
+Longpipe uses custom-trained models built with an EfficientNetLite encoder, and a UNet style decoder, breaking it down into 7 different variations/performance presets, which vary number of channels, encoder size as well as input size. Even at 0.0.1, the first version of Longpipe (across all variants) have much higher segmentation accuracy than alternative open source models like Mediapipe and Bodypix, while also having much better real-world performance due to implmenting the model as pure WebGPU/WebGL shaders and using a zero-copy fully GPU pipeline.
 
-![MediaPipe pipeline diagram](https://github.com/user-attachments/assets/62932072-c5b2-445e-b5d8-a2bd5bb72920)
+### Quality
+Using average alpha pixel error on the P3M-10K valdation dataset (499 landscape images), all variants of Longpipe surpassed mediapipe in both MAE and IoU.
 
-In 2021, I built an SDK to implement [hardware-accelerated neural networks directly in WebGL](https://medium.com/vectorly/building-a-more-efficient-background-segmentation-model-than-google-74ecd17392d5) that proved much more efficient than the MediaPipe implementation. It was popular, but it was a commercial SDK — the company was acquired and the technology was never opened up.
+<img width="640" alt="lp-quality" src="https://github.com/user-attachments/assets/c7044937-95af-496f-893a-a05a50d7c914" />
 
-In 2022, Google Meet adopted a similar approach with their own [hardware-accelerated networks](https://research.google/blog/high-definition-segmentation-in-google-meet/), but that was never open-sourced either.
+### Performance
+With the pure GPU zero copy pipeline, Longpipe achieves better real world performance than mediapipe using much larger models.
 
-As of late 2025, MediaPipe is still the state of the art for open-source real-time browser ML, and nothing better has come along.
+<img width="640" alt="lp-speed" src="https://github.com/user-attachments/assets/ce658b8d-dc62-4d6b-90f8-cd62dfef2a59" />
 
-## Solution
 
-With WebGPU shipping and WebNN on the way, it is now possible to build efficient implementations of popular real-time media-processing features — background segmentation, audio filtering — by combining hardware-accelerated neural networks in WebGPU/WebNN with efficient pre- and post-processing, so developers can plug in features like virtual backgrounds and noise removal without worrying about the details.
-
-Longpipe is that SDK.
 
 ## How it works
 
@@ -174,12 +177,6 @@ Six trained presets cover the hardware range:
 
 Training scripts, fixture generation, and the weight export pipeline are not yet documented here — coming soon.
 
-## Acknowledgements
-
-- [EfficientNet-Lite](https://github.com/tensorflow/tpu/tree/master/models/official/efficientnet/lite) for the backbone architecture.
-- [Google Meet HD Segmentation research](https://research.google/blog/high-definition-segmentation-in-google-meet/) for the architectural choices that hold up on accelerators.
-- [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) for making compute-heavy work in the browser realistic.
-- [Mediabunny](https://mediabunny.dev/) — a colleague's project and a model for what an open-source media SDK with sponsorship-backed development can look like.
 
 ## Roadmap
 
