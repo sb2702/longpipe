@@ -19,6 +19,26 @@ import { buildOutputStream } from './audio'
 import { WorkerController } from './worker_controller'
 import { setupInput }  from './setup_input'
 import { setupOutput } from './setup_output'
+import { WORKER_SOURCE } from './worker_inline'
+
+// Spawn the pipeline worker. In published builds, WORKER_SOURCE is the
+// bundled worker code injected by tsup's inline-worker plugin; we wrap
+// that in a Blob URL so the worker is same-origin no matter where the SDK
+// loaded from. In dev (vite serving src/), WORKER_SOURCE is empty and we
+// fall back to URL-based load — same-origin in dev so it works fine.
+function createWorker(): Worker {
+  if (WORKER_SOURCE) {
+    const blob = new Blob([WORKER_SOURCE], { type: 'application/javascript' })
+    const url = URL.createObjectURL(blob)
+    const worker = new Worker(url, { type: 'module' })
+    // The worker spec consumes the URL synchronously during construction,
+    // so we can revoke immediately to free the Blob without affecting the
+    // already-spawned worker. Skip if you ever see init failures here.
+    URL.revokeObjectURL(url)
+    return worker
+  }
+  return new Worker(new URL('./worker/index.ts', import.meta.url), { type: 'module' })
+}
 
 export interface PipelineOptions {
   // Background effect. Wide input surface (string keyword, URL, ImageBitmap,
@@ -153,9 +173,12 @@ export class Pipeline implements PromiseLike<Pipeline> {
     this.stream = buildOutputStream(outputSetup.videoTrack, inputStream, opts.audio)
     outputSetup.startPassthrough?.(inputStream)
 
-    // Worker spawn — `new URL(..., import.meta.url)` is the standard ESM
-    // worker pattern; bundlers (vite, webpack, rollup) handle it.
-    this.worker     = new Worker(new URL('./worker/index.ts', import.meta.url), { type: 'module' })
+    // Worker spawn — Blob-URL pattern when WORKER_SOURCE is inlined by the
+    // tsup build (published builds), URL-based fallback in dev mode where
+    // src/ is served same-origin by vite. Blob URL means consumers can load
+    // the SDK from any origin (npm bundler, esm.sh, jsdelivr) without
+    // hitting cross-origin worker restrictions.
+    this.worker     = createWorker()
     this.controller = new WorkerController(this.worker)
 
     this.ready = new Promise<void>((resolve, reject) => {

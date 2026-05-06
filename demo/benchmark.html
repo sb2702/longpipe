@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Longpipe — benchmark (Longpipe vs MediaPipe, real-world FPS)</title>
+    <style>
+      body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+      a { color: #6cf; }
+      .topbar { padding: 8px 16px; }
+      h2 { padding: 0 16px; margin: 0 0 8px; }
+      .desc { padding: 0 16px 8px; color: #aaa; font-size: 13px; max-width: 760px; line-height: 1.5; }
+      .controls { padding: 0 16px 8px; }
+      button { background: #333; color: #ddd; border: 1px solid #555; padding: 6px 12px; cursor: pointer; }
+      button:hover { background: #444; }
+      #status { padding: 8px 16px; font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; }
+      .info { padding: 4px 16px; font-family: ui-monospace, monospace; font-size: 12px; color: #aaa; }
+      table { margin: 8px 16px; border-collapse: collapse; font-family: ui-monospace, monospace; font-size: 13px; }
+      th, td { padding: 6px 12px; border-bottom: 1px solid #333; text-align: left; }
+      th { color: #888; font-weight: 600; }
+      td.note { color: #888; font-size: 12px; }
+      #canvases { padding: 16px; display: flex; gap: 16px; flex-wrap: wrap; }
+      #canvases canvas { background: #000; }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><a href="/">← demos</a></div>
+    <h2>Real-world FPS: Longpipe vs MediaPipe</h2>
+    <p class="desc">
+      Streams <code>/loop_video.mp4</code> through a WebCodecs pipeline
+      (demux → decode → segment + composite → encode), once per backend.
+      Total elapsed wall clock ÷ frames processed = real FPS, not bounded
+      by display refresh. Both backends produce VideoFrames at the source
+      video's resolution with an image virtual background.
+      First few frames are dropped from timing as warmup.
+    </p>
+    <div class="controls">
+      <button id="run">Run benchmark</button>
+    </div>
+    <div id="status">idle</div>
+    <div class="info">UA: <span id="ua"></span></div>
+    <table>
+      <thead>
+        <tr>
+          <th>backend</th>
+          <th>frames</th>
+          <th>elapsed</th>
+          <th>FPS</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="results"></tbody>
+    </table>
+    <div id="canvases"></div>
+    <script>
+      document.getElementById('ua').textContent = navigator.userAgent
+    </script>
+    <script type="module" src="./benchmark.ts"></script>
+  </body>
+</html>

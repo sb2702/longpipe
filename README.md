@@ -1,4 +1,4 @@
-# Longpipe 🐉
+# Longpipe 🐲
 
 Hardware-accelerated real-time AI media processing in the browser.
 
