@@ -1,6 +1,6 @@
-# Longpipe 🐲
+# Longpipe 🐉
 
-Hardware-accelerated real-time AI media processing in the browser.
+Fast, high quality virtual effects in the browser
 
 
 <img width="640" height="360" alt="0087" src="https://github.com/user-attachments/assets/525f983c-6b3d-43ff-aedf-b1203e2955c1" />
@@ -13,15 +13,10 @@ Try the live demo: [longpipe.dev/demo](https://longpipe.dev/demo)
 
 ## Features
 
-- Real-time portrait matting / virtual backgrounds in the browser
-- WebGPU compute shaders with a WebGL2 fragment-shader fallback
-- Worker-by-default — all model and render work runs off the main thread
-- Background options: blur, image, video, solid color, or none (passthrough)
-- Six trained model presets covering hardware from MacBook Pro down to Chromebook
-- Auto-tuned at init: picks the best preset for the current device, plus the optimal frame transport for the current browser
-- Adaptive at runtime: swaps to a smaller preset when FPS drops, larger when there's headroom
-- Single-call API: `new EffectsPipeline(inputStream, { background })` returns a `MediaStream`
-- Audio passthrough by default
+- **Support across browsers:** Works on every browser, simplifying dozens of browser inconsistencies in one simple API.
+- **Performance:** Longpipe was built from the ground up to work as well on 10-year-old netbooks as it does on the latest MacBook Pro.
+- **Adaptivity:** Longpipe has several model variants (xl to xs), auto-selecting to provide the best quality while maintaining 30 fps.
+- Built by the founder of [Vectorly](https://www.crunchbase.com/organization/vectorly), a commercial effects SDK acquired in 2021. A ground-up redesign for the WebGPU era, with years of production lessons baked in.
 
 ## Install
 
@@ -45,6 +40,25 @@ await pipeline.ready                  // optional — resolves once the effect i
 ```
 
 `pipeline.stream` is wired synchronously and emits the unprocessed input until the model is ready (~1–3s on cold start, depending on hardware), so the consumer sees live video the whole time.
+
+
+## Models
+
+Longpipe uses custom-trained models built with an EfficientNetLite encoder, and a UNet style decoder, breaking it down into 7 different variations/performance presets, which vary number of channels, encoder size as well as input size. Even at 0.0.1, the first version of Longpipe (across all variants) have much higher segmentation accuracy than alternative open source models like Mediapipe and Bodypix, while also having much better real-world performance due to implmenting the model as pure WebGPU/WebGL shaders and using a zero-copy fully GPU pipeline.
+
+### Quality
+Using average alpha pixel error on the P3M-10K valdation dataset (499 landscape images), all variants of Longpipe surpassed mediapipe in both MAE and IoU.
+
+<img width="640" alt="lp-quality" src="https://github.com/user-attachments/assets/c7044937-95af-496f-893a-a05a50d7c914" />
+
+### Performance
+With the pure GPU zero copy pipeline, Longpipe achieves better real world performance than mediapipe using much larger models.
+
+<img width="640" alt="lp-speed" src="https://github.com/user-attachments/assets/ce658b8d-dc62-4d6b-90f8-cd62dfef2a59" />
+
+
+
+
 
 ## Backgrounds
 
@@ -136,20 +150,6 @@ new EffectsPipeline(stream, {
 ## Browser support
 
 Works on Chromium (Chrome, Edge), Firefox, and Safari (desktop and iOS). WebGPU is used when available; WebGL2 is the fallback. Longpipe picks the optimal video frame transport for each browser internally — `MediaStreamTrackProcessor`, `transferControlToOffscreen` + `captureStream`, or an `ImageBitmap` shuttle as universal fallback — all invisible to the caller.
-
-## Models
-
-Longpipe uses custom-trained models built with an EfficientNetLite encoder, and a UNet style decoder, breaking it down into 7 different variations/performance presets, which vary number of channels, encoder size as well as input size. Even at 0.0.1, the first version of Longpipe (across all variants) have much higher segmentation accuracy than alternative open source models like Mediapipe and Bodypix, while also having much better real-world performance due to implmenting the model as pure WebGPU/WebGL shaders and using a zero-copy fully GPU pipeline.
-
-### Quality
-Using average alpha pixel error on the P3M-10K valdation dataset (499 landscape images), all variants of Longpipe surpassed mediapipe in both MAE and IoU.
-
-<img width="640" alt="lp-quality" src="https://github.com/user-attachments/assets/c7044937-95af-496f-893a-a05a50d7c914" />
-
-### Performance
-With the pure GPU zero copy pipeline, Longpipe achieves better real world performance than mediapipe using much larger models.
-
-<img width="640" alt="lp-speed" src="https://github.com/user-attachments/assets/ce658b8d-dc62-4d6b-90f8-cd62dfef2a59" />
 
 
 
