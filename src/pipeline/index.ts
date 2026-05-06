@@ -20,6 +20,9 @@ import { WorkerController } from './worker_controller'
 import { setupInput }  from './setup_input'
 import { setupOutput } from './setup_output'
 import { WORKER_SOURCE } from './worker_inline'
+import { createLogger, setDebug } from './debug'
+
+const log = createLogger('pipeline')
 
 // Spawn the pipeline worker. In published builds, WORKER_SOURCE is the
 // bundled worker code injected by tsup's inline-worker plugin; we wrap
@@ -75,6 +78,10 @@ export interface PipelineOptions {
   // `new Pipeline()` directly. Wrap construction in try/catch if you
   // want to handle those too.
   onError?:        (err: PipelineError) => void
+  // Enable verbose internal logging (`[longpipe/pipeline] …`, etc) on both
+  // the main thread and inside the worker. Default false — production
+  // consumers see nothing in console unless they opt in.
+  debug?:          boolean
 }
 
 // Public CDN where Longpipe hosts its own model weights. Versioned in the
@@ -89,6 +96,7 @@ const DEFAULTS = {
   audio:          'passthrough'               as AudioMode,
   enabled:        true,
   adaptive:       true,
+  debug:          false,
 }
 
 // Fallback output canvas size — only used when neither the caller nor the
@@ -149,6 +157,9 @@ export class Pipeline implements PromiseLike<Pipeline> {
 
   constructor(inputStream: MediaStream, options: PipelineOptions) {
     const opts = { ...DEFAULTS, ...options }
+    // Set debug FIRST so any subsequent log() calls in this constructor
+    // (and downstream main-thread modules) honor the flag from the start.
+    setDebug(opts.debug)
 
     // Pick the best transport pair for this browser. Each axis is chosen
     // independently — the worker's renderer is identical across all 6
@@ -183,7 +194,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
 
     this.ready = new Promise<void>((resolve, reject) => {
       this.controller.addPersistentListener('ready', () => {
-        console.log('[longpipe/pipeline] ready handler invoked; resolving .ready')
+        log('ready handler invoked; resolving .ready')
         opts.onReady?.()
         resolve()
       })
@@ -209,6 +220,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
       backend:    'auto' as const,
       dtype:      'f16'  as const,
       canvasSize: outputSize,
+      debug:      opts.debug,
       ...inputSetup.initFields,
       ...outputSetup.initFields,
     }
@@ -232,26 +244,26 @@ export class Pipeline implements PromiseLike<Pipeline> {
     onError?:       (err: PipelineError) => void,
   ): Promise<void> {
     try {
-      console.log('[longpipe/pipeline] normalizing background…')
+      log('normalizing background…')
       const norm = await normalizeBackground(rawBackground)
       this.bgCleanup = norm.cleanup ?? null
       const initData: InitData = { ...partialInit, background: norm.background }
       const initTransferList = [...transferList, ...(norm.transferList ?? [])]
 
-      console.log('[longpipe/pipeline] sending init…')
+      log('sending init…')
       const initRes = await this.controller.sendMessage('init', initData, initTransferList)
-      console.log('[longpipe/pipeline] init resolved:', initRes)
+      log('init resolved:', initRes)
 
       const url = weightsUrlFor(weightsBaseUrl, initRes.resolvedPreset.model)
-      console.log('[longpipe/pipeline] fetching weights:', url)
+      log('fetching weights:', url)
       const r = await fetch(url)
       if (!r.ok) throw new Error(`weights fetch failed: ${r.status} ${url}`)
       const weights = await r.arrayBuffer()
-      console.log('[longpipe/pipeline] weights bytes:', weights.byteLength)
+      log('weights bytes:', weights.byteLength)
 
-      console.log('[longpipe/pipeline] sending startRender…')
+      log('sending startRender…')
       await this.controller.sendMessage('startRender', { weights }, [weights])
-      console.log('[longpipe/pipeline] startRender resolved; awaiting first frame')
+      log('startRender resolved; awaiting first frame')
 
       // Adaptive controller — only when caller used 'auto' AND didn't
       // disable it. Explicit preset choices are respected and never

@@ -16,6 +16,10 @@
 // worker drains, the channel queue itself can grow. v0.1 trusts the
 // worker drains fast enough; v0.2 should add an ack-based gating loop.
 
+import { createLogger } from '../debug'
+
+const log = createLogger('input-postmessage/main')
+
 export interface PostMessageInputSetup {
   port:         MessagePort
   transferList: Transferable[]
@@ -39,7 +43,7 @@ export function setupPostMessageInput(inputStream: MediaStream): PostMessageInpu
   // ready, which we already are. Failures are logged but non-fatal; rVFC
   // still fires once frames arrive.
   video.play().catch(err => {
-    console.warn('[input-postmessage/main] video.play() rejected:', err)
+    log.warn('video.play() rejected:', err)
   })
 
   const rvfc = (video as unknown as { requestVideoFrameCallback?: RVFCMethod })
@@ -64,7 +68,7 @@ export function setupPostMessageInput(inputStream: MediaStream): PostMessageInpu
     } catch (err) {
       // VideoFrame() can throw if the video isn't ready yet for this tick;
       // safe to skip — next rVFC will retry.
-      console.warn('[input-postmessage/main] VideoFrame() failed; skipping frame:', err)
+      log.warn('VideoFrame() failed; skipping frame:', err)
     }
     rvfc(tick)
   }

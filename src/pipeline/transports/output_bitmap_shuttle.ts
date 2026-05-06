@@ -15,6 +15,10 @@
 // captureStream picks up the new bitmap automatically and emits it as a
 // VideoFrame on the track.
 
+import { createLogger } from '../debug'
+
+const log = createLogger('bitmap-shuttle/main')
+
 export interface BitmapShuttleOutputSetup {
   videoTrack:   MediaStreamTrack
   port:         MessagePort           // hand this to worker via transfer list
@@ -83,7 +87,7 @@ export function setupBitmapShuttleOutput(
     } catch (err) {
       // transferFromImageBitmap can throw if the bitmap was somehow already
       // consumed; log + drop so the pipe doesn't stall.
-      console.warn('[bitmap-shuttle/main] transferFromImageBitmap failed:', err)
+      log.warn('transferFromImageBitmap failed:', err)
     }
   }
   mainPort.start()

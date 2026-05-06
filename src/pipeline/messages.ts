@@ -54,6 +54,10 @@ export interface InitData {
   backend:  'webgpu' | 'webgl' | 'auto'
   dtype:    Dtype
 
+  // When true, the worker enables the same debug-log gate as the main thread
+  // (both contexts have their own setDebug state). Default false.
+  debug?:   boolean
+
   // Note: weights are NOT in InitData. Two-phase init: 'init' resolves
   // backend + preset and returns InitResponse; main then fetches weights
   // for the resolved preset and sends them via 'startRender'. This lets

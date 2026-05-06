@@ -32,7 +32,8 @@ const WARMUP_ITERS  = 3
 const TIMED_ITERS   = 10
 const DEFAULT_SOURCE_FPS = 30
 
-const log = (...args: unknown[]) => console.log('[longpipe/autotune]', ...args)
+import { createLogger } from '../debug'
+const log = createLogger('autotune')
 
 interface NetworkLike { readonly output: Tensor; run(): void }
 type NetworkCtor = new (b: Backend, i: Tensor, w: ModelWeights) => NetworkLike

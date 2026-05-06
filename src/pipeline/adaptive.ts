@@ -10,8 +10,9 @@
 import type { ModelName, PresetName } from './presets'
 import { PRESETS } from './presets'
 import type { RendererStats, PipelineError } from './messages'
+import { createLogger } from './debug'
 
-const log = (...args: unknown[]) => console.log('[longpipe/adaptive]', ...args)
+const log = createLogger('adaptive')
 
 // Tunables. Hardcoded for v0.1; surface as PipelineOptions later if
 // callers actually want to tune.

@@ -19,9 +19,11 @@ import type {
   WorkerEvent,
 } from './messages'
 
+import { createLogger } from './debug'
+
 export type EventHandler<E extends EventName> = (data: EventMap[E]) => void
 
-const log = (...args: unknown[]) => console.log('[longpipe/worker_controller]', ...args)
+const log = createLogger('worker_controller')
 
 export class WorkerController {
   private worker: Worker

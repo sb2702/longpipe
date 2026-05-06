@@ -21,6 +21,9 @@ import type { Renderer } from './renderer'
 import { createMstgOutput }            from './adapters/output_mstg'
 import { createTransferCaptureOutput } from './adapters/output_transfer_capture'
 import { createBitmapShuttleOutput }   from './adapters/output_bitmap_shuttle'
+import { createLogger } from '../debug'
+
+const log = createLogger('create_output')
 
 export function createOutputSink(
   data:     InitData,
@@ -36,7 +39,7 @@ export function createOutputSink(
       // Background pipe: transform → MSTG writable. handleInit will pipe its
       // input into transform.writable; backpressure flows through both.
       transform.readable.pipeTo(data.outputWritable, { signal }).catch(err => {
-        if (!signal.aborted) console.warn('[create_output] mstg downstream pipe failed:', err)
+        if (!signal.aborted) log.warn('mstg downstream pipe failed:', err)
       })
       return transform.writable
     }

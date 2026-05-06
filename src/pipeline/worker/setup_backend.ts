@@ -22,6 +22,9 @@ import type { Backend, Dtype } from '~/model/backend.ts'
 import { WebGPUBackend } from '~/model/backends/webgpu/index.ts'
 import { WebGLBackend }  from '~/model/backends/webgl/index.ts'
 import type { InitData, PipelineError } from '../messages'
+import { createLogger } from '../debug'
+
+const log = createLogger('setup_backend')
 
 export interface BackendSetup {
   backend:         Backend
@@ -75,10 +78,10 @@ export async function setupBackend(
       }).catch(() => { /* device.lost itself rejecting is unexpected; ignore */ })
       return { backend, resolvedBackend: 'webgpu', resolvedDtype: dtype, canvas }
     } catch (e) {
-      console.warn('[setup_backend] WebGPU isAvailable but create() threw; trying WebGL fallback:', e)
+      log.warn('WebGPU isAvailable but create() threw; trying WebGL fallback:', e)
       lastError = e
       if (isTransferCapture) {
-        console.warn('[setup_backend] transfer-capture topology: WebGL fallback may also fail on the same canvas')
+        log.warn('transfer-capture topology: WebGL fallback may also fail on the same canvas')
       }
     }
   }
@@ -101,7 +104,7 @@ export async function setupBackend(
       })
       return { backend, resolvedBackend: 'webgl', resolvedDtype: data.dtype, canvas }
     } catch (e) {
-      console.warn('[setup_backend] WebGL create() threw:', e)
+      log.warn('WebGL create() threw:', e)
       lastError = e
     }
   }

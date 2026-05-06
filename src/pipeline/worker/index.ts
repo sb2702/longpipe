@@ -12,7 +12,9 @@
 //
 // All actual work lives in the submodules; this file should stay thin.
 
-const log = (...args: unknown[]) => console.log('[longpipe/worker]', ...args)
+import { createLogger, setDebug } from '../debug'
+
+const log = createLogger('worker')
 log('script loaded')
 
 import type {
@@ -79,6 +81,9 @@ async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
 }
 
 async function handleInit(data: InitData): Promise<InitResponse> {
+  // Honor the consumer's debug flag inside the worker (its own context).
+  // Set this BEFORE the first log() of this call so the message respects it.
+  setDebug(!!data.debug)
   log('handleInit: start; topology=', data.topology, 'preset=', data.preset, 'backend=', data.backend, 'dtype=', data.dtype)
   if (renderer) throw new Error('handleInit: already initialized')
 
