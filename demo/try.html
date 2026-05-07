@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Try Longpipe (SDK demo)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* Brand palette — mirrors the Longpipe website tokens */
+    :root {
+      --bg:            #ecfdf5;
+      --bg-card:       #ffffff;
+      --bg-card-tint:  #d1fae5;
+      --border:        #a7f3d0;
+      --border-strong: #6ee7b7;
+      --text:          #022c22;
+      --muted:         #065f46;
+      --accent:        #059669;
+      --accent-hover:  #047857;
+      --accent-soft:   #d1fae5;
+      --error:         #dc2626;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-hover); }
+    code, kbd, samp { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+    nav {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    nav .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      color: var(--text);
+    }
+    nav .links { display: flex; gap: 18px; font-size: 14px; color: var(--muted); }
+    nav .links a { color: var(--muted); }
+    nav .links a:hover { color: var(--text); }
+
+    main {
+      flex: 1;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 40px 24px 56px;
+      width: 100%;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    h1 .accent { color: var(--accent); }
+    .intro {
+      color: var(--muted);
+      margin: 0 0 32px;
+      max-width: 600px;
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    .video-card {
+      background: #000;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 12px 32px -12px rgba(5, 95, 70, 0.28);
+      margin-bottom: 14px;
+    }
+    .video-card video {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #000;
+    }
+    .status {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 0 4px 24px;
+      min-height: 18px;
+    }
+    .status.error { color: var(--error); }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 720px) {
+      .controls { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .card-label {
+      margin: 0 0 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+
+    .segmented {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .segmented button {
+      flex: 1;
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 120ms, border-color 120ms, color 120ms;
+    }
+    .segmented button:hover { background: var(--accent-soft); }
+    .segmented button.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .upload-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      margin-left: 2px;
+      border-radius: 4px;
+      opacity: 0.55;
+      cursor: pointer;
+      transition: opacity 120ms, background 120ms;
+    }
+    .upload-icon:hover {
+      opacity: 1;
+      background: rgba(2, 44, 34, 0.08);
+    }
+    .segmented button.active .upload-icon { opacity: 0.85; }
+    .segmented button.active .upload-icon:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.18);
+    }
+    .upload-icon svg { width: 13px; height: 13px; display: block; }
+
+    .bg-extra {
+      margin-top: 12px;
+      display: none;
+      gap: 10px;
+      align-items: center;
+      font-size: 13px;
+    }
+    .bg-extra.show { display: flex; }
+    .bg-extra label { color: var(--muted); min-width: 60px; }
+    .bg-extra input[type=color] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 0;
+      width: 36px;
+      height: 32px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .bg-extra input[type=range] {
+      flex: 1;
+      accent-color: var(--accent);
+    }
+    .bg-extra .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      min-width: 32px;
+      text-align: right;
+    }
+
+    details.advanced {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 20px;
+      margin-bottom: 28px;
+    }
+    details.advanced[open] { padding-bottom: 18px; }
+    details.advanced summary {
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      list-style: none;
+      user-select: none;
+    }
+    details.advanced summary::-webkit-details-marker { display: none; }
+    details.advanced summary::before {
+      content: "▸";
+      display: inline-block;
+      margin-right: 8px;
+      transition: transform 150ms;
+    }
+    details.advanced[open] summary::before { transform: rotate(90deg); }
+    details.advanced .preset-row { margin-top: 14px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="brand"><span>🐉 Longpipe</span></a>
+    <div class="links">
+      <a href="/">All demos</a>
+      <a href="https://github.com/sb2702/longpipe">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+    <h1>Try <span class="accent">Longpipe</span>.</h1>
+    <p class="intro">
+      SDK-side mirror of the website demo. Same UI, same options — but imports
+      from the local source tree (<code>~/pipeline</code>) instead of the
+      published npm package, so you can iterate on the SDK and see changes
+      live. Pick a source, pick a background.
+    </p>
+
+    <div class="video-card">
+      <video id="output" autoplay muted playsinline></video>
+    </div>
+    <div class="status" id="status">starting…</div>
+
+    <div class="controls">
+      <div class="card">
+        <p class="card-label">Source</p>
+        <div class="segmented" id="sourceSeg">
+          <button data-source="video" class="active">Sample video</button>
+          <button data-source="webcam">My webcam</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-label">Background</p>
+        <div class="segmented" id="bgSeg">
+          <button data-bg="image" class="active">
+            <span>Image</span>
+            <span class="upload-icon" data-upload="image" title="Upload your own image" role="button" aria-label="Upload image">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </span>
+          </button>
+          <button data-bg="blur"><span>Blur</span></button>
+          <button data-bg="color"><span>Color</span></button>
+          <button data-bg="video">
+            <span>Video</span>
+            <span class="upload-icon" data-upload="video" title="Upload an mp4 or webm" role="button" aria-label="Upload video">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </span>
+          </button>
+          <button data-bg="none"><span>None</span></button>
+        </div>
+        <input type="file" id="imageUpload" accept="image/*" hidden />
+        <input type="file" id="videoUpload" accept="video/mp4,video/webm" hidden />
+        <div class="bg-extra" id="bgBlurRow">
+          <label for="bgBlurSigma">Strength</label>
+          <input type="range" id="bgBlurSigma" min="1" max="20" step="0.5" value="8" />
+          <span class="val" id="bgBlurVal">8</span>
+        </div>
+        <div class="bg-extra" id="bgColorRow">
+          <label for="bgColor">Color</label>
+          <input type="color" id="bgColor" value="#00b050" />
+          <span class="val" id="bgColorVal">#00b050</span>
+        </div>
+      </div>
+    </div>
+
+    <details class="advanced">
+      <summary>Advanced</summary>
+      <div class="preset-row">
+        <p class="card-label">Preset</p>
+        <div class="segmented" id="presetSeg">
+          <button data-preset="auto" class="active">Auto</button>
+          <button data-preset="fast">Fast</button>
+          <button data-preset="balanced">Balanced</button>
+          <button data-preset="quality">Quality</button>
+        </div>
+      </div>
+    </details>
+  </main>
+
+  <script type="module">
+    import { Pipeline as EffectsPipeline } from '~/pipeline'
+
+    const $output       = document.getElementById('output')
+    const $status       = document.getElementById('status')
+    const $sourceSeg    = document.getElementById('sourceSeg')
+    const $bgSeg        = document.getElementById('bgSeg')
+    const $imageUpload  = document.getElementById('imageUpload')
+    const $videoUpload  = document.getElementById('videoUpload')
+    const $bgBlurSigma  = document.getElementById('bgBlurSigma')
+    const $bgBlurVal    = document.getElementById('bgBlurVal')
+    const $bgBlurRow    = document.getElementById('bgBlurRow')
+    const $bgColor      = document.getElementById('bgColor')
+    const $bgColorVal   = document.getElementById('bgColorVal')
+    const $bgColorRow   = document.getElementById('bgColorRow')
+    const $presetSeg    = document.getElementById('presetSeg')
+
+    let pipeline      = null
+    let inputVideo    = null
+    let webcamStream  = null
+
+    let cachedDefaultBgImage = null
+    let uploadedImageUrl     = null
+    let uploadedVideoUrl     = null
+
+    let currentSource = 'video'
+    let currentBg     = 'image'
+    let currentPreset = 'auto'
+
+    function setStatus(s, ok = true) {
+      $status.textContent = s
+      $status.className = ok ? 'status' : 'status error'
+    }
+
+    async function loadDefaultBgImage() {
+      if (cachedDefaultBgImage) return cachedDefaultBgImage
+      const res = await fetch('./demo.jpg')
+      cachedDefaultBgImage = await createImageBitmap(await res.blob())
+      return cachedDefaultBgImage
+    }
+
+    async function resolveBg() {
+      switch (currentBg) {
+        case 'image': return uploadedImageUrl ?? await loadDefaultBgImage()
+        case 'blur':  return { blur: { sigma: parseFloat($bgBlurSigma.value) } }
+        case 'color': return { color: $bgColor.value }
+        case 'video': return uploadedVideoUrl ? { video: uploadedVideoUrl } : await loadDefaultBgImage()
+        case 'none':  return 'none'
+      }
+    }
+
+    async function getInputStream() {
+      if (currentSource === 'webcam') {
+        webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        return webcamStream
+      }
+      inputVideo = document.createElement('video')
+      inputVideo.src = './loop_video.mp4'
+      inputVideo.loop = true
+      inputVideo.muted = true
+      inputVideo.playsInline = true
+      await inputVideo.play()
+      if (!inputVideo.videoWidth) {
+        await new Promise(res => inputVideo.addEventListener('loadedmetadata', res, { once: true }))
+      }
+      return inputVideo.captureStream()
+    }
+
+    function teardown() {
+      if (pipeline) {
+        try { pipeline.destroy() } catch {}
+        pipeline = null
+      }
+      if (inputVideo) {
+        inputVideo.pause()
+        inputVideo.removeAttribute('src')
+        inputVideo.load()
+        inputVideo = null
+      }
+      if (webcamStream) {
+        for (const t of webcamStream.getTracks()) t.stop()
+        webcamStream = null
+      }
+    }
+
+    async function buildPipeline() {
+      teardown()
+      setStatus('initializing pipeline…')
+      let inputStream
+      try {
+        inputStream = await getInputStream()
+      } catch (err) {
+        setStatus('source unavailable: ' + (err.message || err), false)
+        if (currentSource === 'webcam') {
+          currentSource = 'video'
+          for (const b of $sourceSeg.querySelectorAll('button')) {
+            b.classList.toggle('active', b.dataset.source === 'video')
+          }
+          return buildPipeline()
+        }
+        return
+      }
+      const bg = await resolveBg()
+
+      pipeline = new EffectsPipeline(inputStream, {
+        background: bg,
+        preset: currentPreset,
+        audio: 'drop',
+        onError: (err) => setStatus('error: ' + (err.message || err), false),
+      })
+      $output.srcObject = pipeline.stream
+
+      try {
+        await pipeline.ready
+        setStatus('live — running on your GPU')
+      } catch (err) {
+        setStatus('init failed: ' + (err.message || err), false)
+      }
+    }
+
+    function wireSeg(container, onChange) {
+      container.addEventListener('click', (e) => {
+        const btn = e.target.closest('button')
+        if (!btn) return
+        for (const b of container.querySelectorAll('button')) b.classList.remove('active')
+        btn.classList.add('active')
+        onChange(btn.dataset)
+      })
+    }
+
+    wireSeg($sourceSeg, ({ source }) => {
+      if (source === currentSource) return
+      currentSource = source
+      buildPipeline()
+    })
+
+    function setBgActive(bg) {
+      currentBg = bg
+      for (const b of $bgSeg.querySelectorAll('button')) {
+        b.classList.toggle('active', b.dataset.bg === bg)
+      }
+      $bgBlurRow.classList.toggle('show', bg === 'blur')
+      $bgColorRow.classList.toggle('show', bg === 'color')
+    }
+
+    async function applyBg() {
+      if (!pipeline) return
+      try {
+        await pipeline.setBackground(await resolveBg())
+      } catch (err) {
+        setStatus('background swap failed: ' + (err.message || err), false)
+      }
+    }
+
+    $bgSeg.addEventListener('click', (e) => {
+      const uploadIcon = e.target.closest('.upload-icon')
+      if (uploadIcon) {
+        e.stopPropagation()
+        const which = uploadIcon.dataset.upload
+        if (which === 'image') $imageUpload.click()
+        else if (which === 'video') $videoUpload.click()
+        return
+      }
+      const btn = e.target.closest('button')
+      if (!btn || !btn.dataset.bg) return
+      const bg = btn.dataset.bg
+      if (bg === 'video' && !uploadedVideoUrl) {
+        $videoUpload.click()
+        return
+      }
+      setBgActive(bg)
+      applyBg()
+    })
+
+    wireSeg($presetSeg, ({ preset }) => {
+      if (preset === currentPreset) return
+      currentPreset = preset
+      buildPipeline()
+    })
+
+    $imageUpload.addEventListener('change', () => {
+      const file = $imageUpload.files[0]
+      if (!file) return
+      if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl)
+      uploadedImageUrl = URL.createObjectURL(file)
+      setBgActive('image')
+      applyBg()
+      $imageUpload.value = ''
+    })
+
+    $videoUpload.addEventListener('change', () => {
+      const file = $videoUpload.files[0]
+      if (!file) return
+      if (uploadedVideoUrl) URL.revokeObjectURL(uploadedVideoUrl)
+      uploadedVideoUrl = URL.createObjectURL(file)
+      setBgActive('video')
+      applyBg()
+      $videoUpload.value = ''
+    })
+
+    $bgBlurSigma.addEventListener('input', () => {
+      $bgBlurVal.textContent = $bgBlurSigma.value
+      if (pipeline && currentBg === 'blur') {
+        pipeline.setBackground({ blur: { sigma: parseFloat($bgBlurSigma.value) } })
+      }
+    })
+
+    $bgColor.addEventListener('input', () => {
+      $bgColorVal.textContent = $bgColor.value
+      if (pipeline && currentBg === 'color') {
+        pipeline.setBackground({ color: $bgColor.value })
+      }
+    })
+
+    buildPipeline().catch(err => setStatus('startup failed: ' + (err.message || err), false))
+  </script>
+</body>
+</html>

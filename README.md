@@ -77,8 +77,9 @@ new EffectsPipeline(stream, { background: imageBitmap })
 // video: URL, Blob, or <video> — looped, muted, decoded on the main thread
 new EffectsPipeline(stream, { background: { video: 'https://example.com/bg.mp4' } })
 
-// solid color
-new EffectsPipeline(stream, { background: { color: [0, 100, 200] } })
+// solid color — hex string or [r, g, b] floats in [0, 1]
+new EffectsPipeline(stream, { background: { color: '#00b050' } })       // greenscreen
+new EffectsPipeline(stream, { background: { color: [0, 0.7, 0.3] } })
 ```
 
 Swap at runtime:

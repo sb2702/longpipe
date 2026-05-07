@@ -359,7 +359,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
 // Public type re-exports
 export type { PipelineOptions as Options }
 export type {
-  BackgroundInput, Background, BlurInput, ImageInput, VideoInput,
+  BackgroundInput, Background, BlurInput, ColorInput, ImageInput, VideoInput,
 }                                                             from './background'
 export type { PresetName, ManualPreset, ModelName }           from './presets'
 export type { AudioMode }                                     from './audio'

@@ -4,7 +4,7 @@
 export { Pipeline as EffectsPipeline } from '~/pipeline/index.ts'
 export type {
   PipelineOptions,
-  BackgroundInput, Background, BlurInput, ImageInput, VideoInput,
+  BackgroundInput, Background, BlurInput, ColorInput, ImageInput, VideoInput,
   PresetName, ManualPreset, ModelName,
   AudioMode,
   PipelineError, ErrorSource,

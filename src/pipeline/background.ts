@@ -25,7 +25,7 @@ export type BackgroundInput =
   | ImageBitmap
   | HTMLImageElement
   | HTMLVideoElement                       // typed but throws — see normalize
-  | { color: [number, number, number] }    // debug, undocumented
+  | { color: ColorInput }
   | { blur:  BlurInput }
   | { image: ImageInput }
   | { video: VideoInput }                  // typed but throws — see normalize
@@ -34,6 +34,10 @@ export type BlurInput =
   | true                                   // default (medium)
   | { strength: 'low' | 'medium' | 'high' | number }   // number is 0..1
   | { sigma: number }                                  // raw escape hatch
+
+export type ColorInput =
+  | string                                 // hex: '#rgb' or '#rrggbb' (with or without leading #)
+  | [number, number, number]               // [r, g, b], each float in [0, 1]
 
 export type ImageInput =
   | ImageBitmap
@@ -50,7 +54,7 @@ export type VideoInput =
 
 export type Background =
   | { kind: 'none' }
-  | { kind: 'color'; rgb: [number, number, number] }
+  | { kind: 'color'; rgb: [number, number, number] }   // floats in [0, 1] — shader-ready
   | { kind: 'blur';  sigma: number }
   | { kind: 'image'; bitmap: ImageBitmap }
   | { kind: 'video'; port:   MessagePort }
@@ -92,8 +96,8 @@ export async function normalizeBackground(input: BackgroundInput): Promise<Norma
   // and DOM elements, but TS can't narrow because the typeof guards above
   // are conservative (HTMLImageElement etc. have `.blur()` methods that
   // confuse `'blur' in input`).
-  const obj = input as { color?: [number, number, number]; blur?: BlurInput; image?: ImageInput; video?: VideoInput }
-  if (obj.color)               return { background: { kind: 'color', rgb: obj.color } }
+  const obj = input as { color?: ColorInput; blur?: BlurInput; image?: ImageInput; video?: VideoInput }
+  if (obj.color !== undefined) return { background: { kind: 'color', rgb: parseColor(obj.color) } }
   if (obj.blur  !== undefined) return { background: { kind: 'blur',  sigma: parseBlur(obj.blur) } }
   if (obj.image !== undefined) return { background: { kind: 'image', bitmap: await parseImage(obj.image) } }
   if (obj.video !== undefined) return await parseVideo(obj.video)
@@ -123,6 +127,30 @@ async function parseVideo(input: VideoInput): Promise<NormalizedBackground> {
     transferList: setup.transferList,
     cleanup:      setup.cleanup,
   }
+}
+
+function parseColor(c: ColorInput): [number, number, number] {
+  if (typeof c === 'string') {
+    const hex = c.trim().replace(/^#/, '')
+    if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+      return [
+        parseInt(hex.slice(0, 2), 16) / 255,
+        parseInt(hex.slice(2, 4), 16) / 255,
+        parseInt(hex.slice(4, 6), 16) / 255,
+      ]
+    }
+    if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+      return [
+        parseInt(hex[0] + hex[0], 16) / 255,
+        parseInt(hex[1] + hex[1], 16) / 255,
+        parseInt(hex[2] + hex[2], 16) / 255,
+      ]
+    }
+    throw new Error(`background.color: hex must be #rgb or #rrggbb, got ${describe(c)}`)
+  }
+  if (!Array.isArray(c) || c.length !== 3 || !c.every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1))
+    throw new Error(`background.color: expected hex string or [r, g, b] floats in [0, 1], got ${describe(c)}`)
+  return [c[0], c[1], c[2]]
 }
 
 function parseBlur(b: BlurInput): number {
