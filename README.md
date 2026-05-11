@@ -190,3 +190,9 @@ Training scripts, fixture generation, and the weight export pipeline are not yet
 - [ ] Lighting correction
 - [ ] Background noise removal (audio, separate pipeline)
 - [ ] Mobile SDKs
+
+## License
+
+SDK source code is MIT-licensed — see [LICENSE](LICENSE).
+
+The pre-trained model weights distributed via `cdn.longpipe.dev` (and any mirrored copies) are also MIT-licensed — see [WEIGHTS_LICENSE](WEIGHTS_LICENSE). You're free to self-host them inside other open-source or commercial projects under MIT-compatible terms.

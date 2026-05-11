@@ -78,7 +78,7 @@ def render_html(files, generated, base_url):
 </head>
 <body>
   <h1>Longpipe weights 🐉</h1>
-  <p class="lede">Pre-trained model weights for the <a href="https://longpipe.dev">Longpipe</a> SDK. Machine-readable index: <a href="manifest.json">manifest.json</a>.</p>
+  <p class="lede">Pre-trained model weights for the <a href="https://longpipe.dev">Longpipe</a> SDK. License: <a href="WEIGHTS_LICENSE">WEIGHTS_LICENSE</a> (MIT). Machine-readable index: <a href="manifest.json">manifest.json</a>.</p>
   <table>
     <thead>
       <tr><th>File</th><th>Size</th><th>SHA-256</th></tr>
