@@ -196,3 +196,14 @@ Training scripts, fixture generation, and the weight export pipeline are not yet
 SDK source code is MIT-licensed — see [LICENSE](LICENSE).
 
 The pre-trained model weights distributed via `cdn.longpipe.dev` (and any mirrored copies) are also MIT-licensed — see [WEIGHTS_LICENSE](WEIGHTS_LICENSE). You're free to self-host them inside other open-source or commercial projects under MIT-compatible terms.
+
+### Training data and pretrained weights
+
+The v0.0.1 weights were trained on two publicly released portrait-matting datasets, both under permissive licenses:
+
+- [P3M-10k](https://github.com/JizhiziLi/P3M) — MIT
+- [AISegment Matting Human Datasets](https://www.kaggle.com/datasets/laurentmih/aisegmentcom-matting-human-datasets) — MIT ([upstream license](https://github.com/aisegmentcn/matting_human_datasets/blob/master/LICENSE))
+
+The encoder is initialized from a pre-trained [EfficientNet-Lite](https://github.com/RangiLyu/EfficientNet-Lite) backbone — Apache 2.0.
+
+No non-commercial or attribution-restricted sources were used. The weights can be redistributed under the same MIT terms as the rest of the SDK.
