@@ -99,6 +99,12 @@ export interface Backend {
     BicubicUpsample: (input: Tensor, params: UpsampleParams) => Op;
     ChannelConcat:   (a: Tensor, b: Tensor) => Op;
 
+    // ConvGRU + wrapper primitives (temporal models)
+    Tanh:            (input: Tensor) => Op;
+    ElementwiseMul:  (a: Tensor, b: Tensor) => Op;
+    GruUpdate:       (z: Tensor, h_prev: Tensor, h_til: Tensor) => Op;
+    GammaResidual:   (b: Tensor, h_new: Tensor, gamma: ArrayLike<number>) => Op;
+
     // Fused — eliminate intermediate buffers between paired ops
     Conv2dAdd:       (input: Tensor, skip: Tensor, weights: Conv2DWeights,    params: Conv2dParams)          => Op;
     UpsampleConcat:  (a: Tensor, b: Tensor, params: UpsampleParams) => Op;

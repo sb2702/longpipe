@@ -5,6 +5,10 @@ import { Conv2DWebGL } from '~/model/backends/webgl/ops/conv2d.ts'
 import { DepthwiseConv2DWebGL } from '~/model/backends/webgl/ops/depthwise_conv2d.ts'
 import { AddWebGL } from '~/model/backends/webgl/ops/add.ts'
 import { SigmoidWebGL } from '~/model/backends/webgl/ops/sigmoid.ts'
+import { TanhWebGL } from '~/model/backends/webgl/ops/tanh.ts'
+import { ElementwiseMulWebGL } from '~/model/backends/webgl/ops/elementwise_mul.ts'
+import { GruUpdateWebGL } from '~/model/backends/webgl/ops/gru_update.ts'
+import { GammaResidualWebGL } from '~/model/backends/webgl/ops/gamma_residual.ts'
 import { BilinearUpsampleWebGL } from '~/model/backends/webgl/ops/bilinear_upsample.ts'
 import { BicubicUpsampleWebGL  } from '~/model/backends/webgl/ops/bicubic_upsample.ts'
 import { ChannelConcatWebGL } from '~/model/backends/webgl/ops/channel_concat.ts'
@@ -56,6 +60,10 @@ export class WebGLBackend implements Backend {
       DepthwiseConv2d:  (input, weights, params) => new DepthwiseConv2DWebGL(this, input, weights, params),
       Add:              (a, b)                         => new AddWebGL(this, a, b),
       Sigmoid:          (input)                          => new SigmoidWebGL(this, input),
+      Tanh:             (input)                          => new TanhWebGL(this, input),
+      ElementwiseMul:   (a, b)                          => new ElementwiseMulWebGL(this, a, b),
+      GruUpdate:        (z, h_prev, h_til)              => new GruUpdateWebGL(this, z, h_prev, h_til),
+      GammaResidual:    (b, h_new, gamma)               => new GammaResidualWebGL(this, b, h_new, gamma),
       BilinearUpsample: (input, params)                => new BilinearUpsampleWebGL(this, input, params),
       BicubicUpsample:  (input, params)                => new BicubicUpsampleWebGL(this, input, params),
       ChannelConcat:    (a, b)                           => new ChannelConcatWebGL(this, a, b),
