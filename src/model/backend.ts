@@ -52,6 +52,18 @@ export interface UpsampleConv1x1Params {
   activation:  Activation;
 }
 
+export interface ProjResidualParams {
+  outChannels: number;
+}
+
+export interface ConcatConv2dParams {
+  outChannels: number;
+}
+
+export interface DownAdapterParams {
+  stride: number;
+}
+
 // External image source for the Input op. ImageBitmap is the static / test
 // path (one-shot copy); VideoFrame is the production path (zero-copy on
 // WebGPU via importExternalTexture). Both work directly with WebGL2's
@@ -99,14 +111,37 @@ export interface Backend {
     BicubicUpsample: (input: Tensor, params: UpsampleParams) => Op;
     ChannelConcat:   (a: Tensor, b: Tensor) => Op;
 
-    // ConvGRU + wrapper primitives (temporal models)
+    // Generic elementwise primitives (temporal models / effects)
     Tanh:            (input: Tensor) => Op;
     ElementwiseMul:  (a: Tensor, b: Tensor) => Op;
-    GruUpdate:       (z: Tensor, h_prev: Tensor, h_til: Tensor) => Op;
-    GammaResidual:   (b: Tensor, h_new: Tensor, gamma: ArrayLike<number>) => Op;
+
+    // Fused ConvGRU (production config c_up=2, recurrent=1). GatesFused emits
+    // (z, r); CandUpdateFused consumes it + does candidate/update/output.
+    GatesFused:      (uIn: Tensor, hPrev: Tensor, weights: Conv2DWeights) => Op;
+    CandUpdateFused: (uIn: Tensor, hPrev: Tensor, gatesOut: Tensor, weights: Conv2DWeights, gamma: ArrayLike<number>) => Op;
+
+    // Bespoke N→2 conv 3×3 + relu (wrapper expand_feat). Output is the c_up=2
+    // carrier (.xy = 2 native channels, .zw = 0).
+    ConvExpand:      (input: Tensor, weights: Conv2DWeights) => Op;
+    // Fused concat(u, d) + 6→2 conv 3×3 + relu (E up1_combine). u = c_up=2
+    // carrier (.xy), d = c_high=4 skip (full vec4). Output c_up=2 carrier.
+    CatConv6to2:     (u: Tensor, d: Tensor, weights: Conv2DWeights) => Op;
+    // Fused stride-N 3×3 conv (4→4) + relu + 1×1 adapter (4→3) → base input
+    // (wrapper down2+adapter, or down1+adapter for A/B). Output vec4(xyz, 0).
+    DownAdapter:     (input: Tensor, downWeights: Conv2DWeights, adaptWeights: Conv2DWeights, params: DownAdapterParams) => Op;
+    // Alpha heads: fused concat → conv 3×3 → sigmoid. UpFinal (A/B, 5→1) takes
+    // [u, rgb]; UpFinalSkip (C/D, 9→1) takes [u, d_full, rgb]. Output .x = alpha.
+    UpFinal:         (u: Tensor, rgb: Tensor, weights: Conv2DWeights) => Op;
+    UpFinalSkip:     (u: Tensor, dFull: Tensor, rgb: Tensor, weights: Conv2DWeights) => Op;
 
     // Fused — eliminate intermediate buffers between paired ops
     Conv2dAdd:       (input: Tensor, skip: Tensor, weights: Conv2DWeights,    params: Conv2dParams)          => Op;
+    // Bespoke 1×1 proj + residual add (MBConv tail). Specializes Conv2dAdd to
+    // kernel=1/stride=1/pad=0/no-activation — drops the kernel loop entirely.
+    ProjResidual:    (input: Tensor, skip: Tensor, weights: Conv2DWeights,    params: ProjResidualParams)    => Op;
+    // Bespoke concat(a,b) → 3×3 conv (pad 1) → relu6, fused (decoder conv1).
+    // Inputs must share resolution; conv weight in-channels ordered [a, b].
+    ConcatConv2d:    (a: Tensor, b: Tensor, weights: Conv2DWeights,           params: ConcatConv2dParams)    => Op;
     UpsampleConcat:  (a: Tensor, b: Tensor, params: UpsampleParams) => Op;
     UpsampleConv1x1: (input: Tensor, weights: Conv2DWeights,                  params: UpsampleConv1x1Params) => Op;
     UpsampleSigmoid: (input: Tensor, params: UpsampleParams) => Op;

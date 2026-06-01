@@ -7,8 +7,6 @@ import { AddWebGL } from '~/model/backends/webgl/ops/add.ts'
 import { SigmoidWebGL } from '~/model/backends/webgl/ops/sigmoid.ts'
 import { TanhWebGL } from '~/model/backends/webgl/ops/tanh.ts'
 import { ElementwiseMulWebGL } from '~/model/backends/webgl/ops/elementwise_mul.ts'
-import { GruUpdateWebGL } from '~/model/backends/webgl/ops/gru_update.ts'
-import { GammaResidualWebGL } from '~/model/backends/webgl/ops/gamma_residual.ts'
 import { BilinearUpsampleWebGL } from '~/model/backends/webgl/ops/bilinear_upsample.ts'
 import { BicubicUpsampleWebGL  } from '~/model/backends/webgl/ops/bicubic_upsample.ts'
 import { ChannelConcatWebGL } from '~/model/backends/webgl/ops/channel_concat.ts'
@@ -16,6 +14,15 @@ import { UpsampleSigmoidWebGL } from '~/model/backends/webgl/ops/upsample_sigmoi
 import { UpsampleConcatWebGL } from '~/model/backends/webgl/ops/upsample_concat.ts'
 import { UpsampleConv1x1WebGL } from '~/model/backends/webgl/ops/upsample_conv1x1.ts'
 import { Conv2dAddWebGL } from '~/model/backends/webgl/ops/conv2d_add.ts'
+import { ProjResidualWebGL } from '~/model/backends/webgl/ops/proj_residual.ts'
+import { ConcatConv2dWebGL } from '~/model/backends/webgl/ops/concat_conv2d.ts'
+import { GatesFusedWebGL } from '~/model/backends/webgl/ops/gates_fused.ts'
+import { CandUpdateFusedWebGL } from '~/model/backends/webgl/ops/cand_update_fused.ts'
+import { ConvExpandWebGL } from '~/model/backends/webgl/ops/conv_expand.ts'
+import { CatConv6to2WebGL } from '~/model/backends/webgl/ops/cat_conv_6to2.ts'
+import { DownAdapterWebGL } from '~/model/backends/webgl/ops/down_adapter.ts'
+import { UpFinalWebGL } from '~/model/backends/webgl/ops/up_final.ts'
+import { UpFinalSkipWebGL } from '~/model/backends/webgl/ops/up_final_skip.ts'
 import { CompositeSolidWebGL } from '~/model/backends/webgl/ops/composite_solid.ts'
 import { CompositeImageWebGL } from '~/model/backends/webgl/ops/composite_image.ts'
 import { CompositeImageBilinearWebGL } from '~/model/backends/webgl/ops/composite_image_bilinear.ts'
@@ -62,12 +69,19 @@ export class WebGLBackend implements Backend {
       Sigmoid:          (input)                          => new SigmoidWebGL(this, input),
       Tanh:             (input)                          => new TanhWebGL(this, input),
       ElementwiseMul:   (a, b)                          => new ElementwiseMulWebGL(this, a, b),
-      GruUpdate:        (z, h_prev, h_til)              => new GruUpdateWebGL(this, z, h_prev, h_til),
-      GammaResidual:    (b, h_new, gamma)               => new GammaResidualWebGL(this, b, h_new, gamma),
       BilinearUpsample: (input, params)                => new BilinearUpsampleWebGL(this, input, params),
       BicubicUpsample:  (input, params)                => new BicubicUpsampleWebGL(this, input, params),
       ChannelConcat:    (a, b)                           => new ChannelConcatWebGL(this, a, b),
       Conv2dAdd:        (input, skip, weights, params)   => new Conv2dAddWebGL(this, input, skip, weights, params),
+      ProjResidual:     (input, skip, weights, params)   => new ProjResidualWebGL(this, input, skip, weights, params),
+      ConcatConv2d:     (a, b, weights, params)          => new ConcatConv2dWebGL(this, a, b, weights, params),
+      GatesFused:       (uIn, hPrev, weights)            => new GatesFusedWebGL(this, uIn, hPrev, weights),
+      CandUpdateFused:  (uIn, hPrev, gatesOut, w, gamma) => new CandUpdateFusedWebGL(this, uIn, hPrev, gatesOut, w, gamma),
+      ConvExpand:       (input, weights)                 => new ConvExpandWebGL(this, input, weights),
+      CatConv6to2:      (u, d, weights)                  => new CatConv6to2WebGL(this, u, d, weights),
+      DownAdapter:      (input, downW, adaptW, params)   => new DownAdapterWebGL(this, input, downW, adaptW, params),
+      UpFinal:          (u, rgb, weights)                => new UpFinalWebGL(this, u, rgb, weights),
+      UpFinalSkip:      (u, dFull, rgb, weights)         => new UpFinalSkipWebGL(this, u, dFull, rgb, weights),
       UpsampleConcat:   (a, b, params)                   => new UpsampleConcatWebGL(this, a, b, params),
       UpsampleConv1x1:  (input, weights, params)         => new UpsampleConv1x1WebGL(this, input, weights, params),
       UpsampleSigmoid:  (input, params)                  => new UpsampleSigmoidWebGL(this, input, params),

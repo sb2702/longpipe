@@ -7,12 +7,19 @@ import { AddWebGPU } from "~/model/backends/webgpu/ops/add.ts";
 import { SigmoidWebGPU } from "~/model/backends/webgpu/ops/sigmoid.ts";
 import { TanhWebGPU } from "~/model/backends/webgpu/ops/tanh.ts";
 import { ElementwiseMulWebGPU } from "~/model/backends/webgpu/ops/elementwise_mul.ts";
-import { GruUpdateWebGPU } from "~/model/backends/webgpu/ops/gru_update.ts";
-import { GammaResidualWebGPU } from "~/model/backends/webgpu/ops/gamma_residual.ts";
 import { BilinearUpsampleWebGPU } from "~/model/backends/webgpu/ops/bilinear_upsample.ts";
 import { BicubicUpsampleWebGPU  } from "~/model/backends/webgpu/ops/bicubic_upsample.ts";
 import { ChannelConcatWebGPU } from "~/model/backends/webgpu/ops/channel_concat.ts";
 import { Conv2dAddWebGPU } from "~/model/backends/webgpu/ops/conv2d_add.ts";
+import { ProjResidualWebGPU } from "~/model/backends/webgpu/ops/proj_residual.ts";
+import { ConcatConv2dWebGPU } from "~/model/backends/webgpu/ops/concat_conv2d.ts";
+import { GatesFusedWebGPU } from "~/model/backends/webgpu/ops/gates_fused.ts";
+import { CandUpdateFusedWebGPU } from "~/model/backends/webgpu/ops/cand_update_fused.ts";
+import { ConvExpandWebGPU } from "~/model/backends/webgpu/ops/conv_expand.ts";
+import { CatConv6to2WebGPU } from "~/model/backends/webgpu/ops/cat_conv_6to2.ts";
+import { DownAdapterWebGPU } from "~/model/backends/webgpu/ops/down_adapter.ts";
+import { UpFinalWebGPU } from "~/model/backends/webgpu/ops/up_final.ts";
+import { UpFinalSkipWebGPU } from "~/model/backends/webgpu/ops/up_final_skip.ts";
 import { UpsampleConcatWebGPU } from "~/model/backends/webgpu/ops/upsample_concat.ts";
 import { UpsampleConv1x1WebGPU } from "~/model/backends/webgpu/ops/upsample_conv1x1.ts";
 import { UpsampleSigmoidWebGPU } from "~/model/backends/webgpu/ops/upsample_sigmoid.ts";
@@ -63,12 +70,19 @@ export class WebGPUBackend implements Backend {
       Sigmoid:          (input)                         => new SigmoidWebGPU(this, input),
       Tanh:             (input)                         => new TanhWebGPU(this, input),
       ElementwiseMul:   (a, b)                          => new ElementwiseMulWebGPU(this, a, b),
-      GruUpdate:        (z, h_prev, h_til)              => new GruUpdateWebGPU(this, z, h_prev, h_til),
-      GammaResidual:    (b, h_new, gamma)               => new GammaResidualWebGPU(this, b, h_new, gamma),
       BilinearUpsample: (input, params)                 => new BilinearUpsampleWebGPU(this, input, params),
       BicubicUpsample:  (input, params)                 => new BicubicUpsampleWebGPU(this, input, params),
       ChannelConcat:    (a, b)                          => new ChannelConcatWebGPU(this, a, b),
       Conv2dAdd:        (input, skip, weights, params)  => new Conv2dAddWebGPU(this, input, skip, weights, params),
+      ProjResidual:     (input, skip, weights, params)  => new ProjResidualWebGPU(this, input, skip, weights, params),
+      ConcatConv2d:     (a, b, weights, params)         => new ConcatConv2dWebGPU(this, a, b, weights, params),
+      GatesFused:       (uIn, hPrev, weights)           => new GatesFusedWebGPU(this, uIn, hPrev, weights),
+      CandUpdateFused:  (uIn, hPrev, gatesOut, w, gamma) => new CandUpdateFusedWebGPU(this, uIn, hPrev, gatesOut, w, gamma),
+      ConvExpand:       (input, weights)                 => new ConvExpandWebGPU(this, input, weights),
+      CatConv6to2:      (u, d, weights)                  => new CatConv6to2WebGPU(this, u, d, weights),
+      DownAdapter:      (input, downW, adaptW, params)   => new DownAdapterWebGPU(this, input, downW, adaptW, params),
+      UpFinal:          (u, rgb, weights)               => new UpFinalWebGPU(this, u, rgb, weights),
+      UpFinalSkip:      (u, dFull, rgb, weights)        => new UpFinalSkipWebGPU(this, u, dFull, rgb, weights),
       UpsampleConcat:   (a, b, params)                  => new UpsampleConcatWebGPU(this, a, b, params),
       UpsampleConv1x1:  (input, weights, params)        => new UpsampleConv1x1WebGPU(this, input, weights, params),
       UpsampleSigmoid:  (input, params)                 => new UpsampleSigmoidWebGPU(this, input, params),

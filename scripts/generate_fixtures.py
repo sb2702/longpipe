@@ -241,45 +241,6 @@ def generate_elementwise_mul():
     }
 
 
-def generate_gru_update():
-    # Fused (1 - z) * h_prev + z * h_til, used inside ConvGRU.
-    # z is the output of a sigmoid so live in (0, 1) in practice.
-    C, H, W = 16, 8, 8
-    z      = torch.sigmoid(torch.randn(1, C, H, W))
-    h_prev = torch.randn(1, C, H, W)
-    h_til  = torch.tanh(torch.randn(1, C, H, W))
-    h_new  = (1.0 - z) * h_prev + z * h_til
-    return {
-        "channels": C,
-        "input_shape": [1, C, H, W],
-        "z":      to_nhwc(z),
-        "h_prev": to_nhwc(h_prev),
-        "h_til":  to_nhwc(h_til),
-        "expected_output": to_nhwc(h_new),
-    }
-
-
-def generate_gamma_residual():
-    # Per-channel scaled residual b + γ * h_new, used at the end of ConvGRU.
-    # γ is one f32 per channel — laid out as a flat array of length C; the
-    # shader / runtime treats it as c_groups vec4s.
-    C, H, W = 16, 8, 8
-    b      = torch.randn(1, C, H, W)
-    h_new  = torch.randn(1, C, H, W)
-    gamma  = torch.randn(C)
-    out    = b + gamma.view(1, -1, 1, 1) * h_new
-    return {
-        "channels": C,
-        "height": H,
-        "width":  W,
-        "input_shape": [1, C, H, W],
-        "b":     to_nhwc(b),
-        "h_new": to_nhwc(h_new),
-        "gamma": gamma.cpu().numpy().tolist(),
-        "expected_output": to_nhwc(out),
-    }
-
-
 def generate_bilinear_upsample():
     C, H, W = 16, 8, 8
     x = torch.randn(1, C, H, W)
@@ -331,6 +292,296 @@ def generate_conv2d_add():
         "input_shape":  [1, C, H, W],
         "input":   to_nhwc(x),
         "skip":    to_nhwc(skip),
+        "weights": conv_weights(conv.weight.detach()),
+        "bias":    conv.bias.detach().cpu().numpy().tolist(),
+        "expected_output": to_nhwc(y),
+    }
+
+
+def generate_proj_residual():
+    # Bespoke 1×1 proj + residual add. `input` is the depthwise output (mid
+    # channels), `skip` is the residual at out channels. Distinct in/out groups
+    # (16→8) to exercise the o*I+i weight indexing.
+    Cmid, Cout, H, W = 16, 8, 8, 8
+    conv = nn.Conv2d(Cmid, Cout, kernel_size=1, stride=1, padding=0, bias=True)
+    x    = torch.randn(1, Cmid, H, W)
+    skip = torch.randn(1, Cout, H, W)
+    with torch.no_grad():
+        y = conv(x) + skip
+    return {
+        "in_channels":  Cmid,
+        "out_channels": Cout,
+        "input_shape":  [1, Cmid, H, W],
+        "input":   to_nhwc(x),
+        "skip":    to_nhwc(skip),
+        "weights": conv_weights(conv.weight.detach()),
+        "bias":    conv.bias.detach().cpu().numpy().tolist(),
+        "expected_output": to_nhwc(y),
+    }
+
+
+def conv_expand_weights(w):
+    """[2, I, KH, KW] (I mult of 4) → 9 * in_groups mat4x2, 8 floats each
+    (col-major c0r0,c0r1,...,c3r0,c3r1) for conv_expand."""
+    O, I, KH, KW = w.shape
+    assert O == 2 and I % 4 == 0
+    in_groups = I // 4
+    out = []
+    for ky in range(KH):
+        for kx in range(KW):
+            for ig in range(in_groups):
+                for col in range(4):
+                    in_idx = ig * 4 + col
+                    for row in range(2):
+                        out.append(float(w[row, in_idx, ky, kx]))
+    return out
+
+
+def generate_conv_expand():
+    # Bespoke N→2 conv 3×3 (pad 1) + relu (wrapper expand_feat). Input mult of 4.
+    # Output packed to 4 channels (.xy = the 2 native outputs, .zw = 0).
+    in_c, H, W = 16, 8, 8
+    conv = nn.Conv2d(in_c, 2, kernel_size=3, padding=1, bias=True)
+    x = torch.randn(1, in_c, H, W)
+    with torch.no_grad():
+        y2 = F.relu(conv(x))                       # (1, 2, H, W)
+    y4 = torch.cat([y2, torch.zeros(1, 2, H, W)], dim=1)
+    return {
+        "in_channels": in_c,
+        "input_shape": [1, in_c, H, W],
+        "input":   to_nhwc(x),
+        "weights": conv_expand_weights(conv.weight.detach()),
+        "bias":    conv.bias.detach().cpu().numpy().tolist(),   # 2 floats
+        "expected_output": to_nhwc(y4),
+    }
+
+
+def cat_conv_6to2_weights(w):
+    """[2, 6, KH, KW] → 9 * 2 mat3x2, 6 floats each (col-major
+    c0r0,c0r1,c1r0,c1r1,c2r0,c2r1). Input groups (0,1,2) then (3,4,5)."""
+    O, I, KH, KW = w.shape
+    assert O == 2 and I == 6
+    out = []
+    for ky in range(KH):
+        for kx in range(KW):
+            for ig in range(2):
+                for col in range(3):
+                    in_idx = ig * 3 + col
+                    for row in range(2):
+                        out.append(float(w[row, in_idx, ky, kx]))
+    return out
+
+
+def generate_cat_conv_6to2():
+    # Fused concat(u[2], d[4]) → 6→2 conv 3×3 (pad 1) + relu (E up1_combine).
+    # u packed in 4ch (.xy), d full 4ch. Output 4ch carrier (.xy). Conv in-channel
+    # order = [u.0, u.1, d.0, d.1, d.2, d.3].
+    H, W = 8, 8
+    conv = nn.Conv2d(6, 2, kernel_size=3, padding=1, bias=True)
+    u2 = torch.randn(1, 2, H, W)
+    d4 = torch.randn(1, 4, H, W)
+    with torch.no_grad():
+        y2 = F.relu(conv(torch.cat([u2, d4], dim=1)))
+    u4 = torch.cat([u2, torch.zeros(1, 2, H, W)], dim=1)
+    y4 = torch.cat([y2, torch.zeros(1, 2, H, W)], dim=1)
+    return {
+        "in_h": H, "in_w": W,
+        "u_in":    to_nhwc(u4),
+        "d_in":    to_nhwc(d4),
+        "weights": cat_conv_6to2_weights(conv.weight.detach()),
+        "bias":    conv.bias.detach().cpu().numpy().tolist(),   # 2 floats
+        "expected_output": to_nhwc(y4),
+    }
+
+
+def up_final_weights(w):
+    """[1,5,3,3] → 18 vec4: [0..8]=(w0,w1,0,0) u; [9..17]=(w2,w3,w4,0) rgb."""
+    O, I, KH, KW = w.shape
+    assert O == 1 and I == 5
+    out = []
+    for ky in range(3):
+        for kx in range(3):
+            out.extend([float(w[0, 0, ky, kx]), float(w[0, 1, ky, kx]), 0.0, 0.0])
+    for ky in range(3):
+        for kx in range(3):
+            out.extend([float(w[0, 2, ky, kx]), float(w[0, 3, ky, kx]),
+                        float(w[0, 4, ky, kx]), 0.0])
+    return out
+
+
+def up_final_skip_weights(w):
+    """[1,9,3,3] → 27 vec4 (3 per kpos): (w0,w1,0,0)|(w2..w5)|(w6,w7,w8,0)."""
+    O, I, KH, KW = w.shape
+    assert O == 1 and I == 9
+    out = []
+    for ky in range(3):
+        for kx in range(3):
+            out.extend([float(w[0, 0, ky, kx]), float(w[0, 1, ky, kx]), 0.0, 0.0])
+            out.extend([float(w[0, 2, ky, kx]), float(w[0, 3, ky, kx]),
+                        float(w[0, 4, ky, kx]), float(w[0, 5, ky, kx])])
+            out.extend([float(w[0, 6, ky, kx]), float(w[0, 7, ky, kx]),
+                        float(w[0, 8, ky, kx]), 0.0])
+    return out
+
+
+def generate_up_final():
+    # A/B alpha head: concat(u[2], rgb[3]) → conv 5→1 → sigmoid. Output .x = alpha.
+    H, W = 8, 8
+    conv = nn.Conv2d(5, 1, kernel_size=3, padding=1, bias=True)
+    u2  = torch.randn(1, 2, H, W)
+    rgb = torch.randn(1, 3, H, W)
+    with torch.no_grad():
+        y = torch.sigmoid(conv(torch.cat([u2, rgb], dim=1)))
+    return {
+        "in_h": H, "in_w": W,
+        "u_in":    to_nhwc(torch.cat([u2,  torch.zeros(1, 2, H, W)], dim=1)),
+        "rgb_in":  to_nhwc(torch.cat([rgb, torch.zeros(1, 1, H, W)], dim=1)),
+        "weights": up_final_weights(conv.weight.detach()),
+        "bias":    conv.bias.detach().cpu().numpy().tolist(),   # 1
+        "expected_output": to_nhwc(torch.cat([y, torch.zeros(1, 3, H, W)], dim=1)),
+    }
+
+
+def generate_up_final_skip():
+    # C/D alpha head: concat(u[2], d_full[4], rgb[3]) → conv 9→1 → sigmoid.
+    H, W = 8, 8
+    conv = nn.Conv2d(9, 1, kernel_size=3, padding=1, bias=True)
+    u2  = torch.randn(1, 2, H, W)
+    d4  = torch.randn(1, 4, H, W)
+    rgb = torch.randn(1, 3, H, W)
+    with torch.no_grad():
+        y = torch.sigmoid(conv(torch.cat([u2, d4, rgb], dim=1)))
+    return {
+        "in_h": H, "in_w": W,
+        "u_in":    to_nhwc(torch.cat([u2,  torch.zeros(1, 2, H, W)], dim=1)),
+        "d_in":    to_nhwc(d4),
+        "rgb_in":  to_nhwc(torch.cat([rgb, torch.zeros(1, 1, H, W)], dim=1)),
+        "weights": up_final_skip_weights(conv.weight.detach()),
+        "bias":    conv.bias.detach().cpu().numpy().tolist(),
+        "expected_output": to_nhwc(torch.cat([y, torch.zeros(1, 3, H, W)], dim=1)),
+    }
+
+
+def generate_down_adapter():
+    # Fused stride-N 3×3 conv (4→4, relu) + 1×1 adapter (4→3) (E down2+adapter).
+    # Symmetric pad 1. Output 4ch (.xyz = adapter, .w = 0). Adapter weight padded
+    # [3,4]→[4,4] (4th out row 0); adapter bias [3]→[4].
+    in_c, H, W, stride = 4, 16, 16, 2
+    down  = nn.Conv2d(in_c, 4, kernel_size=3, stride=stride, padding=1, bias=True)
+    adapt = nn.Conv2d(4, 3, kernel_size=1, bias=True)
+    x = torch.randn(1, in_c, H, W)
+    with torch.no_grad():
+        d = F.relu(down(x))
+        a = adapt(d)
+    oh, ow = a.shape[2], a.shape[3]
+    a4 = torch.cat([a, torch.zeros(1, 1, oh, ow)], dim=1)   # .xyz = adapter, .w = 0
+
+    adapt_w_pad = torch.zeros(4, 4, 1, 1)
+    adapt_w_pad[:3] = adapt.weight.detach()
+    adapt_b_pad = torch.zeros(4)
+    adapt_b_pad[:3] = adapt.bias.detach()
+
+    return {
+        "in_channels": in_c, "stride": stride,
+        "input_shape":  [1, in_c, H, W],
+        "output_shape": [1, 4, oh, ow],
+        "input":   to_nhwc(x),
+        "down_weights":  conv_weights(down.weight.detach()),   # 9 mat4x4
+        "down_bias":     down.bias.detach().cpu().numpy().tolist(),   # 4
+        "adapt_weights": conv_weights(adapt_w_pad),            # 1 mat4x4
+        "adapt_bias":    adapt_b_pad.cpu().numpy().tolist(),   # 4 (.xyz used)
+        "expected_output": to_nhwc(a4),
+    }
+
+
+def generate_gru_fused():
+    """Production ConvGRU (c_up=2, split_ratio=0.5 → passthrough=1, recurrent=1),
+    fused gates + cand_update. Inputs/outputs packed to 4 channels (only the
+    leading lanes carry data). Weights use the fused shaders' special packing
+    (9 vec4 per kpos), NOT the mat4x4 conv layout."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "training"))
+    from models.temporal_model import ConvGRU
+
+    H, W = 8, 8
+    gru = ConvGRU(channels=2, kernel=3, split_ratio=0.5).eval()
+    assert gru.recurrent_ch == 1 and gru.passthrough_ch == 1
+    with torch.no_grad():
+        nn.init.uniform_(gru.gates.weight, -0.5, 0.5)
+        nn.init.uniform_(gru.gates.bias,   -0.2, 0.2)
+        nn.init.kaiming_normal_(gru.cand.weight)
+        nn.init.uniform_(gru.cand.bias,    -0.2, 0.2)
+        gru.gamma.copy_(torch.randn_like(gru.gamma))
+
+    x      = torch.randn(1, 2, H, W)
+    h_prev = torch.randn(1, 1, H, W)
+    a = x[:, :1]
+    b = x[:, 1:]
+
+    with torch.no_grad():
+        zr    = gru.gates(torch.cat([b, h_prev], dim=1))
+        z     = torch.sigmoid(zr[:, :1])
+        r     = torch.sigmoid(zr[:, 1:])
+        rh    = r * h_prev
+        h_til = torch.tanh(gru.cand(torch.cat([b, rh], dim=1)))
+        h_new = (1.0 - z) * h_prev + z * h_til
+        b_out = b + gru.gamma.view(1, -1, 1, 1) * h_new
+
+        # Hidden state lives in channel .z of the carrier tensor: the GRU output
+        # (a, b_out, h_new, 0) is fed back unchanged as next frame's h_prev, so
+        # both read h_prev from .z and write h_new to .z (option A — no extra buf).
+        zeros       = torch.zeros_like(a)
+        u_in_4      = torch.cat([a, b, zeros, zeros], dim=1)
+        h_prev_4    = torch.cat([zeros, zeros, h_prev, zeros], dim=1)
+        gates_out_4 = torch.cat([z, r, zeros, zeros], dim=1)
+        out_4       = torch.cat([a, b_out, h_new, zeros], dim=1)
+
+    # gates: 9 vec4 = (z_w_b, z_w_h, r_w_b, r_w_h); out0=z,out1=r; in0=b,in1=h.
+    gw = gru.gates.weight.detach()
+    gates_packed = []
+    for ky in range(3):
+        for kx in range(3):
+            gates_packed += [float(gw[0, 0, ky, kx]), float(gw[0, 1, ky, kx]),
+                             float(gw[1, 0, ky, kx]), float(gw[1, 1, ky, kx])]
+    # cand: 9 vec4 (.xy = b_w, rh_w); in0=b, in1=rh.
+    cw = gru.cand.weight.detach()
+    cand_packed = []
+    for ky in range(3):
+        for kx in range(3):
+            cand_packed += [float(cw[0, 0, ky, kx]), float(cw[0, 1, ky, kx]), 0.0, 0.0]
+
+    return {
+        "height": H, "width": W,
+        "u_in":          to_nhwc(u_in_4),
+        "h_prev":        to_nhwc(h_prev_4),
+        "gates_weights": gates_packed,
+        "gates_bias":    gru.gates.bias.detach().cpu().numpy().tolist(),  # [z_bias, r_bias]
+        "cand_weights":  cand_packed,
+        "cand_bias":     gru.cand.bias.detach().cpu().numpy().tolist(),   # [cand_bias]
+        "gamma":         gru.gamma.detach().cpu().numpy().tolist(),       # [gamma]
+        "expected_gates":  to_nhwc(gates_out_4),
+        "expected_output": to_nhwc(out_4),
+    }
+
+
+def generate_concat_conv2d():
+    # Fused concat(a, b) → 3×3 conv (pad 1) → relu6. Both inputs at output
+    # resolution; conv in-channels ordered [a, b]. Distinct a/b groups (16, 8).
+    a_c, b_c, out_c, H, W = 16, 8, 8, 8, 8
+    conv = nn.Conv2d(a_c + b_c, out_c, kernel_size=3, padding=1, bias=True)
+    a = torch.randn(1, a_c, H, W)
+    b = torch.randn(1, b_c, H, W)
+    with torch.no_grad():
+        y = F.relu6(conv(torch.cat([a, b], dim=1)))
+    return {
+        "a_channels":   a_c,
+        "b_channels":   b_c,
+        "out_channels": out_c,
+        "in_h": H, "in_w": W,
+        "a_shape": [1, a_c, H, W],
+        "b_shape": [1, b_c, H, W],
+        "input_a": to_nhwc(a),
+        "input_b": to_nhwc(b),
         "weights": conv_weights(conv.weight.detach()),
         "bias":    conv.bias.detach().cpu().numpy().tolist(),
         "expected_output": to_nhwc(y),
@@ -424,94 +675,6 @@ def generate_depthwise_separable():
     }
 
 
-def generate_convgru_block():
-    """One-timestep ConvGRU forward — mirrors training/models/temporal_model.py:ConvGRU.
-
-    Pre-splits inputs into (a, b) and the gates conv into (z_conv, r_conv) so
-    the SDK block reuses existing primitives without needing channel-slice or
-    split-and-activate shaders.
-    """
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "training"))
-    from models.temporal_model import ConvGRU
-
-    # Channel layout: C = 16, split 50/50 → passthrough = recurrent = 8.
-    # 2c = 16 for gates conv. All multiples of 4.
-    C, H, W = 16, 8, 8
-    gru = ConvGRU(channels=C, kernel=3, split_ratio=0.5).eval()
-    # Cand starts zero-init (identity-at-init); fill with random so the path
-    # is actually exercised.
-    nn.init.kaiming_normal_(gru.cand.weight)
-    nn.init.zeros_(gru.cand.bias)
-    with torch.no_grad():
-        gru.gamma.copy_(torch.randn_like(gru.gamma))
-
-    passthrough = gru.passthrough_ch
-    recurrent   = gru.recurrent_ch
-
-    x      = torch.randn(1, C, H, W)
-    h_prev = torch.randn(1, recurrent, H, W)
-    a = x[:, :passthrough]
-    b = x[:, passthrough:]
-
-    # Capture all intermediates so a debug test can pinpoint divergence.
-    with torch.no_grad():
-        cat_bh   = torch.cat([b, h_prev], dim=1)
-        z_pre    = gru.gates(cat_bh)[:, :recurrent]
-        r_pre    = gru.gates(cat_bh)[:, recurrent:]
-        z        = torch.sigmoid(z_pre)
-        r        = torch.sigmoid(r_pre)
-        rh       = r * h_prev
-        cat_brh  = torch.cat([b, rh], dim=1)
-        cand_pre = gru.cand(cat_brh)
-        h_til    = torch.tanh(cand_pre)
-        h_new    = (1.0 - z) * h_prev + z * h_til
-        b_out    = b + gru.gamma.view(1, -1, 1, 1) * h_new
-        out      = torch.cat([a, b_out], dim=1)
-
-    # Split gates conv (out=2c) into z_conv (out=c) and r_conv (out=c).
-    gates_w = gru.gates.weight.detach()
-    gates_b = gru.gates.bias.detach()
-    z_w, r_w = gates_w[:recurrent], gates_w[recurrent:]
-    z_b, r_b = gates_b[:recurrent], gates_b[recurrent:]
-
-    return {
-        "channels":    C,
-        "passthrough": passthrough,
-        "recurrent":   recurrent,
-        "height":      H,
-        "width":       W,
-        "input_shape": [1, C, H, W],
-        "a":      to_nhwc(a),
-        "b":      to_nhwc(b),
-        "h_prev": to_nhwc(h_prev),
-        "z_conv": { "weights": conv_weights(z_w),
-                    "bias":    z_b.cpu().numpy().tolist() },
-        "r_conv": { "weights": conv_weights(r_w),
-                    "bias":    r_b.cpu().numpy().tolist() },
-        "cand":   { "weights": conv_weights(gru.cand.weight.detach()),
-                    "bias":    gru.cand.bias.detach().cpu().numpy().tolist() },
-        "gamma":  gru.gamma.detach().cpu().numpy().tolist(),
-        "expected_output": to_nhwc(out),
-        # Per-step reference outputs for debug (block test only checks final).
-        "intermediates": {
-            "cat_bh":   to_nhwc(cat_bh),
-            "z_pre":    to_nhwc(z_pre),
-            "z":        to_nhwc(z),
-            "r_pre":    to_nhwc(r_pre),
-            "r":        to_nhwc(r),
-            "rh":       to_nhwc(rh),
-            "cat_brh":  to_nhwc(cat_brh),
-            "cand_pre": to_nhwc(cand_pre),
-            "h_til":    to_nhwc(h_til),
-            "h_new":    to_nhwc(h_new),
-            "b_out":    to_nhwc(b_out),
-        },
-    }
-
-
-# ── UNet wrapper helpers ──────────────────────────────────────────────────
-
 def _pad4(n: int) -> int:
     return ((n + 3) // 4) * 4
 
@@ -543,6 +706,26 @@ def _pad_conv(w: torch.Tensor, b: torch.Tensor):
 def _pack_conv(conv: nn.Conv2d):
     w, b = _pad_conv(conv.weight.detach().clone(), conv.bias.detach().clone())
     return { "weights": conv_weights(w), "bias": b.cpu().numpy().tolist() }
+
+
+def _pack_conv_expand(conv: nn.Conv2d):
+    return { "weights": conv_expand_weights(conv.weight.detach()),
+             "bias": conv.bias.detach().cpu().numpy().tolist() }
+
+
+def _pack_cat_conv_6to2(conv: nn.Conv2d):
+    return { "weights": cat_conv_6to2_weights(conv.weight.detach()),
+             "bias": conv.bias.detach().cpu().numpy().tolist() }
+
+
+def _pack_up_final(conv: nn.Conv2d):
+    return { "weights": up_final_weights(conv.weight.detach()),
+             "bias": conv.bias.detach().cpu().numpy().tolist() }
+
+
+def _pack_up_final_skip(conv: nn.Conv2d):
+    return { "weights": up_final_skip_weights(conv.weight.detach()),
+             "bias": conv.bias.detach().cpu().numpy().tolist() }
 
 
 class _WrapperStubBase(nn.Module):
@@ -584,28 +767,38 @@ def _build_wrapper_fixture(variant: str, base_hw: int, c_high: int,
         "canvas":    canvas,
         "x_hr":      _to_nhwc_padded(x_hr),        # 3 channels padded to 4
         "feat_lr":   to_nhwc(feat_lr),             # already mult-of-4
-        "down1":     _pack_conv(wrapper.down1),
-        "adapter":   _pack_conv(wrapper.adapter),
-        "expandFeat":_pack_conv(wrapper.expand_feat),
+        "down1":     _pack_conv(wrapper.down1),    # mat4x4 (B: DownAdapter; E/D: Conv2d)
+        "adapter":   _pack_conv(wrapper.adapter),  # mat4x4 padded 4→3
+        "expandFeat":_pack_conv_expand(wrapper.expand_feat),   # mat4x2 N→2
         # Single-channel flat alpha (test extracts channel 0 from sigmoid output).
         "expected_output": alpha.squeeze(0).squeeze(0).flatten().cpu().numpy().tolist(),
     }
     if wrapper.one_stage:
-        out["upCombine"] = _pack_conv(wrapper.up_combine)
+        out["upCombine"] = _pack_up_final(wrapper.up_combine)            # 5→1
     else:
-        out["down2"]      = _pack_conv(wrapper.down2)
-        out["up1Combine"] = _pack_conv(wrapper.up1_combine)
-        out["upCombine"]  = _pack_conv(wrapper.up2_combine)
+        out["down2"]      = _pack_conv(wrapper.down2)                    # mat4x4
+        out["up1Combine"] = _pack_cat_conv_6to2(wrapper.up1_combine)     # mat3x2 6→2
+        out["upCombine"]  = (_pack_up_final_skip(wrapper.up2_combine)    # D: 9→1
+                             if wrapper.has_input_skip
+                             else _pack_up_final(wrapper.up2_combine))   # E: 5→1
     return out
 
 
+def generate_wrapper_a():
+    return _build_wrapper_fixture('A', base_hw=8, c_high=4, c_low=4, feat_ch=8)
+
+
 def generate_wrapper_b():
-    # c_low=c_high=8 → c_up=4 (all multiples of 4 for the existing shaders).
-    return _build_wrapper_fixture('B', base_hw=8, c_high=8, c_low=8, feat_ch=8)
+    # Production widths: c_high=c_low=4 → c_up=2 (the native narrow path).
+    return _build_wrapper_fixture('B', base_hw=8, c_high=4, c_low=4, feat_ch=8)
 
 
 def generate_wrapper_e():
-    return _build_wrapper_fixture('E', base_hw=8, c_high=8, c_low=8, feat_ch=8)
+    return _build_wrapper_fixture('E', base_hw=8, c_high=4, c_low=4, feat_ch=8)
+
+
+def generate_wrapper_d():
+    return _build_wrapper_fixture('D', base_hw=8, c_high=4, c_low=4, feat_ch=8)
 
 
 # ── Multi-frame tier fixtures (5 production tiers, T frames each) ─────────
@@ -712,65 +905,6 @@ def generate_tier_small():  return _build_tier_fixture('B', 8, 8, 8, feat_ch=16)
 def generate_tier_xs():     return _build_tier_fixture('E', 8, 8, 8, feat_ch=16)
 
 
-def generate_convgru_4frame():
-    """Stateful ConvGRU forward over T=4 frames — same architecture as
-    `generate_convgru_block`. h_prev starts as zeros and is threaded
-    frame-to-frame from PyTorch's ConvGRU.forward."""
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "training"))
-    from models.temporal_model import ConvGRU
-
-    C, H, W = 16, 8, 8
-    T = 4
-    gru = ConvGRU(channels=C, kernel=3, split_ratio=0.5).eval()
-    nn.init.kaiming_normal_(gru.cand.weight)
-    nn.init.zeros_(gru.cand.bias)
-    with torch.no_grad():
-        gru.gamma.copy_(torch.randn_like(gru.gamma))
-
-    passthrough = gru.passthrough_ch
-    recurrent   = gru.recurrent_ch
-
-    xs    = [torch.randn(1, C, H, W) for _ in range(T)]
-    outs  = []
-    h     = None     # ConvGRU substitutes zeros_like(b) when h_prev is None
-    with torch.no_grad():
-        for x in xs:
-            out, h = gru(x, h)
-            outs.append(out)
-
-    a_per_t = [x[:, :passthrough] for x in xs]
-    b_per_t = [x[:, passthrough:] for x in xs]
-
-    gates_w = gru.gates.weight.detach()
-    gates_b = gru.gates.bias.detach()
-    z_w, r_w = gates_w[:recurrent], gates_w[recurrent:]
-    z_b, r_b = gates_b[:recurrent], gates_b[recurrent:]
-
-    return {
-        "channels":    C,
-        "passthrough": passthrough,
-        "recurrent":   recurrent,
-        "height":      H,
-        "width":       W,
-        "frames":      T,
-        "input_shape": [1, C, H, W],
-        # Per-frame inputs (pre-split passthrough/recurrent).
-        "a_per_frame": [to_nhwc(a) for a in a_per_t],
-        "b_per_frame": [to_nhwc(b) for b in b_per_t],
-        # Frame-invariant weights.
-        "z_conv": { "weights": conv_weights(z_w),
-                    "bias":    z_b.cpu().numpy().tolist() },
-        "r_conv": { "weights": conv_weights(r_w),
-                    "bias":    r_b.cpu().numpy().tolist() },
-        "cand":   { "weights": conv_weights(gru.cand.weight.detach()),
-                    "bias":    gru.cand.bias.detach().cpu().numpy().tolist() },
-        "gamma":  gru.gamma.detach().cpu().numpy().tolist(),
-        # Per-frame reference outputs.
-        "expected_outputs": [to_nhwc(o) for o in outs],
-    }
-
-
 def generate_decoder_block():
     """Realistic decoder block: deep(128,4,4) + skip(112,8,8) → (64,8,8)."""
     deep_c, skip_c, out_c = 128, 112, 64
@@ -821,8 +955,6 @@ FIXTURES = {
     "tanh":                     generate_tanh,
     "elementwise_add":          generate_elementwise_add,
     "elementwise_mul":          generate_elementwise_mul,
-    "gru_update":               generate_gru_update,
-    "gamma_residual":           generate_gamma_residual,
     "conv2d_1x1":               generate_conv2d_1x1,
     "conv2d_3x3":               generate_conv2d_3x3,
     "conv2d_3x3_stride2":       generate_conv2d_3x3_stride2,
@@ -831,6 +963,14 @@ FIXTURES = {
     "bilinear_upsample_2x":     generate_bilinear_upsample,
     "channel_concat":           generate_channel_concat,
     "conv2d_add":               generate_conv2d_add,
+    "proj_residual":            generate_proj_residual,
+    "concat_conv2d":            generate_concat_conv2d,
+    "gru_fused":                generate_gru_fused,
+    "conv_expand":              generate_conv_expand,
+    "cat_conv_6to2":            generate_cat_conv_6to2,
+    "down_adapter":             generate_down_adapter,
+    "up_final":                 generate_up_final,
+    "up_final_skip":            generate_up_final_skip,
     "upsample_concat":          generate_upsample_concat,
     "upsample_conv1x1":         generate_upsample_conv1x1,
     "upsample_sigmoid":         generate_upsample_sigmoid,
@@ -838,10 +978,10 @@ FIXTURES = {
     "mbconv_k3_s1_residual":    generate_mbconv_k3_s1_residual,
     "mbconv_k3_s2":             generate_mbconv_k3_s2,
     "decoder_block":            generate_decoder_block,
-    "convgru_block":            generate_convgru_block,
-    "convgru_4frame":           generate_convgru_4frame,
+    "wrapper_a":                generate_wrapper_a,
     "wrapper_b":                generate_wrapper_b,
     "wrapper_e":                generate_wrapper_e,
+    "wrapper_d":                generate_wrapper_d,
     "tier_xl":                  generate_tier_xl,
     "tier_large":               generate_tier_large,
     "tier_medium":              generate_tier_medium,

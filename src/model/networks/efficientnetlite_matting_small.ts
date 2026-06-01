@@ -8,6 +8,9 @@ import { DecoderBlock } from '~/model/blocks/decoder_block.ts'
 // standard decoder trimmed to 2 skips: dec_ch=(128,64,32). Used by small + xs presets.
 export class EfficientNetLiteMattingSmall {
   readonly output: Tensor
+  // Pre-head feature (finalUp output, at base-input/2 res). A UNet wrapper
+  // consumes this (upsampled to input res) instead of `output`.
+  readonly featLowRes: Tensor
 
   // Encoder
   private readonly stem:  Op
@@ -163,6 +166,7 @@ export class EfficientNetLiteMattingSmall {
       outChannels: 32,
       activation:  'relu6',
     })
+    this.featLowRes = this.finalUp.output
 
     this.outConv = backend.ops.Conv2d(this.finalUp.output, w.decoder.outputConv, {
       outChannels: 4,

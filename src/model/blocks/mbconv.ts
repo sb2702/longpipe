@@ -17,7 +17,6 @@ export class MBConv implements Op {
   readonly expandOp: Op | null
   readonly dwOp:     Op
   readonly projOp:   Op
-  readonly addOp:    Op | null
 
   constructor(backend: Backend, input: Tensor, w: MBConvWeights, params: MBConvParams) {
     this.inputs = [input]
@@ -46,25 +45,27 @@ export class MBConv implements Op {
       activation: 'relu6',
     })
 
-    // 3. Project (1x1, no activation)
-    this.projOp = backend.ops.Conv2d(this.dwOp.output, w.proj, {
-      outChannels: params.outChannels,
-      kernel:      1,
-      stride:      1,
-      padding:     0,
-      activation:  'none',
-    })
+    // 3. Project (1x1, no activation). For residual blocks the skip add is
+    //    fused into the projection (ProjResidual — bespoke 1×1 + residual);
+    //    otherwise a plain 1×1 Conv2d.
+    this.projOp = hasResidual
+      ? backend.ops.ProjResidual(this.dwOp.output, input, w.proj, {
+          outChannels: params.outChannels,
+        })
+      : backend.ops.Conv2d(this.dwOp.output, w.proj, {
+          outChannels: params.outChannels,
+          kernel:      1,
+          stride:      1,
+          padding:     0,
+          activation:  'none',
+        })
 
-    // 4. Residual add — null when stride > 1 or channels change
-    this.addOp = hasResidual ? backend.ops.Add(input, this.projOp.output) : null
-
-    this.output = this.addOp ? this.addOp.output : this.projOp.output
+    this.output = this.projOp.output
   }
 
   run(): void {
     this.expandOp?.run()
     this.dwOp.run()
     this.projOp.run()
-    this.addOp?.run()
   }
 }

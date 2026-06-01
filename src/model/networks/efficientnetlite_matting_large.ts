@@ -7,6 +7,9 @@ import { DecoderBlock } from '~/model/blocks/decoder_block.ts'
 // 256×144, full encoder (tf_efficientnet_lite0, out_indices=(1,2,3,4)), standard decoder (128,64,32,16).
 export class EfficientNetLiteMattingLarge {
   readonly output: Tensor
+  // Pre-head feature (finalUp output, at base-input/2 res). A UNet wrapper
+  // consumes this (upsampled to input res) instead of `output`.
+  readonly featLowRes: Tensor
 
   // Encoder
   private readonly stem:  Op
@@ -218,6 +221,7 @@ export class EfficientNetLiteMattingLarge {
       outChannels: 16,
       activation:  'relu6',
     })
+    this.featLowRes = this.finalUp.output
 
     this.outConv = backend.ops.Conv2d(this.finalUp.output, w.decoder.outputConv, {
       outChannels: 4,

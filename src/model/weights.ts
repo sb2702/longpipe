@@ -24,8 +24,15 @@ export interface DecoderBlockWeights {
   conv2: Conv2DWeights
 }
 
+// Native narrow-path packings (each leaf's `.weights` uses the packer named):
+//   down1     conv_weights (mat4x4; B feeds DownAdapter, E/D a plain Conv2d)
+//   down2     conv_weights (mat4x4; DownAdapter down conv, E/D only)
+//   adapter   conv_weights (mat4x4, padded 4→3 → [4,4,1,1])
+//   expandFeat conv_expand_weights (mat4x2, feat_ch→2)
+//   up1Combine cat_conv_6to2_weights (mat3x2, 6→2; two-stage only)
+//   upCombine  up_final_weights (5→1, B/E) | up_final_skip_weights (9→1, D)
 export interface UNetWrapperWeights {
-  // Down-path: down1 always present; down2 only for two-stage variants (E/C/D).
+  // Down-path: down1 always present; down2 only for two-stage variants (E/D).
   down1:        Conv2DWeights
   down2?:       Conv2DWeights
   adapter:      Conv2DWeights
@@ -37,16 +44,16 @@ export interface UNetWrapperWeights {
   upCombine:    Conv2DWeights
 }
 
+// Production ConvGRU fused weights (c_up=2, split_ratio=0.5 → passthrough=1,
+// recurrent=1), packed for the fused gates_fused / cand_update shaders.
+//   gates: gates Conv2d(2,2) → 9 vec4 per kpos = (z_w_b, z_w_h, r_w_b, r_w_h)
+//   cand:  cand  Conv2d(2,1) → 9 vec4 per kpos, .xy = (b_w, rh_w)
 export interface ConvGRUWeights {
-  // Gates conv (2c → 2c) is pre-split at export time into z_conv and r_conv
-  // (each 2c → c) — numerically identical to PyTorch's gates(...).chunk(2)
-  // along the output-channel dim. Avoids needing a custom split+activate op.
-  zConv: Conv2DWeights
-  rConv: Conv2DWeights
-  // Candidate conv (2c → c).
-  cand:  Conv2DWeights
-  // Per-recurrent-channel residual scale γ, length = recurrent_ch.
-  gamma: ArrayLike<number>
+  gates:     ArrayLike<number>   // 9*4 = 36 floats
+  gatesBias: ArrayLike<number>   // 2: (z_bias, r_bias)
+  cand:      ArrayLike<number>   // 9*4 = 36 floats
+  candBias:  ArrayLike<number>   // 1: (cand_bias)
+  gamma:     ArrayLike<number>   // 1: recurrent_ch
 }
 
 export interface ModelWeights {

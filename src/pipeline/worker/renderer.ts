@@ -11,7 +11,6 @@ import type { ModelWeights } from '~/model/weights.ts'
 import { RenderOp, type BackgroundConfig as RenderOpBackgroundConfig } from '~/model/render_op.ts'
 import { loadWeightsFromBinary } from '~/utils/loadWeights.ts'
 import { EfficientNetLiteMattingLarge }   from '~/model/networks/efficientnetlite_matting_large.ts'
-import { EfficientNetLiteMattingCompact } from '~/model/networks/efficientnetlite_matting_compact.ts'
 import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small.ts'
 import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl.ts'
 import type { ManualPreset, ModelName } from '../presets'
@@ -53,7 +52,6 @@ const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
   xxs:     EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   xs:      EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   small:   EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
-  compact: EfficientNetLiteMattingCompact as unknown as NetworkCtor,
   medium:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   large:   EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   xl:      EfficientNetLiteMattingXL      as unknown as NetworkCtor,

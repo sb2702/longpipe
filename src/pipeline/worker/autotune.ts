@@ -17,7 +17,6 @@ import type {
 import type { Conv2DWeights, DepthwiseWeights, ModelWeights } from '~/model/weights.ts'
 import { PRESETS, type ManualPreset, type ModelName } from '../presets'
 import { EfficientNetLiteMattingLarge }   from '~/model/networks/efficientnetlite_matting_large.ts'
-import { EfficientNetLiteMattingCompact } from '~/model/networks/efficientnetlite_matting_compact.ts'
 import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small.ts'
 import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl.ts'
 import {WebGLBackend} from "~/model/backends/webgl/index.ts";
@@ -46,7 +45,6 @@ const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
   xxs:     EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   xs:      EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
   small:   EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
-  compact: EfficientNetLiteMattingCompact as unknown as NetworkCtor,
   medium:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   large:   EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
   xl:      EfficientNetLiteMattingXL      as unknown as NetworkCtor,
