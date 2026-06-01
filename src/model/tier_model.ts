@@ -23,6 +23,9 @@ export type BaseNetworkCtor = new (backend: Backend, input: Tensor, w: ModelWeig
 export class TierModel implements Op {
   readonly inputs: Tensor[]
   readonly output: Tensor
+  // Only set when `gru` is supplied: the output-GRU carrier (a, b_out, h_new, 0).
+  // Feed it back as the next frame's `gru.hPrev` to thread temporal state.
+  readonly hiddenState: Tensor | null
 
   private readonly steps: { run(): void }[]
 
@@ -33,6 +36,7 @@ export class TierModel implements Op {
     wrapperWeights: UNetWrapperWeights,
     params: UNetWrapperParams,
     BaseCtor: BaseNetworkCtor,
+    gru?: { weights: ConvGRUWeights; hPrev: Tensor },
   ) {
     this.inputs = [x_hr]
 
@@ -50,11 +54,12 @@ export class TierModel implements Op {
 
     const up = buildWrapperUp(
       backend, x_hr, featUp.output, down.d1, down.dFull, down.midH, down.midW,
-      wrapperWeights, params,
+      wrapperWeights, params, gru,
     )
 
     this.steps = [...down.steps, base, featUp, ...up.steps]
     this.output = up.alpha
+    this.hiddenState = up.hiddenState
   }
 
   run(): void {
