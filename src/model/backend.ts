@@ -23,7 +23,7 @@ export interface Presenter {
   run(): void;
 }
 
-export type Activation = "none" | "relu6";
+export type Activation = "none" | "relu6" | "relu";
 
 export interface Conv2dParams {
   outChannels: number;

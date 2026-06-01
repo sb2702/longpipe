@@ -510,6 +510,267 @@ def generate_convgru_block():
     }
 
 
+# ── UNet wrapper helpers ──────────────────────────────────────────────────
+
+def _pad4(n: int) -> int:
+    return ((n + 3) // 4) * 4
+
+
+def _to_nhwc_padded(t: torch.Tensor):
+    """NCHW → NHWC vec4 with channels padded to multiple of 4 (zeros)."""
+    nhwc = t.permute(0, 2, 3, 1).contiguous()
+    B, H, W, C = nhwc.shape
+    if C % 4 != 0:
+        nhwc = F.pad(nhwc, (0, 4 - (C % 4)), value=0.0)
+        C = nhwc.shape[-1]
+    return nhwc.reshape(B, H, W, C // 4, 4).flatten().cpu().numpy().tolist()
+
+
+def _pad_conv(w: torch.Tensor, b: torch.Tensor):
+    """Pad conv [O,I,KH,KW] + bias [O] so both I and O are multiples of 4.
+    Numerically identical to the unpadded conv as long as upstream-padded
+    inputs zero-fill and downstream consumers ignore the extra outputs."""
+    O, I, KH, KW = w.shape
+    tI, tO = _pad4(I), _pad4(O)
+    if I != tI:
+        w = torch.cat([w, torch.zeros(O, tI - I, KH, KW)], dim=1)
+    if O != tO:
+        w = torch.cat([w, torch.zeros(tO - O, tI, KH, KW)], dim=0)
+        b = torch.cat([b, torch.zeros(tO - O)], dim=0)
+    return w, b
+
+
+def _pack_conv(conv: nn.Conv2d):
+    w, b = _pad_conv(conv.weight.detach().clone(), conv.bias.detach().clone())
+    return { "weights": conv_weights(w), "bias": b.cpu().numpy().tolist() }
+
+
+class _WrapperStubBase(nn.Module):
+    """UNetMattingModel only reads output_conv.in_channels at __init__; the
+    fixture feeds feat_lr directly so forward_features is never invoked."""
+    def __init__(self, feat_ch: int):
+        super().__init__()
+        self.output_conv = nn.Conv2d(feat_ch, 1, 1)
+
+
+def _build_wrapper_fixture(variant: str, base_hw: int, c_high: int,
+                           c_low: int, feat_ch: int):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "training"))
+    from models.unet_model import UNetMattingModel, VARIANT_SPEC
+
+    canvas = int(round(base_hw * VARIANT_SPEC[variant]['canvas_mul']))
+
+    base = _WrapperStubBase(feat_ch)
+    wrapper = UNetMattingModel(base, variant=variant, c_high=c_high, c_low=c_low).eval()
+    # Force gru_output to identity-at-init so the static-only block runner
+    # can omit it without affecting numerics.
+    nn.init.zeros_(wrapper.gru_output.cand.weight)
+    nn.init.zeros_(wrapper.gru_output.cand.bias)
+
+    x_hr    = torch.randn(1, 3, canvas, canvas)
+    feat_lr = torch.randn(1, feat_ch, base_hw, base_hw)
+    with torch.no_grad():
+        adapted, inter = wrapper._down_path(x_hr)
+        alpha, _ = wrapper._up_path(x_hr, feat_lr, inter, h_gru=None)
+
+    out = {
+        "variant":   variant,
+        "c_high":    c_high,
+        "c_low":     c_low,
+        "c_up":      wrapper.c_up,
+        "feat_ch":   feat_ch,
+        "base_hw":   base_hw,
+        "canvas":    canvas,
+        "x_hr":      _to_nhwc_padded(x_hr),        # 3 channels padded to 4
+        "feat_lr":   to_nhwc(feat_lr),             # already mult-of-4
+        "down1":     _pack_conv(wrapper.down1),
+        "adapter":   _pack_conv(wrapper.adapter),
+        "expandFeat":_pack_conv(wrapper.expand_feat),
+        # Single-channel flat alpha (test extracts channel 0 from sigmoid output).
+        "expected_output": alpha.squeeze(0).squeeze(0).flatten().cpu().numpy().tolist(),
+    }
+    if wrapper.one_stage:
+        out["upCombine"] = _pack_conv(wrapper.up_combine)
+    else:
+        out["down2"]      = _pack_conv(wrapper.down2)
+        out["up1Combine"] = _pack_conv(wrapper.up1_combine)
+        out["upCombine"]  = _pack_conv(wrapper.up2_combine)
+    return out
+
+
+def generate_wrapper_b():
+    # c_low=c_high=8 → c_up=4 (all multiples of 4 for the existing shaders).
+    return _build_wrapper_fixture('B', base_hw=8, c_high=8, c_low=8, feat_ch=8)
+
+
+def generate_wrapper_e():
+    return _build_wrapper_fixture('E', base_hw=8, c_high=8, c_low=8, feat_ch=8)
+
+
+# ── Multi-frame tier fixtures (5 production tiers, T frames each) ─────────
+
+class _TierStubBase(nn.Module):
+    """Stand-in for MattingModel with a deterministic feat_lr producer.
+    Per-frame feat_lr varies with x_hr → adapter chain, so multi-frame
+    inputs propagate as they would with the real base."""
+    def __init__(self, feat_ch: int):
+        super().__init__()
+        self.output_conv = nn.Conv2d(feat_ch, 1, 1)
+        self.feat_conv   = nn.Conv2d(3, feat_ch, 3, padding=1)
+
+    def forward_features(self, x, hiddens=None):
+        return self.feat_conv(x), hiddens
+
+
+def _build_tier_fixture(variant: str, base_hw: int, c_high: int, c_low: int,
+                        feat_ch: int, T: int = 3):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "training"))
+    from models.unet_model import UNetMattingModel, VARIANT_SPEC
+    from models.temporal_model import ConvGRU as _ConvGRU
+
+    canvas = int(round(base_hw * VARIANT_SPEC[variant]['canvas_mul']))
+
+    base = _TierStubBase(feat_ch)
+    wrapper = UNetMattingModel(base, variant=variant, c_high=c_high, c_low=c_low).eval()
+    # Replace gru_output with split_ratio=1.0 so passthrough=0 and all c_up
+    # channels are recurrent — avoids the recurrent_ch=c_up/2 mult-of-4 issue
+    # at c_up=4. Cand is non-zero so state-threading actually matters.
+    wrapper.gru_output = _ConvGRU(wrapper.c_up, split_ratio=1.0).eval()
+    with torch.no_grad():
+        wrapper.gru_output.cand.weight.normal_(0, 0.02)
+        wrapper.gru_output.cand.bias.zero_()
+        wrapper.gru_output.gamma.copy_(torch.randn_like(wrapper.gru_output.gamma) * 0.5)
+
+    xs       = [torch.randn(1, 3, canvas, canvas) for _ in range(T)]
+    feat_lrs = []
+    alphas   = []
+    h_gru, base_hidden = None, None
+    with torch.no_grad():
+        for x in xs:
+            adapted, inter      = wrapper._down_path(x)
+            feat_lr, base_hidden = wrapper.base.forward_features(adapted, base_hidden)
+            alpha, h_gru        = wrapper._up_path(x, feat_lr, inter, h_gru=h_gru)
+            feat_lrs.append(feat_lr)
+            alphas.append(alpha)
+
+    # gru_output gates split into z_conv + r_conv (same trick as ConvGRU block).
+    gru = wrapper.gru_output
+    gates_w = gru.gates.weight.detach()
+    gates_b = gru.gates.bias.detach()
+    z_w, r_w = gates_w[:gru.recurrent_ch], gates_w[gru.recurrent_ch:]
+    z_b, r_b = gates_b[:gru.recurrent_ch], gates_b[gru.recurrent_ch:]
+
+    out = {
+        "variant":   variant,
+        "c_high":    c_high,
+        "c_low":     c_low,
+        "c_up":      wrapper.c_up,
+        "feat_ch":   feat_ch,
+        "base_hw":   base_hw,
+        "canvas":    canvas,
+        "frames":    T,
+        "gru_passthrough": gru.passthrough_ch,   # expected 0 with split_ratio=1.0
+        "gru_recurrent":   gru.recurrent_ch,
+        # Per-frame inputs.
+        "x_hr_per_frame":    [_to_nhwc_padded(x) for x in xs],
+        "feat_lr_per_frame": [to_nhwc(f) for f in feat_lrs],
+        # Wrapper weights (frame-invariant).
+        "down1":      _pack_conv(wrapper.down1),
+        "adapter":    _pack_conv(wrapper.adapter),
+        "expandFeat": _pack_conv(wrapper.expand_feat),
+        # gru_output weights (gates pre-split into z_conv + r_conv).
+        "gruOutput": {
+            "zConv": { "weights": conv_weights(z_w),
+                       "bias":    z_b.cpu().numpy().tolist() },
+            "rConv": { "weights": conv_weights(r_w),
+                       "bias":    r_b.cpu().numpy().tolist() },
+            "cand":  { "weights": conv_weights(gru.cand.weight.detach()),
+                       "bias":    gru.cand.bias.detach().cpu().numpy().tolist() },
+            "gamma": gru.gamma.detach().cpu().numpy().tolist(),
+        },
+        # Per-frame reference alphas (single-channel flat, H*W).
+        "expected_alphas": [a.squeeze(0).squeeze(0).flatten().cpu().numpy().tolist()
+                            for a in alphas],
+    }
+    if wrapper.one_stage:
+        out["upCombine"] = _pack_conv(wrapper.up_combine)
+    else:
+        out["down2"]      = _pack_conv(wrapper.down2)
+        out["up1Combine"] = _pack_conv(wrapper.up1_combine)
+        out["upCombine"]  = _pack_conv(wrapper.up2_combine)
+    return out
+
+
+# Production tier matrix: feat_ch=32 for xl (xl decoder), 16 for the rest
+# (standard decoder). Wrapper variant per the production tier spec.
+def generate_tier_xl():     return _build_tier_fixture('E', 8, 8, 8, feat_ch=32)
+def generate_tier_large():  return _build_tier_fixture('E', 8, 8, 8, feat_ch=16)
+def generate_tier_medium(): return _build_tier_fixture('B', 8, 8, 8, feat_ch=16)
+def generate_tier_small():  return _build_tier_fixture('B', 8, 8, 8, feat_ch=16)
+def generate_tier_xs():     return _build_tier_fixture('E', 8, 8, 8, feat_ch=16)
+
+
+def generate_convgru_4frame():
+    """Stateful ConvGRU forward over T=4 frames — same architecture as
+    `generate_convgru_block`. h_prev starts as zeros and is threaded
+    frame-to-frame from PyTorch's ConvGRU.forward."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "training"))
+    from models.temporal_model import ConvGRU
+
+    C, H, W = 16, 8, 8
+    T = 4
+    gru = ConvGRU(channels=C, kernel=3, split_ratio=0.5).eval()
+    nn.init.kaiming_normal_(gru.cand.weight)
+    nn.init.zeros_(gru.cand.bias)
+    with torch.no_grad():
+        gru.gamma.copy_(torch.randn_like(gru.gamma))
+
+    passthrough = gru.passthrough_ch
+    recurrent   = gru.recurrent_ch
+
+    xs    = [torch.randn(1, C, H, W) for _ in range(T)]
+    outs  = []
+    h     = None     # ConvGRU substitutes zeros_like(b) when h_prev is None
+    with torch.no_grad():
+        for x in xs:
+            out, h = gru(x, h)
+            outs.append(out)
+
+    a_per_t = [x[:, :passthrough] for x in xs]
+    b_per_t = [x[:, passthrough:] for x in xs]
+
+    gates_w = gru.gates.weight.detach()
+    gates_b = gru.gates.bias.detach()
+    z_w, r_w = gates_w[:recurrent], gates_w[recurrent:]
+    z_b, r_b = gates_b[:recurrent], gates_b[recurrent:]
+
+    return {
+        "channels":    C,
+        "passthrough": passthrough,
+        "recurrent":   recurrent,
+        "height":      H,
+        "width":       W,
+        "frames":      T,
+        "input_shape": [1, C, H, W],
+        # Per-frame inputs (pre-split passthrough/recurrent).
+        "a_per_frame": [to_nhwc(a) for a in a_per_t],
+        "b_per_frame": [to_nhwc(b) for b in b_per_t],
+        # Frame-invariant weights.
+        "z_conv": { "weights": conv_weights(z_w),
+                    "bias":    z_b.cpu().numpy().tolist() },
+        "r_conv": { "weights": conv_weights(r_w),
+                    "bias":    r_b.cpu().numpy().tolist() },
+        "cand":   { "weights": conv_weights(gru.cand.weight.detach()),
+                    "bias":    gru.cand.bias.detach().cpu().numpy().tolist() },
+        "gamma":  gru.gamma.detach().cpu().numpy().tolist(),
+        # Per-frame reference outputs.
+        "expected_outputs": [to_nhwc(o) for o in outs],
+    }
+
+
 def generate_decoder_block():
     """Realistic decoder block: deep(128,4,4) + skip(112,8,8) → (64,8,8)."""
     deep_c, skip_c, out_c = 128, 112, 64
@@ -578,6 +839,14 @@ FIXTURES = {
     "mbconv_k3_s2":             generate_mbconv_k3_s2,
     "decoder_block":            generate_decoder_block,
     "convgru_block":            generate_convgru_block,
+    "convgru_4frame":           generate_convgru_4frame,
+    "wrapper_b":                generate_wrapper_b,
+    "wrapper_e":                generate_wrapper_e,
+    "tier_xl":                  generate_tier_xl,
+    "tier_large":               generate_tier_large,
+    "tier_medium":              generate_tier_medium,
+    "tier_small":               generate_tier_small,
+    "tier_xs":                  generate_tier_xs,
 }
 
 if __name__ == "__main__":

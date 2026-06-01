@@ -24,6 +24,19 @@ export interface DecoderBlockWeights {
   conv2: Conv2DWeights
 }
 
+export interface UNetWrapperWeights {
+  // Down-path: down1 always present; down2 only for two-stage variants (E/C/D).
+  down1:        Conv2DWeights
+  down2?:       Conv2DWeights
+  adapter:      Conv2DWeights
+  // Up-path: expand_feat always present; up1Combine only for two-stage variants.
+  expandFeat:   Conv2DWeights
+  up1Combine?:  Conv2DWeights
+  // Final combine + 1-channel output (named `upCombine` for one-stage, `up2Combine`
+  // for two-stage — same role, kept as one field).
+  upCombine:    Conv2DWeights
+}
+
 export interface ConvGRUWeights {
   // Gates conv (2c → 2c) is pre-split at export time into z_conv and r_conv
   // (each 2c → c) — numerically identical to PyTorch's gates(...).chunk(2)
