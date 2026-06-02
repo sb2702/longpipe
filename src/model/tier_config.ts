@@ -6,9 +6,10 @@ import { EfficientNetLiteMattingXL }    from '~/model/networks/efficientnetlite_
 
 // Production tier table — "the model is code". Per-tier wrapper variant + GRU
 // placement live here (NOT in the .bin); the .bin carries only weights. Mirrors
-// the shipped per-tier policy and the variants of the trained checkpoints:
-//   xs / small      → static (no ConvGRU)
-//   medium/large/xl → gru-at-base (ConvGRU on the c_up carrier at base res)
+// the variants of the trained checkpoints. All five tiers ship gru-at-base
+// (ConvGRU on the c_up carrier at base res) as of 2026-06-02 — xs/small gained
+// GRU heads (small/A, xs/B temporal checkpoints) after the static versions read
+// poorly in the live demo.
 // Production widths are fixed: cHigh = cLow = 4, cUp = 2 (the fused narrow ops
 // require them; the carrier lives in a 4-ch tensor's .xy).
 export interface Res { w: number; h: number }
@@ -32,8 +33,8 @@ const LARGE = EfficientNetLiteMattingLarge as unknown as BaseNetworkCtor
 const XL    = EfficientNetLiteMattingXL    as unknown as BaseNetworkCtor
 
 export const TIER_CONFIG: Record<string, TierConfig> = {
-  xs:     { base: SMALL, wrapper: { variant: 'B', cHigh: 4, cLow: 4, cUp: 2, gruAtBase: false }, hasGru: false, canvasRes: { w: 384,  h: 216 }, baseRes: { w: 128, h: 72  } },
-  small:  { base: SMALL, wrapper: { variant: 'A', cHigh: 4, cLow: 4, cUp: 2, gruAtBase: false }, hasGru: false, canvasRes: { w: 384,  h: 216 }, baseRes: { w: 192, h: 108 } },
+  xs:     { base: SMALL, wrapper: { variant: 'B', cHigh: 4, cLow: 4, cUp: 2, gruAtBase: true  }, hasGru: true,  canvasRes: { w: 384,  h: 216 }, baseRes: { w: 128, h: 72  } },
+  small:  { base: SMALL, wrapper: { variant: 'A', cHigh: 4, cLow: 4, cUp: 2, gruAtBase: true  }, hasGru: true,  canvasRes: { w: 384,  h: 216 }, baseRes: { w: 192, h: 108 } },
   medium: { base: LARGE, wrapper: { variant: 'A', cHigh: 4, cLow: 4, cUp: 2, gruAtBase: true  }, hasGru: true,  canvasRes: { w: 512,  h: 288 }, baseRes: { w: 256, h: 144 } },
   large:  { base: LARGE, wrapper: { variant: 'D', cHigh: 4, cLow: 4, cUp: 2, gruAtBase: true  }, hasGru: true,  canvasRes: { w: 640,  h: 360 }, baseRes: { w: 256, h: 144 } },
   xl:     { base: XL,    wrapper: { variant: 'E', cHigh: 4, cLow: 4, cUp: 2, gruAtBase: true  }, hasGru: true,  canvasRes: { w: 1280, h: 720 }, baseRes: { w: 320, h: 180 } },
