@@ -13,6 +13,7 @@
 import type {
   Backend, Tensor,
   Conv2dParams, DepthwiseParams, UpsampleConv1x1Params,
+  ProjResidualParams, ConcatConv2dParams,
 } from '~/model/backend.ts'
 import type { Conv2DWeights, DepthwiseWeights, ModelWeights } from '~/model/weights.ts'
 import { PRESETS, type ManualPreset } from '../presets'
@@ -24,7 +25,7 @@ import {WebGLBackend} from "~/model/backends/webgl/index.ts";
 // compositor + transport + main-thread headroom. 0.5 = "model takes at
 // most half the frame", which keeps xl/large from being picked just
 // because they squeak under the 33ms wall.
-let SAFETY_MARGIN = 0.5
+const SAFETY_MARGIN = 0.5
 const WARMUP_ITERS  = 3
 const TIMED_ITERS   = 10
 const DEFAULT_SOURCE_FPS = 30
@@ -46,9 +47,11 @@ export async function autotunePreset(
   sourceFpsTarget: number = DEFAULT_SOURCE_FPS,
 ): Promise<ManualPreset> {
 
-  //Be conservative with WebGL
-  if(backend instanceof  WebGLBackend) SAFETY_MARGIN = SAFETY_MARGIN*0.5;
-  const budgetMs = (1000 / sourceFpsTarget) * SAFETY_MARGIN
+  // Be conservative with WebGL (heavier fence-sync, no upgrade path): half the
+  // budget. Local — never mutate the module-level constant (would compound
+  // across repeated inits).
+  const safetyMargin = backend instanceof WebGLBackend ? SAFETY_MARGIN * 0.5 : SAFETY_MARGIN
+  const budgetMs = (1000 / sourceFpsTarget) * safetyMargin
   log(`start; budget per source frame: ${budgetMs.toFixed(1)}ms (source ${sourceFpsTarget}fps × ${SAFETY_MARGIN} safety)`)
   log('backend dtype:', backend.dtype)
 
@@ -120,6 +123,22 @@ function synthBackend(backend: Backend): Backend {
           bias:    new Float32Array(params.outChannels),
         }
         return backend.ops.UpsampleConv1x1(input, synth, params)
+      },
+      // ProjResidual: 1×1 conv (input.c → outChannels) + residual add.
+      ProjResidual: (input, skip, _w, params: ProjResidualParams) => {
+        const synth: Conv2DWeights = {
+          weights: new Float32Array(input.c * params.outChannels),
+          bias:    new Float32Array(params.outChannels),
+        }
+        return backend.ops.ProjResidual(input, skip, synth, params)
+      },
+      // ConcatConv2d: 3×3 conv over concat(a, b) → outChannels (decoder conv1).
+      ConcatConv2d: (a, b, _w, params: ConcatConv2dParams) => {
+        const synth: Conv2DWeights = {
+          weights: new Float32Array(9 * (a.c + b.c) * params.outChannels),
+          bias:    new Float32Array(params.outChannels),
+        }
+        return backend.ops.ConcatConv2d(a, b, synth, params)
       },
     }
   return wrapped

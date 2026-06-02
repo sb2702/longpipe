@@ -1,14 +1,20 @@
-import type { Backend, Dtype } from '~/model/backend'
-import type { ModelWeights } from '~/model/weights'
+import type { Backend, Dtype, Tensor } from '~/model/backend'
 import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { WebGLBackend } from '~/model/backends/webgl/index'
-import { EfficientNetLiteMattingLarge } from '~/model/networks/efficientnetlite_matting_large'
+import { TierModel } from '~/model/tier_model'
+import { TIER_CONFIG } from '~/model/tier_config'
 import { RenderOp, type BackgroundConfig } from '~/model/render_op'
 import { loadWeightsFromBinary } from '~/utils/loadWeights'
 
-// Network input dimensions for the "large" preset (16:9 landscape).
-const NET_H = 144
-const NET_W = 256
+// Single-frame smoke of the shipped "large" tier (full base + UNet-D wrapper +
+// gru-at-base). Network input (x_hr) runs at the tier's canvas res; the wrapper
+// strides down to base res internally. GRU hidden carrier is zero on this one
+// frame (no temporal history) — this validates the forward path in-browser,
+// not the temporal smoothing (use loop-video.html for that).
+const TIER = 'large'
+const TIER_CFG = TIER_CONFIG[TIER]
+const NET_W = TIER_CFG.canvasRes.w   // 640
+const NET_H = TIER_CFG.canvasRes.h   // 360
 
 const status = (s: string) => {
   const el = document.getElementById('status')!
@@ -152,13 +158,25 @@ async function run() {
   inputCanvas.getContext('2d')!.drawImage(cropped, 0, 0, NET_W, NET_H)
 
   status('parsing weights…')
-  const weights = loadWeightsFromBinary(weightsBuf) as ModelWeights
+  // Composite tier bin: { base, wrapper, gru? }. loadWeightsFromBinary resolves
+  // the tree generically; TIER_CONFIG decides the structure.
+  const w = loadWeightsFromBinary(weightsBuf) as any
 
   status('building network…')
-  // Network owns its input tensor (constructed at network resolution); we
-  // hand the same Input op to RenderOp so its setSource() can fan out.
+  // x_hr Input at the tier's canvas res; the same Input op is handed to RenderOp
+  // so setSource() fans out to display + network paths.
   const networkInput = backend.ops.Input(NET_H, NET_W)
-  const model = new EfficientNetLiteMattingLarge(backend, networkInput.output, weights)
+
+  // gru-at-base: zero hidden carrier at base res (single frame → no history).
+  let gru: { weights: any; hPrev: Tensor } | undefined
+  if (TIER_CFG.hasGru) {
+    const r = TIER_CFG.wrapper.gruAtBase ? TIER_CFG.baseRes : TIER_CFG.canvasRes
+    const hPrev = backend.tensor(r.h, r.w, 4, new Float32Array(r.h * r.w * 4))
+    gru = { weights: w.gru, hPrev }
+  }
+  const model = new TierModel(
+    backend, networkInput.output, w.base, w.wrapper, TIER_CFG.wrapper, TIER_CFG.base, gru,
+  )
 
   // Resolve background config — for image mode, ingest demo.jpg via a one-
   // shot Input op (static, no per-frame fanout needed).
@@ -176,7 +194,8 @@ async function run() {
     bgConfig = { mode: 'blur', sigma }
   }
 
-  const renderOp = new RenderOp(backend, model, networkInput, {
+  const renderOp = new RenderOp(backend)
+  renderOp.attachNetwork(model, networkInput, {
     upscaler:   upscalerMode === 'bicubic' ? 'bicubic' : 'bilinear',
     background: bgConfig,
   })

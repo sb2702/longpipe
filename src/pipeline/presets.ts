@@ -27,7 +27,7 @@ export interface ManualPreset {
 // every frame (skipFrames=0); the others skip every other frame
 // (skipFrames=1). resolution = canvas res (mirrors TIER_CONFIG.canvasRes).
 export const PRESETS: ManualPreset[] = [
-  { model: 'xs',      dtype: 'f16', resolution: { w: 384,  h: 216 }, skipFrames: 1 },
+  { model: 'xs',      dtype: 'f16', resolution: { w: 384,  h: 216 }, skipFrames: 2 },
   { model: 'small',   dtype: 'f16', resolution: { w: 384,  h: 216 }, skipFrames: 1 },
   { model: 'medium',  dtype: 'f16', resolution: { w: 512,  h: 288 }, skipFrames: 1 },
   { model: 'large',   dtype: 'f32', resolution: { w: 640,  h: 360 }, skipFrames: 0 },
