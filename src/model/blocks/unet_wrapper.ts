@@ -12,6 +12,11 @@ export interface UNetWrapperParams {
   cHigh:   number   // down1 output (E/D); down conv output (A/B). Expected 4.
   cLow:    number   // adapter input. Expected 4.
   cUp:     number   // expand_feat / up1_combine output. Expected 2.
+  // GRU placement (only consulted when a `gru` is supplied). true = apply the
+  // output ConvGRU on the c_up carrier at BASE resolution, before the up-path
+  // bilinear upsamples (production policy for medium/large/xl). false/undefined
+  // = canvas resolution (legacy). Mirrors UNetMattingModel(gru_at_base=...).
+  gruAtBase?: boolean
 }
 
 // Result of the wrapper down-path. `adapted` is the base input (vec4 .xyz);
@@ -97,11 +102,26 @@ export function buildWrapperUp(
 
   const expand = backend.ops.ConvExpand(feat, w.expandFeat)   // → c_up=2 carrier at base
   steps.push(expand)
+  let carrier = expand.output                                 // c_up=2 at base resolution
+
+  // The output-stage ConvGRU smooths the c_up carrier; its output (a, b_out,
+  // h_new, 0) is BOTH the smoothed carrier (.xy → downstream) AND next frame's
+  // hPrev (hidden in .z) — option-A threading. Placement is gruAtBase-gated.
+  let hiddenState: Tensor | null = null
+
+  // gru-at-base: smooth at BASE res, before the up-path upsamples (cheaper —
+  // base has canvas_mul² fewer pixels). Production for medium/large/xl.
+  if (gru && params.gruAtBase) {
+    const g = new ConvGRU(backend, carrier, gru.hPrev, gru.weights)
+    steps.push(g)
+    carrier = g.output
+    hiddenState = g.output
+  }
 
   let uAtCanvas: Tensor
   if (isTwoStage) {
     if (!w.up1Combine) throw new Error('two-stage variant requires w.up1Combine')
-    const u_a_up = backend.ops.BilinearUpsample(expand.output, { outH: midH, outW: midW })
+    const u_a_up = backend.ops.BilinearUpsample(carrier, { outH: midH, outW: midW })
     steps.push(u_a_up)
     const u1 = backend.ops.CatConv6to2(u_a_up.output, d1!, w.up1Combine)   // concat + 6→2
     steps.push(u1)
@@ -109,16 +129,13 @@ export function buildWrapperUp(
     steps.push(u1_up)
     uAtCanvas = u1_up.output
   } else {
-    const u_a_up = backend.ops.BilinearUpsample(expand.output, { outH: x_hr.h, outW: x_hr.w })
+    const u_a_up = backend.ops.BilinearUpsample(carrier, { outH: x_hr.h, outW: x_hr.w })
     steps.push(u_a_up)
     uAtCanvas = u_a_up.output
   }
 
-  // Output-stage temporal GRU (canvas res, c_up=2). Smooths uAtCanvas before
-  // the final head. Its output (a, b_out, h_new, 0) is BOTH the smoothed carrier
-  // (.xy → head) AND next frame's hPrev (hidden in .z) — option-A threading.
-  let hiddenState: Tensor | null = null
-  if (gru) {
+  // gru-at-canvas (legacy): smooth at canvas res before the head.
+  if (gru && !params.gruAtBase) {
     const g = new ConvGRU(backend, uAtCanvas, gru.hPrev, gru.weights)
     steps.push(g)
     uAtCanvas = g.output

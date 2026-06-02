@@ -15,10 +15,8 @@ import type {
   Conv2dParams, DepthwiseParams, UpsampleConv1x1Params,
 } from '~/model/backend.ts'
 import type { Conv2DWeights, DepthwiseWeights, ModelWeights } from '~/model/weights.ts'
-import { PRESETS, type ManualPreset, type ModelName } from '../presets'
-import { EfficientNetLiteMattingLarge }   from '~/model/networks/efficientnetlite_matting_large.ts'
-import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small.ts'
-import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl.ts'
+import { PRESETS, type ManualPreset } from '../presets'
+import { TIER_CONFIG } from '~/model/tier_config.ts'
 import {WebGLBackend} from "~/model/backends/webgl/index.ts";
 
 // Frame budget = (1000 / sourceFps) × SAFETY_MARGIN. The model gets at
@@ -34,21 +32,14 @@ const DEFAULT_SOURCE_FPS = 30
 import { createLogger } from '../debug'
 const log = createLogger('autotune')
 
-interface NetworkLike { readonly output: Tensor; run(): void }
-type NetworkCtor = new (b: Backend, i: Tensor, w: ModelWeights) => NetworkLike
+type RunnableCtor = new (b: Backend, i: Tensor, w: ModelWeights) => { run(): void }
 
-// xxs / xs share the Small architecture and medium shares the Large
-// architecture (per docs/MODEL_PLAN.md) — only the input resolution and
-// dtype differ, which flow in via the input Tensor and backend
-// respectively, not the class.
-const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
-  xxs:     EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
-  xs:      EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
-  small:   EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
-  medium:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
-  large:   EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
-  xl:      EfficientNetLiteMattingXL      as unknown as NetworkCtor,
-}
+// NOTE: this benches the BASE network alone (encoder+decoder) at base res —
+// the dominant cost and a reasonable proxy for relative tier ordering. It does
+// NOT model the wrapper down/up-path (which at xl runs at 1280×720 and is not
+// negligible) or the ConvGRU. Adaptive FPS-downgrade corrects an over-pick at
+// runtime. Follow-up: bench the full TierModel (needs synth weights for the
+// wrapper/gru ops, beyond the 4 the synth backend intercepts today).
 
 export async function autotunePreset(
   backend:         Backend,
@@ -63,12 +54,13 @@ export async function autotunePreset(
 
   let best: ManualPreset | null = null
   for (const preset of PRESETS) {
-    if (!NETWORK_CTORS[preset.model]) {
-      log('skip', preset.model, '(network class not implemented in TS yet)')
+    if (!TIER_CONFIG[preset.model]) {
+      log('skip', preset.model, '(no TIER_CONFIG entry)')
       continue
     }
     try {
-      log(`bench ${preset.model} @ ${preset.resolution.w}×${preset.resolution.h} skipFrames=${preset.skipFrames} …`)
+      const baseRes = TIER_CONFIG[preset.model].baseRes
+      log(`bench ${preset.model} base @ ${baseRes.w}×${baseRes.h} skipFrames=${preset.skipFrames} …`)
       const ms = await microbench(backend, preset)
       const ok = ms <= budgetMs
       log(`  ${preset.model}: ${ms.toFixed(1)}ms / source frame ${ok ? '✓ within budget' : '✗ over budget'}`)
@@ -144,11 +136,12 @@ function dummyWeights(): ModelWeights {
 // ── Bench loop ──────────────────────────────────────────────────────────────
 
 async function microbench(backend: Backend, preset: ManualPreset): Promise<number> {
-  const Ctor = NETWORK_CTORS[preset.model]
-  if (!Ctor) throw new Error(`microbench: no network class for '${preset.model}'`)
+  const cfg = TIER_CONFIG[preset.model]
+  if (!cfg) throw new Error(`microbench: no TIER_CONFIG entry for '${preset.model}'`)
+  const Ctor = cfg.base as unknown as RunnableCtor
 
   const sb      = synthBackend(backend)
-  const input   = sb.tensor(preset.resolution.h, preset.resolution.w, 4)
+  const input   = sb.tensor(cfg.baseRes.h, cfg.baseRes.w, 4)
   const network = new Ctor(sb, input, dummyWeights())
 
   // Warmup — first iters include shader compile + pipeline cache fill;

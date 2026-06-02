@@ -1,0 +1,6 @@
+# Local-only round-trip artifacts (real-weight .bins + PyTorch reference alphas),
+# produced by: training/deploy/export_sdk_weights.py --ref-dir <this dir>.
+# Large real-weight binaries — never committed. The round-trip test self-skips
+# when this dir is empty (clean checkout / CI).
+*
+!.gitignore

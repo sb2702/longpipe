@@ -7,13 +7,11 @@ import type { Backend, Tensor, InputOp } from '~/model/backend.ts'
 // Streams API pipe chain (inputReadable → transform → outputWritable) is
 // wired in worker/index.ts handleInit() where transport adapters are
 // composed with this renderer.
-import type { ModelWeights } from '~/model/weights.ts'
 import { RenderOp, type BackgroundConfig as RenderOpBackgroundConfig } from '~/model/render_op.ts'
 import { loadWeightsFromBinary } from '~/utils/loadWeights.ts'
-import { EfficientNetLiteMattingLarge }   from '~/model/networks/efficientnetlite_matting_large.ts'
-import { EfficientNetLiteMattingSmall }   from '~/model/networks/efficientnetlite_matting_small.ts'
-import { EfficientNetLiteMattingXL }      from '~/model/networks/efficientnetlite_matting_xl.ts'
-import type { ManualPreset, ModelName } from '../presets'
+import { TierModel } from '~/model/tier_model.ts'
+import { TIER_CONFIG } from '~/model/tier_config.ts'
+import type { ManualPreset } from '../presets'
 import type { Background } from '../background'
 import type { RendererStats } from '../messages'
 import type { Topology } from '../topology'
@@ -41,22 +39,6 @@ export interface RendererOptions {
 // adding measurement overhead that would itself perturb the measurement.
 const MODEL_TIMING_SAMPLE_INTERVAL = 5
 
-interface NetworkLike { readonly output: Tensor; run(): void }
-type NetworkCtor = new (backend: Backend, input: Tensor, w: ModelWeights) => NetworkLike
-
-// xxs / xs share the Small architecture and medium shares the Large
-// architecture (per docs/MODEL_PLAN.md) — only the input resolution and
-// dtype differ, which flow in via the input Tensor and backend
-// respectively, not the class.
-const NETWORK_CTORS: Partial<Record<ModelName, NetworkCtor>> = {
-  xxs:     EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
-  xs:      EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
-  small:   EfficientNetLiteMattingSmall   as unknown as NetworkCtor,
-  medium:  EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
-  large:   EfficientNetLiteMattingLarge   as unknown as NetworkCtor,
-  xl:      EfficientNetLiteMattingXL      as unknown as NetworkCtor,
-}
-
 const STATS_WINDOW_MS = 1000
 
 export class Renderer {
@@ -76,6 +58,12 @@ export class Renderer {
   private modelTimingCounter: number = 0
 
   private renderOp:     RenderOp
+  // Current tier model + its recurrent hidden carrier (GRU tiers only). After
+  // each model run we copyTensor(tierModel.hiddenState → hPrev) so the ConvGRU
+  // samples last frame's hidden (.z) on the next run. Both null for static
+  // tiers (xs/small) and before the first setPreset.
+  private tierModel: TierModel | null = null
+  private hPrev:     Tensor    | null = null
   // Persistent Input op for 'image' background mode; rebuilt when image changes.
   private bgImageInput: InputOp | null = null
   // Persistent Input op + port for 'video' background mode. The port
@@ -137,6 +125,13 @@ export class Renderer {
     if (this.shouldRunModel()) {
       const t = performance.now()
       this.renderOp.runModel()
+      // Thread recurrent ConvGRU state (GRU tiers only): carry this run's
+      // hidden (.z of the GRU output) into the buffer the GRU samples next
+      // run. GPU-resident copy, queued after the model's commands and before
+      // the next frame's — no CPU round-trip. Static tiers have no hidden state.
+      if (this.hPrev && this.tierModel?.hiddenState) {
+        this.backend.copyTensor(this.tierModel.hiddenState, this.hPrev)
+      }
       // GPU-time sampling: WebGPU only (cheap native promise per sync;
       // WebGL's setTimeout-polling fence is too heavy at per-frame rate).
       // Even on WebGPU, sample 1 in N runs to keep concurrent in-flight
@@ -187,17 +182,40 @@ export class Renderer {
   // RenderOp instance is reused: only the network-dependent pieces
   // (network, networkInput, upscaler, compositor) are rebuilt.
   setPreset(preset: ManualPreset, weightsBuf: ArrayBuffer): void {
-    const Ctor = NETWORK_CTORS[preset.model]
-    if (!Ctor) throw new Error(`renderer: model '${preset.model}' not implemented in src/model/networks/`)
+    const cfg = TIER_CONFIG[preset.model]
+    if (!cfg) throw new Error(`renderer: no TIER_CONFIG entry for model '${preset.model}'`)
 
-    const weights      = loadWeightsFromBinary(weightsBuf)
-    const networkInput = this.backend.ops.Input(preset.resolution.h, preset.resolution.w)
-    const network      = new Ctor(this.backend, networkInput.output, weights)
+    // Composite tier weights { base, wrapper, gru? }. loadWeightsFromBinary
+    // resolves the tree generically; tier_config (model-as-code) decides the
+    // structure / placement, NOT the .bin. Cast: the resolved shape is the
+    // union of base ModelWeights + wrapper + optional gru.
+    const w = loadWeightsFromBinary(weightsBuf) as any
 
-    this.renderOp.attachNetwork(network, networkInput, {
+    // x_hr at canvas res — authoritative from tier_config, not preset.resolution
+    // (the wrapper down-path strides this to base res internally).
+    const networkInput = this.backend.ops.Input(cfg.canvasRes.h, cfg.canvasRes.w)
+
+    // GRU tiers: a zero-initialised hidden carrier at the resolution the GRU
+    // runs (base res for gru-at-base, else canvas res). Reset on every swap —
+    // temporal state restarting is acceptable for an adaptive preset change.
+    let gru: { weights: any; hPrev: Tensor } | undefined
+    let hPrev: Tensor | null = null
+    if (cfg.hasGru) {
+      const r = cfg.wrapper.gruAtBase ? cfg.baseRes : cfg.canvasRes
+      hPrev = this.backend.tensor(r.h, r.w, 4, new Float32Array(r.h * r.w * 4))
+      gru   = { weights: w.gru, hPrev }
+    }
+
+    const tier = new TierModel(
+      this.backend, networkInput.output, w.base, w.wrapper, cfg.wrapper, cfg.base, gru,
+    )
+
+    this.renderOp.attachNetwork(tier, networkInput, {
       upscaler:   'bilinear',
       background: this.translateBackground(this.currentBackground),
     })
+    this.tierModel   = tier
+    this.hPrev       = hPrev
     this.preset      = preset
     this.skipCounter = 0
   }

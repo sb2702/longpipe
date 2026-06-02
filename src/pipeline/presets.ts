@@ -1,12 +1,18 @@
 import type { Dtype } from '~/model/backend.ts'
 
-export type ModelName = 'xxs' | 'xs' | 'small' | 'medium' | 'large' | 'xl'
+// The five production tiers. Each has a TIER_CONFIG entry (base + wrapper +
+// GRU policy) in ~/model/tier_config.ts and a shipped model_<name>.bin.
+export type ModelName = 'xs' | 'small' | 'medium' | 'large' | 'xl'
 
 export type PresetName = 'fast' | 'balanced' | 'quality' | 'auto'
 
 export interface ManualPreset {
   model:      ModelName
   dtype:      Dtype
+  // x_hr (network input) AND alpha-output resolution = the tier's canvas res.
+  // MUST match TIER_CONFIG[model].canvasRes (the model layer is authoritative;
+  // tests/networks/tier_config.test.ts asserts agreement). The wrapper strides
+  // this down to base res internally.
   resolution: { w: number; h: number }
   // Number of input frames the model SKIPS between runs. 0 = run every
   // frame, 1 = every other frame, etc. The compositor still runs every
@@ -19,25 +25,20 @@ export interface ManualPreset {
 //
 // Per-source-frame cost = per-run cost / (skipFrames + 1). xl/large run
 // every frame (skipFrames=0); the others skip every other frame
-// (skipFrames=1).
+// (skipFrames=1). resolution = canvas res (mirrors TIER_CONFIG.canvasRes).
 export const PRESETS: ManualPreset[] = [
-  // xxs: same architecture as xs (small encoder + standard decoder), runs at
-  // 128×72 with skipFrames=3 (one model run per 4 source frames). For very
-  // weak hardware. Reuses model_xs.bin since architecture matches; SDK will
-  // fetch model_xxs.bin so upload a copy on the CDN.
-  { model: 'xxs',     dtype: 'f16', resolution: { w: 128, h: 72  }, skipFrames: 3 },
-  { model: 'xs',      dtype: 'f16', resolution: { w: 192, h: 108 }, skipFrames: 1 },
-  { model: 'small',   dtype: 'f16', resolution: { w: 256, h: 144 }, skipFrames: 1 },
-  { model: 'medium',  dtype: 'f16', resolution: { w: 256, h: 144 }, skipFrames: 1 },
-  { model: 'large',   dtype: 'f32', resolution: { w: 256, h: 144 }, skipFrames: 0 },
-  { model: 'xl',      dtype: 'f32', resolution: { w: 512, h: 288 }, skipFrames: 0 },
+  { model: 'xs',      dtype: 'f16', resolution: { w: 384,  h: 216 }, skipFrames: 1 },
+  { model: 'small',   dtype: 'f16', resolution: { w: 384,  h: 216 }, skipFrames: 1 },
+  { model: 'medium',  dtype: 'f16', resolution: { w: 512,  h: 288 }, skipFrames: 1 },
+  { model: 'large',   dtype: 'f32', resolution: { w: 640,  h: 360 }, skipFrames: 0 },
+  { model: 'xl',      dtype: 'f32', resolution: { w: 1280, h: 720 }, skipFrames: 0 },
 ]
 
 // Named shortcuts → index into PRESETS. 'auto' resolved via microbench at init.
 export const NAMED_PRESET_INDEX: Record<Exclude<PresetName, 'auto'>, number> = {
-  fast:     1,   // xs (xxs is too aggressive for the 'fast' shortcut)
-  balanced: 3,   // medium
-  quality:  5,   // xl
+  fast:     0,   // xs
+  balanced: 2,   // medium
+  quality:  4,   // xl
 }
 
 export function resolveNamedPreset(name: PresetName): ManualPreset | null {

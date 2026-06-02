@@ -234,6 +234,17 @@ export class WebGPUBackend implements Backend {
     return result;
   }
 
+  // GPU-resident buffer→buffer copy (no CPU round-trip). Both tensor buffers
+  // carry COPY_SRC|COPY_DST (see STORAGE usage), so this is a plain enqueued
+  // DMA on the device queue. src/dst must be the same byte size.
+  copyTensor(src: WebGPUTensor, dst: WebGPUTensor): void {
+    if (src.buffer.size !== dst.buffer.size)
+      throw new Error(`copyTensor: size mismatch (src ${src.buffer.size} vs dst ${dst.buffer.size})`);
+    const enc = this.device.createCommandEncoder();
+    enc.copyBufferToBuffer(src.buffer, 0, dst.buffer, 0, src.buffer.size);
+    this.device.queue.submit([enc.finish()]);
+  }
+
   // Awaits all in-flight queue work. Used for benchmarking when we want
   // a sync barrier without paying the readback bandwidth cost.
   async sync(): Promise<void> {

@@ -168,6 +168,13 @@ export interface Backend {
   // by this backend; conversion from fp16 storage is handled internally.
   readback(tensor: Tensor): Promise<Float32Array>;
 
+  // GPU-resident copy of src's contents into dst (identical shape + dtype).
+  // Stays entirely on-device — no readback, no CPU round-trip. Used to thread
+  // recurrent state across frames: after a model run, copyTensor(model.
+  // hiddenState, hPrev) carries the ConvGRU hidden (.z) into the buffer the
+  // GRU samples next frame. WebGPU = copyBufferToBuffer; WebGL = copyTexSubImage2D.
+  copyTensor(src: Tensor, dst: Tensor): void;
+
   // Wait for all pending GPU work to complete. Cheaper than readback when
   // you only need a sync barrier (e.g., timing benchmarks). WebGPU uses
   // queue.onSubmittedWorkDone(); WebGL2 uses fenceSync + clientWaitSync

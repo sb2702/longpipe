@@ -197,6 +197,21 @@ export class WebGLBackend implements Backend {
     return px
   }
 
+  // GPU-resident texture→texture copy (no CPU round-trip). Binds src as the
+  // reusable fbo's color attachment (read source) and copies its pixels into
+  // dst with copyTexSubImage2D. src/dst must share texture dimensions + format
+  // (guaranteed when same shape + same backend dtype).
+  copyTensor(src: WebGLTensor, dst: WebGLTensor): void {
+    if (src.texW !== dst.texW || src.texH !== dst.texH)
+      throw new Error(`copyTensor: size mismatch (src ${src.texW}×${src.texH} vs dst ${dst.texW}×${dst.texH})`)
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, src.texture, 0)
+    gl.bindTexture(gl.TEXTURE_2D, dst.texture)
+    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, src.texW, src.texH)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  }
+
   // Wait for all pending GL work to complete. Uses fenceSync + polling
   // clientWaitSync (non-blocking, yields to the event loop). Falls back to
   // gl.finish() if fences aren't available.

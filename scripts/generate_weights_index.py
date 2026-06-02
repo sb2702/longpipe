@@ -17,6 +17,7 @@ import argparse
 import datetime
 import hashlib
 import json
+import struct
 from pathlib import Path
 
 PATTERN = "model_*.bin"
@@ -41,11 +42,35 @@ def sha256_of(path: Path) -> str:
     return h.hexdigest()
 
 
+def read_header(path: Path) -> dict:
+    """Parse the .bin header (see WEIGHTS_FORMAT.md): [u32 header_len][JSON][payload].
+    Returns {dtype, kind, hasGru, top} describing the weight structure without
+    reading the payload. Composite tier .bins have top-level base/wrapper(/gru);
+    legacy base-only .bins have encoder/bottleneck/decoder."""
+    try:
+        with open(path, "rb") as f:
+            (hlen,) = struct.unpack("<I", f.read(4))
+            hdr = json.loads(f.read(hlen).decode("utf-8"))
+    except Exception as e:
+        return {"dtype": "?", "kind": "unreadable", "hasGru": False, "top": [], "error": str(e)}
+    dtype = hdr.get("__dtype__", "f32")
+    keys = sorted(k for k in hdr.keys() if k != "__dtype__")
+    if "base" in keys and "wrapper" in keys:
+        kind = "tier"
+    elif "encoder" in keys:
+        kind = "base-only"
+    else:
+        kind = "unknown"
+    return {"dtype": dtype, "kind": kind, "hasGru": "gru" in keys, "top": keys}
+
+
 def render_html(files, generated, base_url):
     rows = "\n".join(
         f'    <tr>'
         f'<td><a href="{f["name"]}">{f["name"]}</a></td>'
         f'<td>{human_size(f["size"])}</td>'
+        f'<td><code>{f.get("dtype", "?")}</code></td>'
+        f'<td>{f.get("kind", "?")}{" · gru" if f.get("hasGru") else ""}</td>'
         f'<td><code title="{f["sha256"]}">{f["sha256"][:12]}…</code></td>'
         f'</tr>'
         for f in files
@@ -81,7 +106,7 @@ def render_html(files, generated, base_url):
   <p class="lede">Pre-trained model weights for the <a href="https://longpipe.dev">Longpipe</a> SDK. License: <a href="WEIGHTS_LICENSE">WEIGHTS_LICENSE</a> (MIT). Machine-readable index: <a href="manifest.json">manifest.json</a>.</p>
   <table>
     <thead>
-      <tr><th>File</th><th>Size</th><th>SHA-256</th></tr>
+      <tr><th>File</th><th>Size</th><th>dtype</th><th>format</th><th>SHA-256</th></tr>
     </thead>
     <tbody>
 {rows}
@@ -114,8 +139,11 @@ def main():
     for p in paths:
         size = p.stat().st_size
         digest = sha256_of(p)
-        files.append({"name": p.name, "size": size, "sha256": digest})
-        print(f"  {p.name}: {human_size(size)}  {digest[:12]}…")
+        hdr = read_header(p)
+        files.append({"name": p.name, "size": size, "sha256": digest,
+                      "dtype": hdr["dtype"], "kind": hdr["kind"], "hasGru": hdr["hasGru"]})
+        gru = " gru" if hdr["hasGru"] else ""
+        print(f"  {p.name}: {human_size(size)}  {hdr['dtype']} {hdr['kind']}{gru}  {digest[:12]}…")
 
     generated = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 

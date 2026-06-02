@@ -2,8 +2,11 @@ import type { Tensor, Conv2dParams } from "~/model/backend.ts";
 import type { Conv2DWeights } from "~/model/weights.ts";
 import type { WebGPUBackend } from "~/model/backends/webgpu/index.ts";
 import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op.ts";
-import conv2dF32Src from "~/model/backends/webgpu/shaders/conv2d.wgsl";
-import conv2dF16Src from "~/model/backends/webgpu/shaders/conv2d_f16.wgsl";
+// Output-channel-blocked (K=4) conv2d: each thread computes 4 output channel-
+// groups for one pixel, reusing each input load across them. Output-identical to
+// the plain conv2d shader (verified ≤1 ULP) and faster end-to-end on WebGPU.
+import conv2dF32Src from "~/model/backends/webgpu/shaders/conv2d_cblock4.wgsl";
+import conv2dF16Src from "~/model/backends/webgpu/shaders/conv2d_cblock4_f16.wgsl";
 import { convOutSize, resolvePad } from "~/model/backends/webgpu/ops/conv_utils.ts";
 import { toUploadView } from "~/utils/weights.ts";
 
@@ -40,6 +43,7 @@ export class Conv2DWebGPU extends WebGPUOp {
 
     this.defaultSetup();
 
-    this.dispatch = [Math.ceil(outW / 8), Math.ceil(outH / 8), outGroups];
+    // K=4 channel-blocking: one thread per 4 output channel-groups → ceil(outGroups/4) in z.
+    this.dispatch = [Math.ceil(outW / 8), Math.ceil(outH / 8), Math.ceil(outGroups / 4)];
   }
 }

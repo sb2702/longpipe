@@ -9,8 +9,9 @@ import type { ConvGRUWeights } from '~/model/weights.ts'
 //   state  hPrev : .z = previous hidden h (zero tensor on frame 0)
 //   output       : .x = a, .y = b_out, .z = h_new
 //
-// The output tensor doubles as next frame's hPrev (hidden in .z) — the runtime
-// ping-pongs two output buffers across frames, no separate hidden-state buffer.
+// The output carries next frame's hidden in .z. The renderer threads it forward
+// with backend.copyTensor(model.hiddenState → hPrev) after each model run (a
+// GPU-resident copy into the stable hPrev buffer this op samples next frame).
 //
 // Inputs:
 //   uIn   : c_up=2 feature at canvas resolution (.x=a, .y=b)
