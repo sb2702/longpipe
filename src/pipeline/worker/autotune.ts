@@ -52,7 +52,7 @@ export async function autotunePreset(
   // across repeated inits).
   const safetyMargin = backend instanceof WebGLBackend ? SAFETY_MARGIN * 0.5 : SAFETY_MARGIN
   const budgetMs = (1000 / sourceFpsTarget) * safetyMargin
-  log(`start; budget per source frame: ${budgetMs.toFixed(1)}ms (source ${sourceFpsTarget}fps × ${SAFETY_MARGIN} safety)`)
+  log(`start; budget per source frame: ${budgetMs.toFixed(1)}ms (source ${sourceFpsTarget}fps × ${safetyMargin} safety)`)
   log('backend dtype:', backend.dtype)
 
   let best: ManualPreset | null = null

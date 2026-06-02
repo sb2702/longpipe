@@ -321,11 +321,22 @@
           <button data-preset="quality">Quality</button>
         </div>
       </div>
+      <div class="preset-row">
+        <p class="card-label">Model <span style="text-transform:none;font-weight:400;opacity:0.7">(explicit tier — overrides preset, no adaptive)</span></p>
+        <div class="segmented" id="modelSeg">
+          <button data-model="xs">XS</button>
+          <button data-model="small">Small</button>
+          <button data-model="medium">Medium</button>
+          <button data-model="large">Large</button>
+          <button data-model="xl">XL</button>
+        </div>
+      </div>
     </details>
   </main>
 
   <script type="module">
     import { Pipeline as EffectsPipeline } from '~/pipeline'
+    import { PRESETS } from '~/pipeline/presets'
 
     const $output       = document.getElementById('output')
     const $status       = document.getElementById('status')
@@ -340,6 +351,7 @@
     const $bgColorVal   = document.getElementById('bgColorVal')
     const $bgColorRow   = document.getElementById('bgColorRow')
     const $presetSeg    = document.getElementById('presetSeg')
+    const $modelSeg     = document.getElementById('modelSeg')
 
     let pipeline      = null
     let inputVideo    = null
@@ -438,7 +450,11 @@
 
       try {
         await pipeline.ready
-        setStatus('live — running on your GPU')
+        const stats = await pipeline.getStats().catch(() => null)
+        const tag = stats?.preset
+          ? `${stats.preset}${stats.skipFrames ? ` · 1-in-${stats.skipFrames + 1} frames` : ''}`
+          : 'live'
+        setStatus(`live — ${tag} on your GPU`)
       } catch (err) {
         setStatus('init failed: ' + (err.message || err), false)
       }
@@ -498,10 +514,32 @@
       applyBg()
     })
 
-    wireSeg($presetSeg, ({ preset }) => {
-      if (preset === currentPreset) return
-      currentPreset = preset
+    // Preset (named) and Model (explicit tier) are two ways to set the same
+    // thing — currentPreset is either a name string ('auto'|'fast'|…) or a
+    // ManualPreset object pulled from PRESETS. Selecting from either row clears
+    // the other's active state so it's always clear what's running.
+    function presetForModel(model) {
+      const p = PRESETS.find(p => p.model === model)
+      if (!p) throw new Error(`no preset entry for model '${model}'`)
+      return p
+    }
+
+    function selectPreset(value, clickedBtn) {
+      if (clickedBtn.classList.contains('active')) return
+      currentPreset = value
+      for (const b of [...$presetSeg.querySelectorAll('button'), ...$modelSeg.querySelectorAll('button')]) {
+        b.classList.toggle('active', b === clickedBtn)
+      }
       buildPipeline()
+    }
+
+    $presetSeg.addEventListener('click', (e) => {
+      const btn = e.target.closest('button')
+      if (btn) selectPreset(btn.dataset.preset, btn)
+    })
+    $modelSeg.addEventListener('click', (e) => {
+      const btn = e.target.closest('button')
+      if (btn) selectPreset(presetForModel(btn.dataset.model), btn)
     })
 
     $imageUpload.addEventListener('change', () => {
