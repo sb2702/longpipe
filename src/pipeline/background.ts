@@ -164,7 +164,7 @@ function parseBlur(b: BlurInput): number {
     const s = b.strength
     if (typeof s === 'number') {
       const t = Math.max(0, Math.min(1, s))
-      return SIGMA_LOW + (SIGMA_HIGH - SIGMA_LOW) * t
+      return SIGMA_HIGH * t                 // 0 = no blur, 1 = max (SIGMA_HIGH)
     }
     if (s === 'low')    return SIGMA_LOW
     if (s === 'medium') return SIGMA_MEDIUM

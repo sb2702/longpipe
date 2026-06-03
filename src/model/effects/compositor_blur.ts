@@ -6,17 +6,28 @@ import { BlurPyramid } from '~/model/effects/blur_pyramid.ts'
 // bilinear-sampling presenter. The presenter's final per-pixel scan
 // expands the half-res blurred bg back to canvas resolution for free —
 // avoiding the most expensive op a full pyramid would have.
+// Below this sigma there's effectively no blur to do — and the pyramid floors
+// at 2 levels (a visible half-res blur) so it can't represent "off" anyway.
+// At/under this, composite the subject over the UNMODIFIED background (strength
+// 0 = no blur).
+const BLUR_EPS = 0.05
+
 export class CompositorBlur {
-  private readonly blur:      BlurPyramid
+  private readonly blur:      BlurPyramid | null
   private readonly presenter: Presenter
 
   constructor(backend: Backend, image: Tensor, alpha: Tensor, sigma: number) {
-    this.blur      = new BlurPyramid(backend, image, sigma)
-    this.presenter = backend.presenters.CompositeImageBilinear(image, alpha, this.blur.output)
+    if (sigma <= BLUR_EPS) {
+      this.blur      = null
+      this.presenter = backend.presenters.CompositeImage(image, alpha, image)
+    } else {
+      this.blur      = new BlurPyramid(backend, image, sigma)
+      this.presenter = backend.presenters.CompositeImageBilinear(image, alpha, this.blur.output)
+    }
   }
 
   run(): void {
-    this.blur.run()
+    this.blur?.run()
     this.presenter.run()
   }
 }
