@@ -9,7 +9,7 @@ Fast, high quality virtual effects in the browser
 
 Try the live demo: [longpipe.dev/demo](https://longpipe.dev/demo)
 
-> **Warning** — This project is very new (v0.0.1) and still under active development. Expect API changes between versions and bugs.
+> **Warning** — This project is very new and still under active development. Expect API changes between versions and bugs.
 
 ## Features
 
@@ -44,7 +44,7 @@ await pipeline.ready                  // optional — resolves once the effect i
 
 ## Performance
 
-Longpipe uses custom-trained models built with an EfficientNetLite encoder, and a UNet style decoder, breaking it down into 7 different variations/performance presets, which vary number of channels, encoder size as well as input size. Even at 0.0.1, the first version of Longpipe (across all variants) have much higher segmentation accuracy than alternative open source models like Mediapipe and Bodypix, while also having much better real-world performance due to implmenting the model as pure WebGPU/WebGL shaders and using a zero-copy fully GPU pipeline.
+Longpipe uses custom-trained models built with an EfficientNet-Lite encoder and a U-Net style decoder, broken into five performance presets (`xs` through `xl`) that vary in encoder size, decoder width, and input resolution. Across all variants Longpipe has much higher segmentation accuracy than alternative open-source models like MediaPipe and BodyPix, while also delivering much better real-world performance — the model runs as pure WebGPU/WebGL shaders in a zero-copy, fully-GPU pipeline.
 
 ### Quality
 Using average alpha pixel error on the P3M-10K valdation dataset (499 landscape images), all variants of Longpipe surpassed mediapipe in both MAE and IoU.
@@ -104,7 +104,7 @@ You can also pass a manual config:
 
 ```ts
 new EffectsPipeline(stream, {
-  preset: { model: 'large', dtype: 'f16', resolution: { w: 256, h: 144 }, skipFrames: 0 },
+  preset: { model: 'large', dtype: 'f32', resolution: { w: 640, h: 360 }, skipFrames: 0 },
 })
 ```
 
@@ -138,7 +138,7 @@ pipeline.destroy()
 
 ## Self-hosting weights
 
-By default Longpipe fetches model weights from `https://cdn.longpipe.dev/models/v/0.0.1/`. You can browse the available files, sizes, and SHA-256 hashes at [cdn.longpipe.dev/models/v/0.0.1/index.html](https://cdn.longpipe.dev/models/v/0.0.1/index.html) (machine-readable list at [manifest.json](https://cdn.longpipe.dev/models/v/0.0.1/manifest.json)).
+By default Longpipe fetches model weights from `https://cdn.longpipe.dev/models/v/0.0.2/`. You can browse the available files, sizes, and SHA-256 hashes at [cdn.longpipe.dev/models/v/0.0.2/index.html](https://cdn.longpipe.dev/models/v/0.0.2/index.html) (machine-readable list at [manifest.json](https://cdn.longpipe.dev/models/v/0.0.2/manifest.json)).
 
 To serve them yourself, mirror the files under any base URL with the same `model_${name}.bin` naming convention and pass it via `weightsBaseUrl`:
 
@@ -158,20 +158,18 @@ Works on Chromium (Chrome, Edge), Firefox, and Safari (desktop and iOS). WebGPU 
 
 Two layers:
 
-- **Model** (`src/model/`) — EfficientNet-Lite-0 encoder with a U-Net decoder, written as TypeScript op classes. Each layer is a class; weights load as binary tensors at init; the backend (WebGPU or WebGL2) is injected at construction. BatchNorm is fused into conv weights at export — there is no BN op at inference.
-- 
+- **Model** (`src/model/`) — an EfficientNet-Lite encoder (lite0; lite4 on the `xl` tier) with a U-Net decoder, plus a lightweight U-Net *wrapper* that sharpens the matte at higher resolution and a temporal ConvGRU that smooths it across frames. Written as TypeScript op classes — each layer is a class; weights load as binary tensors at init; the backend (WebGPU or WebGL2) is injected at construction. BatchNorm is fused into conv weights at export — there is no BN op at inference.
 - **Pipeline** (`src/pipeline/`) — capability detection, per-browser frame transport selection, worker spawn, audio passthrough, autotune, and the adaptive controller. Designed to absorb the browser/codec/canvas plumbing complexity so consumers don't have to. 
 
-Six trained presets cover the hardware range:
+Five trained presets cover the hardware range. "Resolution" is the model's working (canvas) resolution; the encoder runs at a lower internal resolution and the U-Net wrapper refines back up to this.
 
-| Preset  | Resolution | Encoder | Decoder  | Skip frames |
-|---------|------------|---------|----------|-------------|
-| xl      | 512×288    | full    | 2× ch    | 0           |
-| large   | 256×144    | full    | standard | 0           |
-| medium  | 256×144    | full    | standard | 1           |
-| compact | 256×144    | full    | small    | 1           |
-| small   | 256×144    | small   | standard | 1           |
-| xs      | 192×108    | small   | standard | 1           |
+| Preset | Resolution | Encoder      | Decoder  | Skip frames |
+|--------|------------|--------------|----------|-------------|
+| xl     | 1280×720   | full (lite4) | 2× ch    | 0           |
+| large  | 640×360    | full (lite0) | standard | 0           |
+| medium | 512×288    | full (lite0) | standard | 1           |
+| small  | 384×216    | small        | standard | 1           |
+| xs     | 384×216    | small        | standard | 2           |
 
 `Skip frames` is how many input frames the model sits out between runs — the compositor still renders every frame using the most recent alpha matte. Autotune picks one of these at init based on a microbenchmark of the actual network on the actual device.
 
@@ -199,11 +197,15 @@ The pre-trained model weights distributed via `cdn.longpipe.dev` (and any mirror
 
 ### Training data and pretrained weights
 
-The v0.0.1 weights were trained on two publicly released portrait-matting datasets, both under permissive licenses:
+Longpipe's pre-trained weights are released under MIT (see [WEIGHTS_LICENSE](WEIGHTS_LICENSE)). They were trained on:
 
 - [P3M-10k](https://github.com/JizhiziLi/P3M) — MIT
 - [AISegment Matting Human Datasets](https://www.kaggle.com/datasets/laurentmih/aisegmentcom-matting-human-datasets) — MIT ([upstream license](https://github.com/aisegmentcn/matting_human_datasets/blob/master/LICENSE))
+- [COCO](https://cocodataset.org) person masks — annotations are CC BY 4.0; the underlying images are Flickr-sourced under their own (mixed) licenses, which COCO does not relicense
+- Synthetic images generated with [Z-Image](https://github.com/Tongyi-MAI/Z-Image) (text-to-image) — Apache 2.0
+- A custom dataset of short webcam videos collected via [Prolific](https://www.prolific.com/), from participants who gave explicit, informed consent for their footage to be used to train an open-source virtual-background model. Faces are blurred before training; the raw videos are stored privately (EU), never distributed, and deleted after the training window.
+- Pseudo-labels generated by [BiRefNet](https://github.com/ZhengPeng7/BiRefNet) (MIT), used as a teacher model
 
 The encoder is initialized from a pre-trained [EfficientNet-Lite](https://github.com/RangiLyu/EfficientNet-Lite) backbone — Apache 2.0.
 
-No non-commercial or attribution-restricted sources were used. The weights can be redistributed under the same MIT terms as the rest of the SDK.
+As is standard for trained models, the released weights are not a redistribution of any training image or video — they are published under MIT. Aside from COCO (whose underlying Flickr images carry mixed licenses), every source above is permissively licensed or used with explicit consent. If your use case has strict data-provenance requirements, review COCO's image terms for yourself.

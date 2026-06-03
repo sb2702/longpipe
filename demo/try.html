@@ -83,6 +83,7 @@
     }
 
     .video-card {
+      position: relative;
       background: #000;
       border-radius: 16px;
       overflow: hidden;
@@ -95,6 +96,23 @@
       aspect-ratio: 16/9;
       background: #000;
     }
+    .fps-badge {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre;
+      text-align: right;
+      color: #d1fae5;
+      background: rgba(2, 44, 34, 0.62);
+      padding: 5px 9px;
+      border-radius: 7px;
+      pointer-events: none;
+      backdrop-filter: blur(2px);
+    }
+    .fps-badge:empty { display: none; }
     .status {
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
@@ -256,6 +274,7 @@
 
     <div class="video-card">
       <video id="output" autoplay muted playsinline></video>
+      <div id="fps" class="fps-badge"></div>
     </div>
     <div class="status" id="status">starting…</div>
 
@@ -322,13 +341,14 @@
         </div>
       </div>
       <div class="preset-row">
-        <p class="card-label">Model <span style="text-transform:none;font-weight:400;opacity:0.7">(explicit tier — overrides preset, no adaptive)</span></p>
+        <p class="card-label">Model <span style="text-transform:none;font-weight:400;opacity:0.7">(explicit segmenter — overrides preset, no adaptive)</span></p>
         <div class="segmented" id="modelSeg">
           <button data-model="xs">XS</button>
           <button data-model="small">Small</button>
           <button data-model="medium">Medium</button>
           <button data-model="large">Large</button>
           <button data-model="xl">XL</button>
+          <button data-model="mediapipe" title="MediaPipe Selfie Segmentation (off-the-shelf, runs on main thread)">MediaPipe</button>
         </div>
       </div>
     </details>
@@ -352,6 +372,7 @@
     const $bgColorRow   = document.getElementById('bgColorRow')
     const $presetSeg    = document.getElementById('presetSeg')
     const $modelSeg     = document.getElementById('modelSeg')
+    const $fps          = document.getElementById('fps')
 
     let pipeline      = null
     let inputVideo    = null
@@ -365,9 +386,60 @@
     let currentBg     = 'image'
     let currentPreset = 'auto'
 
+    // Which segmenter is active: 'longpipe' (our Pipeline) or 'mediapipe'
+    // (off-the-shelf MediaPipe Selfie Segmentation, for side-by-side comparison).
+    let engine = 'longpipe'
+    // MediaPipe state (only set while engine === 'mediapipe').
+    let mp        = null    // SelfieSegmentation instance
+    let mpVideo   = null    // hidden <video> driving frames
+    let mpCanvas  = null    // composite target (piped to #output via captureStream)
+    let mpStream  = null    // mpCanvas.captureStream()
+    let mpBgImage = null    // ImageBitmap for image-background compositing
+    let mpRunning = false
+    let mpScriptPromise = null
+
+    // FPS readout. Longpipe: poll getStats() (process()/sec + network runs/sec).
+    // MediaPipe: count onResults ticks over a rolling 1s window.
+    let statsTimer   = null
+    let mpFrameTimes = []
+    let mpLastShown  = 0
+
     function setStatus(s, ok = true) {
       $status.textContent = s
       $status.className = ok ? 'status' : 'status error'
+    }
+
+    function clearFps() {
+      if (statsTimer) { clearInterval(statsTimer); statsTimer = null }
+      mpFrameTimes = []
+      mpLastShown  = 0
+      $fps.textContent = ''
+    }
+
+    // Longpipe: poll the worker's pre-tracked counters (cheap postMessage).
+    // s.fps = composited frames/sec; s.modelFps = network runs/sec (lower when
+    // the preset skips frames).
+    function startLongpipeFps() {
+      if (statsTimer) clearInterval(statsTimer)
+      statsTimer = setInterval(async () => {
+        if (!pipeline) return
+        try {
+          const s = await pipeline.getStats()
+          $fps.textContent = `${s.fps} fps\n${s.modelFps}/s model`
+        } catch { /* transient during teardown */ }
+      }, 500)
+    }
+
+    // MediaPipe: tick per onResults into a rolling 1s window, but only repaint
+    // the badge every 2s so the number is readable (not flickering each frame).
+    function tickMpFps() {
+      const now = performance.now()
+      mpFrameTimes.push(now)
+      while (mpFrameTimes.length && mpFrameTimes[0] < now - 1000) mpFrameTimes.shift()
+      if (now - mpLastShown >= 2000) {
+        $fps.textContent = `${mpFrameTimes.length} fps\nMediaPipe`
+        mpLastShown = now
+      }
     }
 
     async function loadDefaultBgImage() {
@@ -405,10 +477,18 @@
     }
 
     function teardown() {
+      clearFps()
       if (pipeline) {
         try { pipeline.destroy() } catch {}
         pipeline = null
       }
+      // MediaPipe teardown: stop the pump loop, close the graph, drop the
+      // capture stream + hidden video.
+      mpRunning = false
+      if (mp)       { try { mp.close() } catch {} mp = null }
+      if (mpStream) { for (const t of mpStream.getTracks()) t.stop(); mpStream = null }
+      if (mpVideo)  { mpVideo.pause(); mpVideo.srcObject = null; mpVideo = null }
+      mpCanvas = null
       if (inputVideo) {
         inputVideo.pause()
         inputVideo.removeAttribute('src')
@@ -455,9 +535,132 @@
           ? `${stats.preset}${stats.skipFrames ? ` · 1-in-${stats.skipFrames + 1} frames` : ''}`
           : 'live'
         setStatus(`live — ${tag} on your GPU`)
+        startLongpipeFps()
       } catch (err) {
         setStatus('init failed: ' + (err.message || err), false)
       }
+    }
+
+    // ── MediaPipe Selfie Segmentation (off-the-shelf comparison engine) ──────
+    // Loaded as a classic <script> (the @mediapipe package attaches a global +
+    // loads its own wasm/data via locateFile — cleaner than wrangling its
+    // non-ESM build through vite). Runs on the main thread; composites the
+    // person over the SAME background the user picked, so it's a true A/B
+    // against the Longpipe tiers.
+    const MP_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1'
+
+    function loadMediaPipeScript() {
+      if (mpScriptPromise) return mpScriptPromise
+      mpScriptPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script')
+        s.src = `${MP_CDN}/selfie_segmentation.js`
+        s.crossOrigin = 'anonymous'
+        s.onload = () => resolve()
+        s.onerror = () => { mpScriptPromise = null; reject(new Error('failed to load MediaPipe script')) }
+        document.head.appendChild(s)
+      })
+      return mpScriptPromise
+    }
+
+    // For image-background compositing MediaPipe needs a drawable bitmap; for
+    // color/blur/none compositeMP reads the live controls each frame.
+    async function refreshMpBg() {
+      mpBgImage = (currentBg === 'image' || currentBg === 'video')
+        ? (uploadedImageUrl ? await createImageBitmap(await (await fetch(uploadedImageUrl)).blob())
+                            : await loadDefaultBgImage())
+        : null
+    }
+
+    function drawMpBackground(ctx, image, w, h) {
+      if (currentBg === 'color') {
+        ctx.fillStyle = $bgColor.value
+        ctx.fillRect(0, 0, w, h)
+      } else if (currentBg === 'blur') {
+        ctx.filter = `blur(${parseFloat($bgBlurSigma.value)}px)`
+        ctx.drawImage(image, 0, 0, w, h)
+        ctx.filter = 'none'
+      } else if (mpBgImage) {
+        ctx.drawImage(mpBgImage, 0, 0, w, h)
+      } else {
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h)
+      }
+    }
+
+    // Standard MediaPipe background-replacement compositing: keep person pixels
+    // (mask), then draw the chosen background behind them. 'none' = passthrough.
+    function compositeMP(ctx, results) {
+      const w = mpCanvas.width, h = mpCanvas.height
+      ctx.save()
+      ctx.clearRect(0, 0, w, h)
+      if (currentBg === 'none') {
+        ctx.drawImage(results.image, 0, 0, w, h)
+        ctx.restore()
+        return
+      }
+      ctx.drawImage(results.segmentationMask, 0, 0, w, h)   // person = white
+      ctx.globalCompositeOperation = 'source-in'
+      ctx.drawImage(results.image, 0, 0, w, h)              // person pixels only
+      ctx.globalCompositeOperation = 'destination-over'
+      drawMpBackground(ctx, results.image, w, h)            // background behind
+      ctx.restore()
+    }
+
+    async function buildMediaPipe() {
+      teardown()
+      setStatus('loading MediaPipe…')
+      let inputStream
+      try {
+        inputStream = await getInputStream()
+      } catch (err) {
+        setStatus('source unavailable: ' + (err.message || err), false)
+        return
+      }
+      try {
+        await loadMediaPipeScript()
+        await refreshMpBg()
+
+        mpVideo = document.createElement('video')
+        mpVideo.muted = true; mpVideo.playsInline = true; mpVideo.autoplay = true
+        mpVideo.srcObject = inputStream
+        await mpVideo.play()
+        if (!mpVideo.videoWidth) {
+          await new Promise(r => mpVideo.addEventListener('loadedmetadata', r, { once: true }))
+        }
+
+        mpCanvas = document.createElement('canvas')
+        mpCanvas.width  = mpVideo.videoWidth  || 1280
+        mpCanvas.height = mpVideo.videoHeight || 720
+        const ctx = mpCanvas.getContext('2d')
+
+        mp = new window.SelfieSegmentation({ locateFile: (f) => `${MP_CDN}/${f}` })
+        mp.setOptions({ modelSelection: 1, selfieMode: false })   // 1 = landscape model
+        mp.onResults((results) => { if (mpRunning) { compositeMP(ctx, results); tickMpFps() } })
+
+        // Pipe the composite canvas into the existing <video> so the output
+        // area + styling are identical to the Longpipe path.
+        mpStream = mpCanvas.captureStream(30)
+        $output.srcObject = mpStream
+
+        mpRunning = true
+        const pump = async () => {
+          if (!mpRunning || !mp || !mpVideo) return
+          try { await mp.send({ image: mpVideo }) } catch {}
+          if (!mpRunning) return
+          if (mpVideo.requestVideoFrameCallback) mpVideo.requestVideoFrameCallback(pump)
+          else requestAnimationFrame(pump)
+        }
+        if (mpVideo.requestVideoFrameCallback) mpVideo.requestVideoFrameCallback(pump)
+        else requestAnimationFrame(pump)
+
+        setStatus('live — MediaPipe Selfie Segmentation (off-the-shelf, modelSelection=1)')
+      } catch (err) {
+        setStatus('MediaPipe init failed: ' + (err.message || err), false)
+      }
+    }
+
+    // Dispatch to the active engine's builder.
+    function rebuild() {
+      return engine === 'mediapipe' ? buildMediaPipe() : buildPipeline()
     }
 
     function wireSeg(container, onChange) {
@@ -473,7 +676,7 @@
     wireSeg($sourceSeg, ({ source }) => {
       if (source === currentSource) return
       currentSource = source
-      buildPipeline()
+      rebuild()
     })
 
     function setBgActive(bg) {
@@ -486,6 +689,12 @@
     }
 
     async function applyBg() {
+      if (engine === 'mediapipe') {
+        // compositeMP reads color/blur/none live each frame; only the image
+        // bitmap needs (re)loading here.
+        await refreshMpBg().catch(() => {})
+        return
+      }
       if (!pipeline) return
       try {
         await pipeline.setBackground(await resolveBg())
@@ -524,13 +733,27 @@
       return p
     }
 
-    function selectPreset(value, clickedBtn) {
-      if (clickedBtn.classList.contains('active')) return
-      currentPreset = value
+    function setActiveModelBtn(clickedBtn) {
       for (const b of [...$presetSeg.querySelectorAll('button'), ...$modelSeg.querySelectorAll('button')]) {
         b.classList.toggle('active', b === clickedBtn)
       }
+    }
+
+    // Longpipe selection (named preset or explicit tier). value = name string
+    // or a ManualPreset from PRESETS.
+    function selectPreset(value, clickedBtn) {
+      if (clickedBtn.classList.contains('active')) return
+      engine = 'longpipe'
+      currentPreset = value
+      setActiveModelBtn(clickedBtn)
       buildPipeline()
+    }
+
+    function selectMediaPipe(clickedBtn) {
+      if (clickedBtn.classList.contains('active')) return
+      engine = 'mediapipe'
+      setActiveModelBtn(clickedBtn)
+      buildMediaPipe()
     }
 
     $presetSeg.addEventListener('click', (e) => {
@@ -539,7 +762,9 @@
     })
     $modelSeg.addEventListener('click', (e) => {
       const btn = e.target.closest('button')
-      if (btn) selectPreset(presetForModel(btn.dataset.model), btn)
+      if (!btn) return
+      if (btn.dataset.model === 'mediapipe') selectMediaPipe(btn)
+      else selectPreset(presetForModel(btn.dataset.model), btn)
     })
 
     $imageUpload.addEventListener('change', () => {
