@@ -1,6 +1,6 @@
 {
   "name": "longpipe",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Open-source WebGPU/WebGL2 video effects SDK — virtual backgrounds, background blur, portrait matting in real time in the browser.",
   "type": "module",
   "sideEffects": false,
