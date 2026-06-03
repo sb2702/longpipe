@@ -23,6 +23,15 @@ export interface Presenter {
   run(): void;
 }
 
+// Which attached canvas a presenter writes to. 'main' is the always-present
+// output canvas (configured at create()); 'preview' is an optional second
+// canvas registered via attachCanvas() for the preview-effect feature.
+// WebGPU routes each target to its own GPUCanvasContext; WebGL ignores the
+// target (single context — preview is presented by the renderer via a
+// snapshot of the main canvas). Defaults to 'main' everywhere so existing
+// single-output callers are unaffected.
+export type RenderTarget = "main" | "preview";
+
 export type Activation = "none" | "relu6" | "relu";
 
 export interface Conv2dParams {
@@ -150,19 +159,31 @@ export interface Backend {
     Input:           (h: number, w: number) => InputOp;
   };
 
-  // Render-to-display ops. Produce no Tensor — write directly to the canvas.
+  // Render-to-display ops. Produce no Tensor — write directly to a canvas.
+  // The optional `target` selects which attached canvas to write to (default
+  // 'main'); see RenderTarget + attachCanvas. WebGPU honors it; WebGL ignores
+  // it (always its single canvas).
   presenters: {
-    CompositeSolid:          (image: Tensor, alpha: Tensor, bgColor: [number, number, number]) => Presenter;
-    CompositeImage:          (image: Tensor, alpha: Tensor, bg: Tensor) => Presenter;
+    CompositeSolid:          (image: Tensor, alpha: Tensor, bgColor: [number, number, number], target?: RenderTarget) => Presenter;
+    CompositeImage:          (image: Tensor, alpha: Tensor, bg: Tensor, target?: RenderTarget) => Presenter;
     // Same as CompositeImage but bg may be smaller than (image, alpha) — bg
     // is bilinearly sampled. Used by CompositorBlur to absorb the final
     // pyramid upsample into this pass for free.
-    CompositeImageBilinear:  (image: Tensor, alpha: Tensor, bg: Tensor) => Presenter;
+    CompositeImageBilinear:  (image: Tensor, alpha: Tensor, bg: Tensor, target?: RenderTarget) => Presenter;
     // Passthrough: writes image directly to canvas; no alpha, no bg. Used
     // by RenderOp when the renderer is disabled (true GPU-level passthrough
     // — input frame in, same frame on the canvas).
-    CompositePassthrough:    (image: Tensor) => Presenter;
+    CompositePassthrough:    (image: Tensor, target?: RenderTarget) => Presenter;
   };
+
+  // Register an additional output canvas under `name` so presenters can target
+  // it. WebGPU configures a second GPUCanvasContext on the shared device (same
+  // format, premultiplied alpha) — render passes to distinct canvases share
+  // the device's buffers (the alpha tensor) with no readback. WebGL THROWS: a
+  // single GL context can't drive two canvases and cross-context texture
+  // sharing isn't a thing, so the renderer presents the preview by snapshotting
+  // the main canvas instead. Used by the preview-effect feature.
+  attachCanvas(name: RenderTarget, canvas: HTMLCanvasElement | OffscreenCanvas): void;
 
   // Read tensor data back to host as fp32. The tensor must have been allocated
   // by this backend; conversion from fp16 storage is handled internally.

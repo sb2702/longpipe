@@ -76,6 +76,9 @@ async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
     case 'setPreset':   return handleSetPreset(data as CmdDataMap['setPreset'])
     case 'getStats':    return renderer?.getStats() ?? null
     case 'destroy':     return handleDestroy()
+    case 'attachPreview': return handleAttachPreview(data as CmdDataMap['attachPreview'])
+    case 'setPreview':    return handleSetPreview(data as CmdDataMap['setPreview'])
+    case 'clearPreview':  return handleClearPreview()
     default: throw new Error(`unknown cmd: ${cmd}`)
   }
 }
@@ -175,6 +178,20 @@ async function handleSetBackground(bg: Background): Promise<void> {
 
 async function handleSetEnabled(on: boolean): Promise<void> {
   renderer?.setEnabled(on)
+}
+
+async function handleAttachPreview(data: CmdDataMap['attachPreview']): Promise<void> {
+  if (!renderer) throw new Error('handleAttachPreview: not initialized')
+  renderer.attachPreview(data.canvas)
+}
+
+async function handleSetPreview(data: CmdDataMap['setPreview']): Promise<void> {
+  if (!renderer) throw new Error('handleSetPreview: not initialized')
+  renderer.setPreview(data.background, data.fps !== undefined ? { fps: data.fps } : undefined)
+}
+
+async function handleClearPreview(): Promise<void> {
+  renderer?.clearPreview()
 }
 
 async function handleSetPreset(

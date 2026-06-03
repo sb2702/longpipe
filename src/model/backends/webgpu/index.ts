@@ -1,4 +1,4 @@
-import type { Backend, Dtype, DataView_ } from "~/model/backend.ts";
+import type { Backend, Dtype, DataView_, RenderTarget } from "~/model/backend.ts";
 import type { WebGPUTensor, WebGPUMLBuffer } from "~/model/backends/webgpu/base_webgpu_op.ts";
 import { float32ArrayToHalf, halfArrayToFloat32 } from "~/utils/fp16.ts";
 import { Conv2DWebGPU } from "~/model/backends/webgpu/ops/conv2d.ts";
@@ -42,9 +42,15 @@ export interface WebGPUBackendOptions {
 export class WebGPUBackend implements Backend {
   readonly ops: Backend["ops"];
   readonly presenters: Backend["presenters"];
-  readonly canvasContext: GPUCanvasContext;
+  readonly canvasContext: GPUCanvasContext;          // the 'main' target's context
   readonly canvasFormat: GPUTextureFormat;
   readonly bytesPerElement: 2 | 4;
+
+  // Configured GPUCanvasContexts keyed by render target. Seeded with 'main'
+  // (the create() canvas); attachCanvas() adds others (e.g. 'preview'). One
+  // device drives them all, so render passes to different canvases see the
+  // same device buffers — no cross-context sharing problem.
+  private readonly contexts = new Map<RenderTarget, GPUCanvasContext>();
 
   private constructor(
     readonly device: GPUDevice,
@@ -55,13 +61,10 @@ export class WebGPUBackend implements Backend {
 
     const ctx = canvas.getContext("webgpu");
     if (!ctx) throw new Error("Failed to get WebGPU context from canvas");
+    this.canvasFormat = navigator.gpu.getPreferredCanvasFormat();
+    this.configureContext(ctx);
     this.canvasContext = ctx;
-    this.canvasFormat  = navigator.gpu.getPreferredCanvasFormat();
-    this.canvasContext.configure({
-      device,
-      format: this.canvasFormat,
-      alphaMode: "premultiplied",
-    });
+    this.contexts.set("main", ctx);
 
     this.ops = {
       Conv2d:           (input, weights, params)        => new Conv2DWebGPU(this, input, weights, params),
@@ -90,45 +93,66 @@ export class WebGPUBackend implements Backend {
     };
 
     this.presenters = {
-      // The op needs the per-frame swapchain texture before each draw — wrap
-      // it so callers don't have to think about presentation lifecycle.
-      CompositeSolid: (image, alpha, bgColor) => {
+      // The op needs the per-frame swapchain texture of its target canvas
+      // before each draw — wrap it so callers don't have to think about
+      // presentation lifecycle. `target` defaults to 'main'.
+      CompositeSolid: (image, alpha, bgColor, target = "main") => {
         const op = new CompositeSolidWebGPU(this, image, alpha, bgColor);
         return {
           run: () => {
-            op.setOutput(this.getCurrentDisplayTexture());
+            op.setOutput(this.getCurrentDisplayTexture(target));
             op.run();
           },
         };
       },
-      CompositeImage: (image, alpha, bg) => {
+      CompositeImage: (image, alpha, bg, target = "main") => {
         const op = new CompositeImageWebGPU(this, image, alpha, bg);
         return {
           run: () => {
-            op.setOutput(this.getCurrentDisplayTexture());
+            op.setOutput(this.getCurrentDisplayTexture(target));
             op.run();
           },
         };
       },
-      CompositeImageBilinear: (image, alpha, bg) => {
+      CompositeImageBilinear: (image, alpha, bg, target = "main") => {
         const op = new CompositeImageBilinearWebGPU(this, image, alpha, bg);
         return {
           run: () => {
-            op.setOutput(this.getCurrentDisplayTexture());
+            op.setOutput(this.getCurrentDisplayTexture(target));
             op.run();
           },
         };
       },
-      CompositePassthrough: (image) => {
+      CompositePassthrough: (image, target = "main") => {
         const op = new CompositePassthroughWebGPU(this, image);
         return {
           run: () => {
-            op.setOutput(this.getCurrentDisplayTexture());
+            op.setOutput(this.getCurrentDisplayTexture(target));
             op.run();
           },
         };
       },
     };
+  }
+
+  // Configure a GPUCanvasContext for this backend's device + format. Shared by
+  // the constructor (main) and attachCanvas (preview).
+  private configureContext(ctx: GPUCanvasContext): void {
+    ctx.configure({
+      device: this.device,
+      format: this.canvasFormat,
+      alphaMode: "premultiplied",
+    });
+  }
+
+  // Register a second output canvas (see Backend.attachCanvas). 'main' is
+  // reserved for the create() canvas.
+  attachCanvas(name: RenderTarget, canvas: HTMLCanvasElement | OffscreenCanvas): void {
+    if (name === "main") throw new Error("attachCanvas: 'main' is reserved for the create() canvas");
+    const ctx = canvas.getContext("webgpu");
+    if (!ctx) throw new Error(`attachCanvas: failed to get WebGPU context for target '${name}'`);
+    this.configureContext(ctx);
+    this.contexts.set(name, ctx);
   }
 
   static async isAvailable(): Promise<boolean> {
@@ -159,11 +183,13 @@ export class WebGPUBackend implements Backend {
     return new WebGPUBackend(device, opts.canvas, dtype);
   }
 
-  // The swapchain texture for the current frame. Must be called inside the
-  // same task that submits the render commands — texture is invalidated after
-  // the next browser paint.
-  getCurrentDisplayTexture(): GPUTexture {
-    return this.canvasContext.getCurrentTexture();
+  // The swapchain texture for the current frame of `target`'s canvas (default
+  // 'main'). Must be called inside the same task that submits the render
+  // commands — texture is invalidated after the next browser paint.
+  getCurrentDisplayTexture(target: RenderTarget = "main"): GPUTexture {
+    const ctx = this.contexts.get(target);
+    if (!ctx) throw new Error(`getCurrentDisplayTexture: no canvas attached for target '${target}'`);
+    return ctx.getCurrentTexture();
   }
 
   tensor(h: number, w: number, c: number, data?: DataView_): WebGPUTensor {

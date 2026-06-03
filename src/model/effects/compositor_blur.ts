@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Presenter } from '~/model/backend.ts'
+import type { Backend, Tensor, Presenter, RenderTarget } from '~/model/backend.ts'
 import { BlurPyramid } from '~/model/effects/blur_pyramid.ts'
 
 // Background-blur composite: blurs the input image with a pyramid (output
@@ -16,13 +16,13 @@ export class CompositorBlur {
   private readonly blur:      BlurPyramid | null
   private readonly presenter: Presenter
 
-  constructor(backend: Backend, image: Tensor, alpha: Tensor, sigma: number) {
+  constructor(backend: Backend, image: Tensor, alpha: Tensor, sigma: number, target: RenderTarget = 'main') {
     if (sigma <= BLUR_EPS) {
       this.blur      = null
-      this.presenter = backend.presenters.CompositeImage(image, alpha, image)
+      this.presenter = backend.presenters.CompositeImage(image, alpha, image, target)
     } else {
       this.blur      = new BlurPyramid(backend, image, sigma)
-      this.presenter = backend.presenters.CompositeImageBilinear(image, alpha, this.blur.output)
+      this.presenter = backend.presenters.CompositeImageBilinear(image, alpha, this.blur.output, target)
     }
   }
 

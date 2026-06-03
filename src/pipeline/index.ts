@@ -155,6 +155,10 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // replaced or the pipeline is destroyed.
   private bgCleanup: (() => void) | null = null
 
+  // Same as bgCleanup but for the preview background (setPreview). Cleared on
+  // clearPreview / replacement / destroy.
+  private previewBgCleanup: (() => void) | null = null
+
   constructor(inputStream: MediaStream, options: PipelineOptions) {
     const opts = { ...DEFAULTS, ...options }
     // Set debug FIRST so any subsequent log() calls in this constructor
@@ -330,6 +334,47 @@ export class Pipeline implements PromiseLike<Pipeline> {
     void this.controller.sendMessage('setPreset', { preset: p, weights })
   }
 
+  // ── Preview ───────────────────────────────────────────────────────────────
+  // Render a *candidate* effect to a second canvas while the main outgoing
+  // stream keeps its currently-applied effect — for "preview before you apply"
+  // UX (browsing a background menu). The network + alpha are shared with the
+  // main render (computed once); only the compositor differs. Preview is
+  // lower-priority: throttled to `fps` (default 15) and skippable.
+
+  // Attach the preview output canvas — call ONCE. The canvas's control is
+  // transferred to the worker (transferControlToOffscreen), so the element
+  // can't be drawn to by the page afterward and can't be transferred again.
+  // The worker resizes the canvas backing to the output resolution (the
+  // compositors don't resample), so just CSS-size the element for display.
+  attachPreview(canvas: HTMLCanvasElement): void {
+    const offscreen = canvas.transferControlToOffscreen()
+    void this.controller.sendMessage('attachPreview', { canvas: offscreen }, [offscreen])
+  }
+
+  // Set / update the previewed candidate. `background` is the identical wide
+  // surface as construction + setBackground (keyword, URL, ImageBitmap, color,
+  // blur, image, video). 'none' previews the no-effect (raw) option. Resolves
+  // once the worker has applied it (after any URL/bitmap load).
+  async setPreview(input: { background: BackgroundInput; fps?: number }): Promise<void> {
+    const norm = await normalizeBackground(input.background)
+    const previousCleanup = this.previewBgCleanup
+    this.previewBgCleanup = norm.cleanup ?? null
+    await this.controller.sendMessage(
+      'setPreview',
+      { background: norm.background, fps: input.fps },
+      norm.transferList,
+    )
+    previousCleanup?.()
+  }
+
+  // Stop previewing. The preview canvas freezes on its last frame (hide it in
+  // your UI). To "apply" a previewed effect, call setBackground(sameInput).
+  clearPreview(): void {
+    void this.controller.sendMessage('clearPreview', {} as Record<string, never>)
+    this.previewBgCleanup?.()
+    this.previewBgCleanup = null
+  }
+
   setEnabled(on: boolean): void {
     void this.controller.sendMessage('setEnabled', { enabled: on })
   }
@@ -349,6 +394,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
     this.adaptive = null
     this.bgCleanup?.()
     this.bgCleanup = null
+    this.previewBgCleanup?.()
+    this.previewBgCleanup = null
     void this.controller.sendMessage('destroy', {} as Record<string, never>)
     this.controller.terminate()
     this.inputCleanup()

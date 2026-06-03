@@ -1,4 +1,4 @@
-import type { Backend, Dtype, DataView_ } from '~/model/backend.ts'
+import type { Backend, Dtype, DataView_, RenderTarget } from '~/model/backend.ts'
 import type { WebGLTensor, WebGLMLBuffer } from '~/model/backends/webgl/base_webgl_op.ts'
 import { float32ArrayToHalf, halfArrayToFloat32 } from '~/utils/fp16.ts'
 import { Conv2DWebGL } from '~/model/backends/webgl/ops/conv2d.ts'
@@ -90,7 +90,11 @@ export class WebGLBackend implements Backend {
     this.presenters = {
       // WebGL writes to the implicit default framebuffer — the op binds it
       // itself via backend.bindDisplayFramebuffer(), so the wrapper is a
-      // straight pass-through.
+      // straight pass-through. The `target` arg (RenderTarget) is accepted for
+      // interface parity but IGNORED: one GL context = one canvas, so every
+      // presenter renders to the single canvas. Preview output is produced by
+      // the renderer snapshotting this canvas (transferToImageBitmap) — see
+      // attachCanvas below and the renderer's WebGL preview path.
       CompositeSolid: (image, alpha, bgColor) =>
         new CompositeSolidWebGL(this, image, alpha, bgColor),
       CompositeImage: (image, alpha, bg) =>
@@ -135,6 +139,17 @@ export class WebGLBackend implements Backend {
     if (!gl) throw new Error('WebGL2 not available')
     if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('EXT_color_buffer_float not available')
     return new WebGLBackend(gl, opts.canvas, opts.dtype ?? 'f32')
+  }
+
+  // WebGL can't drive a second canvas from one context (no cross-context
+  // texture sharing). The renderer detects this throw (or, better, branches on
+  // backendKind) and presents the preview by snapshotting the main canvas with
+  // transferToImageBitmap → the preview canvas's bitmaprenderer context.
+  attachCanvas(name: RenderTarget): void {
+    throw new Error(
+      `WebGLBackend.attachCanvas('${name}'): WebGL cannot render to a second canvas; ` +
+      `use the renderer's snapshot-and-present path for preview output`,
+    )
   }
 
   // Bind the canvas (default framebuffer) as the render target. Compositor

@@ -20,6 +20,12 @@ export interface CmdDataMap {
   setPreset:     { preset: PresetName | ManualPreset; weights?: ArrayBuffer }
   getStats:      Record<string, never>
   destroy:       Record<string, never>
+  // Preview: attach the (transferred) preview canvas once, then set/clear the
+  // candidate effect. setPreview carries a canonical Background (same shape as
+  // setBackground) plus an optional throttle fps.
+  attachPreview: { canvas: OffscreenCanvas }
+  setPreview:    { background: Background; fps?: number }
+  clearPreview:  Record<string, never>
 }
 
 export interface CmdResponseMap {
@@ -30,6 +36,9 @@ export interface CmdResponseMap {
   setPreset:     PresetSwapResult
   getStats:      RendererStats
   destroy:       void
+  attachPreview: void
+  setPreview:    void
+  clearPreview:  void
 }
 
 export type CmdName = keyof CmdDataMap

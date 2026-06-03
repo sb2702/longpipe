@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Presenter } from '~/model/backend.ts'
+import type { Backend, Tensor, Presenter, RenderTarget } from '~/model/backend.ts'
 
 // Composites an RGBA image over a solid background color using a 1-channel
 // alpha mask, rendering to the backend's canvas. Backend-agnostic — sits
@@ -16,8 +16,9 @@ export class CompositorSolid {
     image: Tensor,
     alpha: Tensor,
     bgColor: [number, number, number],
+    target: RenderTarget = 'main',
   ) {
-    this.presenter = backend.presenters.CompositeSolid(image, alpha, bgColor)
+    this.presenter = backend.presenters.CompositeSolid(image, alpha, bgColor, target)
   }
 
   run(): void {

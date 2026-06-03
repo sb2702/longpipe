@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Presenter } from '~/model/backend.ts'
+import type { Backend, Tensor, Presenter, RenderTarget } from '~/model/backend.ts'
 
 // Composites an RGBA image over a background image (also as a Tensor) using a
 // 1-channel alpha mask, rendering to the backend's canvas. Used for virtual
@@ -11,8 +11,8 @@ import type { Backend, Tensor, Presenter } from '~/model/backend.ts'
 export class CompositorImage {
   private readonly presenter: Presenter
 
-  constructor(backend: Backend, image: Tensor, alpha: Tensor, bg: Tensor) {
-    this.presenter = backend.presenters.CompositeImage(image, alpha, bg)
+  constructor(backend: Backend, image: Tensor, alpha: Tensor, bg: Tensor, target: RenderTarget = 'main') {
+    this.presenter = backend.presenters.CompositeImage(image, alpha, bg, target)
   }
 
   run(): void {

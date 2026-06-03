@@ -2,12 +2,12 @@
 // with frame-skipping logic. Adapters call process(frame) per input frame;
 // renderer decides whether to run the model this frame.
 
-import type { Backend, Tensor, InputOp } from '~/model/backend.ts'
+import type { Backend, Tensor, InputOp, RenderTarget } from '~/model/backend.ts'
 // Note: this file builds the GPU compute chain (network + RenderOp). The
 // Streams API pipe chain (inputReadable → transform → outputWritable) is
 // wired in worker/index.ts handleInit() where transport adapters are
 // composed with this renderer.
-import { RenderOp, type BackgroundConfig as RenderOpBackgroundConfig } from '~/model/render_op.ts'
+import { RenderOp, type BackgroundConfig as RenderOpBackgroundConfig, type CompositeSpec } from '~/model/render_op.ts'
 import { loadWeightsFromBinary } from '~/utils/loadWeights.ts'
 import { TierModel } from '~/model/tier_model.ts'
 import { TIER_CONFIG } from '~/model/tier_config.ts'
@@ -15,6 +15,16 @@ import type { ManualPreset } from '../presets'
 import type { Background } from '../background'
 import type { RendererStats } from '../messages'
 import type { Topology } from '../topology'
+
+// Preview: render a *candidate* effect to a second canvas while the main
+// outgoing stream keeps its currently-applied effect. The network + alpha are
+// shared (computed once); only the compositor differs. Lower-priority than
+// main — throttled to previewFps and only composited on preview ticks.
+export interface PreviewOptions {
+  fps?: number   // default DEFAULT_PREVIEW_FPS — preview composite cadence
+}
+
+const DEFAULT_PREVIEW_FPS = 15
 
 export interface RendererOptions {
   backend:     Backend
@@ -64,15 +74,27 @@ export class Renderer {
   // tiers (xs/small) and before the first setPreset.
   private tierModel: TierModel | null = null
   private hPrev:     Tensor    | null = null
-  // Persistent Input op for 'image' background mode; rebuilt when image changes.
-  private bgImageInput: InputOp | null = null
-  // Persistent Input op + port for 'video' background mode. The port
-  // receives a fresh VideoFrame from main on every video-frame; we
-  // upload it into bgVideoInput's tensor and close the frame. The
-  // compositor reads from bgVideoInput.output every render — no
-  // synchronization needed (last write wins).
-  private bgVideoInput: InputOp     | null = null
-  private bgVideoPort:  MessagePort | null = null
+  // Per-target Input ops + ports for 'image'/'video' background modes. Keyed by
+  // RenderTarget so main and preview can each show a different image/video bg
+  // without colliding on one input op. Each video port receives a fresh
+  // VideoFrame from main per frame; we upload it into that target's input
+  // tensor and close the frame. The compositor reads input.output every render
+  // (last write wins — no sync needed).
+  private bgImageInputs = new Map<RenderTarget, InputOp>()
+  private bgVideoInputs = new Map<RenderTarget, InputOp>()
+  private bgVideoPorts  = new Map<RenderTarget, MessagePort>()
+
+  // Preview state. previewCanvas is set once by attachPreview(); previewBg is
+  // the candidate effect (null = not previewing — clearPreview()). previewCtx
+  // is the WebGL present target (bitmaprenderer); WebGPU composites straight to
+  // the attached canvas instead. previewEffectSpec is the precomputed effect
+  // config (null when the candidate is 'none' → passthrough preview).
+  private previewCanvas:     OffscreenCanvas | null = null
+  private previewCtx:        ImageBitmapRenderingContext | null = null
+  private previewBg:         Background | null = null
+  private previewEffectSpec: RenderOpBackgroundConfig | null = null
+  private previewIntervalMs: number = 1000 / DEFAULT_PREVIEW_FPS
+  private lastPreviewAt:     number = 0
 
   // Frame-skipping: counter-based per preset.skipFrames. Model runs when
   // counter hits 0; counter is reset to skipFrames after each run and
@@ -104,57 +126,111 @@ export class Renderer {
   }
 
   // Per-frame entry point. Always cheap (display). Sometimes expensive (model).
+  //
+  // Handles the main × preview effect matrix: each surface independently runs
+  // an effect composite (background.kind !== 'none') or a raw passthrough
+  // (kind === 'none', or disabled / still booting). The model runs iff EITHER
+  // surface needs alpha — so a preview effect forces inference even when the
+  // main output is passthrough (matrix cell b).
   process(frame: VideoFrame): void {
     this.renderOp.setSource(frame)
+    const now = performance.now()
 
-    if (!this.enabled || this.currentBackground.kind === 'none' || !this.renderOp.hasNetwork()) {
-      // True passthrough at the GPU level: input image written directly to
-      // canvas, no model, no alpha math. Output stream / MSTG / shuttle
-      // path picks up the unmodified frame as if no pipeline existed.
-      // Triggered by:
-      //   - `enabled: false`        (whole SDK paused)
-      //   - `background: 'none'`    (no bg-related effect)
-      //   - no network attached yet (worker still booting — autotune /
-      //     weight fetch in flight; RenderOp is in boot mode)
-      this.renderOp.runPassthrough()
-      this.framesRenderedAt.push(performance.now())
-      this.trim(this.framesRenderedAt)
-      return
+    const hasNet        = this.renderOp.hasNetwork()
+    const mainEffect    = this.enabled && hasNet && this.currentBackground.kind !== 'none'
+    const previewTick   = this.isPreviewTick(now)
+    const previewEffect = previewTick && hasNet && this.previewBg !== null && this.previewBg.kind !== 'none'
+
+    // Model gate. Main follows its skip cadence; a preview tick that needs
+    // alpha forces a run when main didn't already produce one this frame.
+    let ranModel = false
+    if (mainEffect) {
+      if (this.shouldRunModel()) { this.runModelOnce(); ranModel = true }
+      else this.skippedCount++
     }
+    if (!ranModel && previewEffect) { this.runModelOnce(); ranModel = true }
 
-    if (this.shouldRunModel()) {
-      const t = performance.now()
-      this.renderOp.runModel()
-      // Thread recurrent ConvGRU state (GRU tiers only): carry this run's
-      // hidden (.z of the GRU output) into the buffer the GRU samples next
-      // run. GPU-resident copy, queued after the model's commands and before
-      // the next frame's — no CPU round-trip. Static tiers have no hidden state.
-      if (this.hPrev && this.tierModel?.hiddenState) {
-        this.backend.copyTensor(this.tierModel.hiddenState, this.hPrev)
-      }
-      // GPU-time sampling: WebGPU only (cheap native promise per sync;
-      // WebGL's setTimeout-polling fence is too heavy at per-frame rate).
-      // Even on WebGPU, sample 1 in N runs to keep concurrent in-flight
-      // syncs bounded. The adaptive controller only needs a few samples
-      // per second to drive its decisions.
-      if (this.backendKind === 'webgpu' && this.modelTimingCounter % MODEL_TIMING_SAMPLE_INTERVAL === 0) {
-        this.backend.sync().then(() => {
-          this.modelRunSamples.push({ ts: performance.now(), ms: performance.now() - t })
-          this.trimSamples(this.modelRunSamples)
-        }).catch(() => { /* sync errors during shutdown are expected */ })
-      }
-      this.modelTimingCounter++
-    } else {
-      this.skippedCount++
-    }
-
+    // Composite. The display input (full-res image, shared by both surfaces) is
+    // refreshed once inside whichever composite path runs first.
     const td = performance.now()
-    this.renderOp.runDisplay()
+    if (previewTick && this.previewCanvas) {
+      if (this.backendKind === 'webgl') {
+        // WebGL: one canvas — preview composited + snapshotted, then main last
+        // so the output adapter captures main. All synchronous (no race).
+        this.compositePreviewWebGL(mainEffect, previewEffect)
+      } else {
+        // WebGPU: main + preview render to independent swapchains; order free.
+        this.compositeMain(mainEffect)
+        this.renderOp.compositeTo('preview', this.previewSpec(previewEffect))
+      }
+      this.lastPreviewAt = now
+    } else {
+      this.compositeMain(mainEffect)
+    }
     this.displayRunSamples.push({ ts: performance.now(), ms: performance.now() - td })
     this.trimSamples(this.displayRunSamples)
 
     this.framesRenderedAt.push(performance.now())
     this.trim(this.framesRenderedAt)
+  }
+
+  // Main surface: effect (runDisplay) or passthrough. Both refresh the shared
+  // display input as their first step.
+  private compositeMain(effect: boolean): void {
+    if (effect) this.renderOp.runDisplay()
+    else        this.renderOp.runPassthrough()
+  }
+
+  // WebGL preview present: render preview to the single canvas, snapshot it to
+  // the preview canvas's bitmaprenderer context, then re-composite main so the
+  // canvas rests on main content. transferToImageBitmap detaches the canvas
+  // backing (left blank), but main is recomposited before this synchronous
+  // block ends, so neither the output adapter nor a continuous captureStream
+  // ever observes preview/blank content.
+  private compositePreviewWebGL(mainEffect: boolean, previewEffect: boolean): void {
+    this.renderOp.refreshDisplayInput()
+    this.renderOp.compositeTo('preview', this.previewSpec(previewEffect))
+    const bmp = this.canvas.transferToImageBitmap()   // this.canvas === backend.canvas, typed OffscreenCanvas
+    this.previewCtx!.transferFromImageBitmap(bmp)
+    this.renderOp.compositeMain(!mainEffect)   // main last; passthrough when no main effect
+  }
+
+  // Preview compositor spec: the precomputed effect config, or passthrough when
+  // the candidate is 'none' / inference isn't available.
+  private previewSpec(previewEffect: boolean): CompositeSpec {
+    return previewEffect && this.previewEffectSpec
+      ? this.previewEffectSpec
+      : { mode: 'passthrough' }
+  }
+
+  // Run the model once + thread recurrent ConvGRU state (GRU tiers only): carry
+  // this run's hidden (.z of the GRU output) into the buffer the GRU samples
+  // next run. GPU-resident copy, queued after the model's commands and before
+  // the next frame's — no CPU round-trip. Static tiers have no hidden state.
+  private runModelOnce(): void {
+    const t = performance.now()
+    this.renderOp.runModel()
+    if (this.hPrev && this.tierModel?.hiddenState) {
+      this.backend.copyTensor(this.tierModel.hiddenState, this.hPrev)
+    }
+    // GPU-time sampling: WebGPU only (cheap native promise per sync; WebGL's
+    // setTimeout-polling fence is too heavy at per-frame rate). Even on WebGPU,
+    // sample 1 in N runs to keep concurrent in-flight syncs bounded.
+    if (this.backendKind === 'webgpu' && this.modelTimingCounter % MODEL_TIMING_SAMPLE_INTERVAL === 0) {
+      this.backend.sync().then(() => {
+        this.modelRunSamples.push({ ts: performance.now(), ms: performance.now() - t })
+        this.trimSamples(this.modelRunSamples)
+      }).catch(() => { /* sync errors during shutdown are expected */ })
+    }
+    this.modelTimingCounter++
+  }
+
+  // True when the preview should composite this frame: a canvas is attached, a
+  // candidate is set (null = clearPreview), the SDK is enabled, and enough time
+  // has elapsed since the last preview composite (throttle — main is priority).
+  private isPreviewTick(now: number): boolean {
+    if (!this.previewCanvas || this.previewBg === null || !this.enabled) return false
+    return now - this.lastPreviewAt >= this.previewIntervalMs
   }
 
   private shouldRunModel(): boolean {
@@ -170,11 +246,53 @@ export class Renderer {
     this.currentBackground = bg
     // RenderOp.setBackground is a no-op when no network is attached
     // (config gets stored, applied on next setPreset).
-    this.renderOp.setBackground(this.translateBackground(bg))
+    this.renderOp.setBackground(this.translateBackgroundFor('main', bg))
   }
 
   setEnabled(on: boolean): void {
     this.enabled = on
+  }
+
+  // Attach the preview output canvas (once — the canvas's control was
+  // transferred from main). WebGPU registers a 2nd GPUCanvasContext on the
+  // shared device and composites the preview straight to it; WebGL can't drive
+  // a 2nd canvas, so we present via its bitmaprenderer context (a snapshot of
+  // the main canvas — see compositePreviewWebGL).
+  attachPreview(canvas: OffscreenCanvas): void {
+    // The compositors don't resample (output index uses image width), so the
+    // preview canvas backing MUST match the main canvas resolution. We own the
+    // (transferred) offscreen, so resize it here rather than make the caller
+    // guess the output resolution — the app CSS-scales the visible element.
+    canvas.width  = this.canvas.width
+    canvas.height = this.canvas.height
+    this.previewCanvas = canvas
+    if (this.backendKind === 'webgpu') {
+      this.backend.attachCanvas('preview', canvas)
+    } else {
+      const ctx = canvas.getContext('bitmaprenderer')
+      if (!ctx) throw new Error('renderer: failed to get bitmaprenderer context for preview canvas')
+      this.previewCtx = ctx
+    }
+  }
+
+  // Set / update the previewed candidate effect — same canonical Background as
+  // the main effect. fps throttles the preview composite (main stays priority).
+  // 'none' is a valid candidate: previews the no-effect (raw) option.
+  setPreview(bg: Background, opts?: PreviewOptions): void {
+    this.previewBg         = bg
+    this.previewEffectSpec = bg.kind === 'none' ? null : this.translateBackgroundFor('preview', bg)
+    if (opts?.fps && opts.fps > 0) this.previewIntervalMs = 1000 / opts.fps
+    this.lastPreviewAt     = 0   // composite on the very next frame
+  }
+
+  // Stop previewing — the preview canvas freezes on its last frame (the app can
+  // hide it). The model gate drops back to main-only. The attached canvas stays
+  // attached for a future setPreview.
+  clearPreview(): void {
+    this.previewBg         = null
+    this.previewEffectSpec = null
+    const port = this.bgVideoPorts.get('preview')
+    if (port) { port.close(); this.bgVideoPorts.delete('preview') }
   }
 
   // Attach the network — first call wires it from boot mode, subsequent
@@ -212,7 +330,7 @@ export class Renderer {
 
     this.renderOp.attachNetwork(tier, networkInput, {
       upscaler:   'bilinear',
-      background: this.translateBackground(this.currentBackground),
+      background: this.translateBackgroundFor('main', this.currentBackground),
     })
     this.tierModel   = tier
     this.hPrev       = hPrev
@@ -225,10 +343,8 @@ export class Renderer {
   // releases all GPU buffers/textures/pipelines; WebGL loseContext does
   // the equivalent). After destroy(), this Renderer is unusable.
   destroy(): void {
-    if (this.bgVideoPort) {
-      this.bgVideoPort.close()
-      this.bgVideoPort = null
-    }
+    for (const port of this.bgVideoPorts.values()) port.close()
+    this.bgVideoPorts.clear()
     this.backend.destroy()
   }
 
@@ -254,39 +370,39 @@ export class Renderer {
 
   // ── internals ─────────────────────────────────────────────────────────────
 
-  private translateBackground(bg: Background): RenderOpBackgroundConfig {
-    // Switching away from video — close the prior port. Frames in flight
-    // get dropped, which is fine.
-    if (bg.kind !== 'video' && this.bgVideoPort) {
-      this.bgVideoPort.close()
-      this.bgVideoPort = null
+  // Translate a canonical Background into a RenderOp effect config for `target`,
+  // setting up that target's image/video input op as needed. Image/video bg
+  // inputs are per-target so main and preview can show different backgrounds
+  // without colliding. Sized to the (main) canvas — image/alpha/bg must share
+  // h×w for the compositor. 'none' is a stub (the renderer composites
+  // {passthrough} for 'none', never this config).
+  private translateBackgroundFor(target: RenderTarget, bg: Background): RenderOpBackgroundConfig {
+    // Switching this target away from video — close its prior port. Frames in
+    // flight get dropped, which is fine.
+    const prevPort = this.bgVideoPorts.get(target)
+    if (bg.kind !== 'video' && prevPort) {
+      prevPort.close()
+      this.bgVideoPorts.delete(target)
     }
 
     switch (bg.kind) {
       case 'none':
-        // RenderOp always builds a compositor; we pass a stub solid-black
-        // config that never runs because process() short-circuits to
-        // runPassthrough() when kind === 'none'.
         return { mode: 'solid', color: [0, 0, 0] }
       case 'color':
         return { mode: 'solid', color: bg.rgb }
       case 'blur':
         return { mode: 'blur', sigma: bg.sigma }
-      case 'image':
-        if (!this.bgImageInput) {
-          this.bgImageInput = this.backend.ops.Input(this.canvas.height, this.canvas.width)
-        }
-        this.bgImageInput.setSource(bg.bitmap)
-        this.bgImageInput.run()
-        return { mode: 'image', image: this.bgImageInput.output }
+      case 'image': {
+        const input = this.bgInputFor(this.bgImageInputs, target)
+        input.setSource(bg.bitmap)
+        input.run()
+        return { mode: 'image', image: input.output }
+      }
       case 'video': {
-        if (!this.bgVideoInput) {
-          this.bgVideoInput = this.backend.ops.Input(this.canvas.height, this.canvas.width)
-        }
-        // If switching from one video to another, close the prior port.
-        if (this.bgVideoPort) this.bgVideoPort.close()
-        this.bgVideoPort = bg.port
-        const input = this.bgVideoInput
+        const input = this.bgInputFor(this.bgVideoInputs, target)
+        // Switching from one video to another on this target — close the prior.
+        if (prevPort) prevPort.close()
+        this.bgVideoPorts.set(target, bg.port)
         bg.port.onmessage = (e: MessageEvent<{ frame: VideoFrame }>) => {
           const frame = e.data.frame
           try {
@@ -297,9 +413,19 @@ export class Renderer {
           }
         }
         bg.port.start?.()
-        return { mode: 'image', image: this.bgVideoInput.output }
+        return { mode: 'image', image: input.output }
       }
     }
+  }
+
+  // Get-or-create a per-target background Input op (canvas-sized).
+  private bgInputFor(map: Map<RenderTarget, InputOp>, target: RenderTarget): InputOp {
+    let input = map.get(target)
+    if (!input) {
+      input = this.backend.ops.Input(this.canvas.height, this.canvas.width)
+      map.set(target, input)
+    }
+    return input
   }
 
   // Hard-cap helpers: bound buffer sizes so stale data can't grow without

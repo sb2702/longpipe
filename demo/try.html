@@ -227,6 +227,72 @@
       text-align: right;
     }
 
+    /* Preview-an-effect card */
+    .preview-card { margin-bottom: 16px; }
+    .preview-card.disabled { opacity: 0.5; pointer-events: none; }
+    .preview-body {
+      display: flex;
+      gap: 18px;
+      align-items: stretch;
+    }
+    @media (max-width: 640px) { .preview-body { flex-direction: column; } }
+    .preview-canvas-wrap {
+      position: relative;
+      width: 240px;
+      flex: 0 0 auto;
+      align-self: flex-start;   /* don't stretch to the controls' height — keep 16:9 */
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .preview-canvas-wrap canvas { object-fit: cover; }
+    @media (max-width: 640px) { .preview-canvas-wrap { width: 100%; } }
+    .preview-canvas-wrap canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .preview-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #6ee7b7;
+    }
+    .preview-empty.hidden { display: none; }
+    .preview-controls {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+    }
+    .preview-actions { display: flex; gap: 8px; margin-top: auto; }
+    .preview-actions button {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 120ms, border-color 120ms, color 120ms;
+    }
+    .preview-actions button:disabled { opacity: 0.45; cursor: default; }
+    .preview-actions #previewApply:not(:disabled) {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .preview-actions #previewApply:not(:disabled):hover { background: var(--accent-hover); }
+    .preview-actions #previewStop:not(:disabled):hover { background: var(--accent-soft); }
+
     details.advanced {
       background: var(--bg-card);
       border: 1px solid var(--border);
@@ -329,6 +395,30 @@
       </div>
     </div>
 
+    <div class="card preview-card" id="previewCard">
+      <p class="card-label">
+        Preview an effect
+        <span style="text-transform:none;font-weight:400;opacity:0.7">(see a candidate before applying — the outgoing stream above keeps its current effect)</span>
+      </p>
+      <div class="preview-body">
+        <div class="preview-canvas-wrap" id="previewCanvasWrap">
+          <div class="preview-empty" id="previewEmpty">no preview</div>
+        </div>
+        <div class="preview-controls">
+          <div class="segmented" id="previewSeg">
+            <button data-pv="image">Image</button>
+            <button data-pv="blur">Blur</button>
+            <button data-pv="color">Green</button>
+            <button data-pv="none">None</button>
+          </div>
+          <div class="preview-actions">
+            <button id="previewApply" disabled>Apply to stream</button>
+            <button id="previewStop" disabled>Stop preview</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <details class="advanced">
       <summary>Advanced</summary>
       <div class="preset-row">
@@ -373,6 +463,12 @@
     const $presetSeg    = document.getElementById('presetSeg')
     const $modelSeg     = document.getElementById('modelSeg')
     const $fps          = document.getElementById('fps')
+    const $previewCard       = document.getElementById('previewCard')
+    const $previewCanvasWrap = document.getElementById('previewCanvasWrap')
+    const $previewEmpty      = document.getElementById('previewEmpty')
+    const $previewSeg        = document.getElementById('previewSeg')
+    const $previewApply      = document.getElementById('previewApply')
+    const $previewStop       = document.getElementById('previewStop')
 
     let pipeline      = null
     let inputVideo    = null
@@ -385,6 +481,11 @@
     let currentSource = 'video'
     let currentBg     = 'image'
     let currentPreset = 'auto'
+
+    // Preview state. previewCanvasEl is recreated per pipeline build —
+    // transferControlToOffscreen (inside attachPreview) is one-shot per element.
+    let previewCanvasEl = null
+    let previewKind     = null   // active candidate kind, or null when not previewing
 
     // Which segmenter is active: 'longpipe' (our Pipeline) or 'mediapipe'
     // (off-the-shelf MediaPipe Selfie Segmentation, for side-by-side comparison).
@@ -478,6 +579,7 @@
 
     function teardown() {
       clearFps()
+      teardownPreview()
       if (pipeline) {
         try { pipeline.destroy() } catch {}
         pipeline = null
@@ -536,10 +638,84 @@
           : 'live'
         setStatus(`live — ${tag} on your GPU`)
         startLongpipeFps()
+        setupPreview()
       } catch (err) {
         setStatus('init failed: ' + (err.message || err), false)
       }
     }
+
+    // ── Preview an effect ────────────────────────────────────────────────────
+    // Exercises the SDK preview API: attachPreview (once per build), setPreview
+    // (the candidate, shares the network with the main render), clearPreview,
+    // and Apply = setBackground (commit the candidate to the outgoing stream).
+
+    function resolvePreviewCandidate(kind) {
+      switch (kind) {
+        case 'image': return uploadedImageUrl ?? cachedDefaultBgImage ?? './demo.jpg'
+        case 'blur':  return { blur: { strength: 'high' } }
+        case 'color': return { color: '#00b050' }
+        case 'none':  return 'none'
+      }
+    }
+
+    function resetPreviewUI() {
+      previewKind = null
+      for (const b of $previewSeg.querySelectorAll('button')) b.classList.remove('active')
+      $previewApply.disabled = true
+      $previewStop.disabled  = true
+      $previewEmpty.classList.remove('hidden')
+    }
+
+    // Fresh canvas per build (attachPreview transfers control to the worker —
+    // can't reuse a transferred element). The worker resizes the backing to the
+    // output resolution; CSS scales the visible element down (see .preview-canvas-wrap).
+    function setupPreview() {
+      if (engine !== 'longpipe' || !pipeline) return
+      previewCanvasEl = document.createElement('canvas')
+      $previewCanvasWrap.insertBefore(previewCanvasEl, $previewEmpty)
+      pipeline.attachPreview(previewCanvasEl)
+      resetPreviewUI()
+      $previewCard.classList.remove('disabled')
+    }
+
+    function teardownPreview() {
+      if (previewCanvasEl) { previewCanvasEl.remove(); previewCanvasEl = null }
+      resetPreviewUI()
+    }
+
+    $previewSeg.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button')
+      if (!btn || !pipeline || engine !== 'longpipe') return
+      previewKind = btn.dataset.pv
+      for (const b of $previewSeg.querySelectorAll('button')) b.classList.toggle('active', b === btn)
+      $previewEmpty.classList.add('hidden')
+      $previewApply.disabled = false
+      $previewStop.disabled  = false
+      try {
+        await pipeline.setPreview({ background: resolvePreviewCandidate(previewKind), fps: 15 })
+      } catch (err) {
+        setStatus('preview failed: ' + (err.message || err), false)
+      }
+    })
+
+    // Apply = commit the previewed candidate as the main outgoing effect, then
+    // stop previewing. Sync the relevant bg control so applyBg() resolves to the
+    // same candidate value.
+    $previewApply.addEventListener('click', async () => {
+      if (!pipeline || !previewKind) return
+      const kind = previewKind
+      if (kind === 'blur')  { $bgBlurSigma.value = 16;          $bgBlurVal.textContent = '16' }
+      if (kind === 'color') { $bgColor.value = '#00b050';       $bgColorVal.textContent = '#00b050' }
+      pipeline.clearPreview()
+      setBgActive(kind)
+      await applyBg()
+      resetPreviewUI()
+    })
+
+    $previewStop.addEventListener('click', () => {
+      if (pipeline) pipeline.clearPreview()
+      resetPreviewUI()
+    })
 
     // ── MediaPipe Selfie Segmentation (off-the-shelf comparison engine) ──────
     // Loaded as a classic <script> (the @mediapipe package attaches a global +
@@ -607,6 +783,8 @@
 
     async function buildMediaPipe() {
       teardown()
+      // Preview shares the Longpipe inference path — not available for MediaPipe.
+      $previewCard.classList.add('disabled')
       setStatus('loading MediaPipe…')
       let inputStream
       try {
