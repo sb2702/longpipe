@@ -209,4 +209,4 @@ Longpipe's pre-trained weights are released under MIT (see [WEIGHTS_LICENSE](WEI
 
 The encoder is initialized from a pre-trained [EfficientNet-Lite](https://github.com/RangiLyu/EfficientNet-Lite) backbone — Apache 2.0.
 
-As is standard for trained models, the released weights are not a redistribution of any training image or video — they are published under MIT. Aside from COCO (whose underlying Flickr images carry mixed licenses), every source above is permissively licensed or used with explicit consent. If your use case has strict data-provenance requirements, review COCO's image terms for yourself.
+As is standard for trained models, the released weights are not a redistribution of any training image or video — they are published under MIT.
