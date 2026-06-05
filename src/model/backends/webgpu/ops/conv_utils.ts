@@ -9,6 +9,17 @@ export function convOutSize(
   return Math.floor((inSize - kernel) / stride) + 1;
 }
 
+// ConvTranspose2d output size (output_padding = 0). Inverse of a strided conv:
+// k4/s2/p1 doubles the spatial dims exactly.
+export function convTransposeOutSize(
+  inSize: number,
+  kernel: number,
+  stride: number,
+  padding: number,
+): number {
+  return (inSize - 1) * stride - 2 * padding + kernel;
+}
+
 export function samePadHalf(
   inSize: number,
   outSize: number,

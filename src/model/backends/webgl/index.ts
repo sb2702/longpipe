@@ -2,11 +2,14 @@ import type { Backend, Dtype, DataView_, RenderTarget } from '~/model/backend.ts
 import type { WebGLTensor, WebGLMLBuffer } from '~/model/backends/webgl/base_webgl_op.ts'
 import { float32ArrayToHalf, halfArrayToFloat32 } from '~/utils/fp16.ts'
 import { Conv2DWebGL } from '~/model/backends/webgl/ops/conv2d.ts'
+import { ConvTranspose2DWebGL } from '~/model/backends/webgl/ops/conv_transpose2d.ts'
 import { DepthwiseConv2DWebGL } from '~/model/backends/webgl/ops/depthwise_conv2d.ts'
 import { AddWebGL } from '~/model/backends/webgl/ops/add.ts'
 import { SigmoidWebGL } from '~/model/backends/webgl/ops/sigmoid.ts'
 import { TanhWebGL } from '~/model/backends/webgl/ops/tanh.ts'
 import { ElementwiseMulWebGL } from '~/model/backends/webgl/ops/elementwise_mul.ts'
+import { WarpWebGL } from '~/model/backends/webgl/ops/warp.ts'
+import { StabilizeWebGL } from '~/model/backends/webgl/ops/stabilize.ts'
 import { BilinearUpsampleWebGL } from '~/model/backends/webgl/ops/bilinear_upsample.ts'
 import { BicubicUpsampleWebGL  } from '~/model/backends/webgl/ops/bicubic_upsample.ts'
 import { ChannelConcatWebGL } from '~/model/backends/webgl/ops/channel_concat.ts'
@@ -64,11 +67,14 @@ export class WebGLBackend implements Backend {
 
     this.ops = {
       Conv2d:           (input, weights, params) => new Conv2DWebGL(this, input, weights, params),
+      ConvTranspose2d:  (input, weights, params) => new ConvTranspose2DWebGL(this, input, weights, params),
       DepthwiseConv2d:  (input, weights, params) => new DepthwiseConv2DWebGL(this, input, weights, params),
       Add:              (a, b)                         => new AddWebGL(this, a, b),
       Sigmoid:          (input)                          => new SigmoidWebGL(this, input),
       Tanh:             (input)                          => new TanhWebGL(this, input),
       ElementwiseMul:   (a, b)                          => new ElementwiseMulWebGL(this, a, b),
+      Warp:             (source, flow, params)          => new WarpWebGL(this, source, flow, params),
+      Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGL(this, flow, pred, ref, envPrev, params),
       BilinearUpsample: (input, params)                => new BilinearUpsampleWebGL(this, input, params),
       BicubicUpsample:  (input, params)                => new BicubicUpsampleWebGL(this, input, params),
       ChannelConcat:    (a, b)                           => new ChannelConcatWebGL(this, a, b),

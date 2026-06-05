@@ -32,6 +32,7 @@ export abstract class WebGLOp implements Op {
   protected program!: WebGLProgram
   protected samplers: Array<{ name: string; texture: WebGLTexture }> = []
   protected uniformInts: Record<string, number> = {}
+  protected uniformFloats: Record<string, number> = {}
 
   constructor(protected readonly backend: WebGLBackend) {}
 
@@ -87,6 +88,10 @@ export abstract class WebGLOp implements Op {
     // Set integer uniforms
     for (const [name, val] of Object.entries(this.uniformInts)) {
       gl.uniform1i(gl.getUniformLocation(this.program, name), val)
+    }
+    // Set float uniforms
+    for (const [name, val] of Object.entries(this.uniformFloats)) {
+      gl.uniform1f(gl.getUniformLocation(this.program, name), val)
     }
 
     // Render to output texture

@@ -2,11 +2,14 @@ import type { Backend, Dtype, DataView_, RenderTarget } from "~/model/backend.ts
 import type { WebGPUTensor, WebGPUMLBuffer } from "~/model/backends/webgpu/base_webgpu_op.ts";
 import { float32ArrayToHalf, halfArrayToFloat32 } from "~/utils/fp16.ts";
 import { Conv2DWebGPU } from "~/model/backends/webgpu/ops/conv2d.ts";
+import { ConvTranspose2DWebGPU } from "~/model/backends/webgpu/ops/conv_transpose2d.ts";
 import { DepthwiseConv2DWebGPU } from "~/model/backends/webgpu/ops/depthwise_conv2d.ts";
 import { AddWebGPU } from "~/model/backends/webgpu/ops/add.ts";
 import { SigmoidWebGPU } from "~/model/backends/webgpu/ops/sigmoid.ts";
 import { TanhWebGPU } from "~/model/backends/webgpu/ops/tanh.ts";
 import { ElementwiseMulWebGPU } from "~/model/backends/webgpu/ops/elementwise_mul.ts";
+import { WarpWebGPU } from "~/model/backends/webgpu/ops/warp.ts";
+import { StabilizeWebGPU } from "~/model/backends/webgpu/ops/stabilize.ts";
 import { BilinearUpsampleWebGPU } from "~/model/backends/webgpu/ops/bilinear_upsample.ts";
 import { BicubicUpsampleWebGPU  } from "~/model/backends/webgpu/ops/bicubic_upsample.ts";
 import { ChannelConcatWebGPU } from "~/model/backends/webgpu/ops/channel_concat.ts";
@@ -68,11 +71,14 @@ export class WebGPUBackend implements Backend {
 
     this.ops = {
       Conv2d:           (input, weights, params)        => new Conv2DWebGPU(this, input, weights, params),
+      ConvTranspose2d:  (input, weights, params)        => new ConvTranspose2DWebGPU(this, input, weights, params),
       DepthwiseConv2d:  (input, weights, params)        => new DepthwiseConv2DWebGPU(this, input, weights, params),
       Add:              (a, b)                          => new AddWebGPU(this, a, b),
       Sigmoid:          (input)                         => new SigmoidWebGPU(this, input),
       Tanh:             (input)                         => new TanhWebGPU(this, input),
       ElementwiseMul:   (a, b)                          => new ElementwiseMulWebGPU(this, a, b),
+      Warp:             (source, flow, params)          => new WarpWebGPU(this, source, flow, params),
+      Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGPU(this, flow, pred, ref, envPrev, params),
       BilinearUpsample: (input, params)                 => new BilinearUpsampleWebGPU(this, input, params),
       BicubicUpsample:  (input, params)                 => new BicubicUpsampleWebGPU(this, input, params),
       ChannelConcat:    (a, b)                          => new ChannelConcatWebGPU(this, a, b),

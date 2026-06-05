@@ -49,6 +49,28 @@ export interface DepthwiseParams {
   activation: Activation;
 }
 
+export interface ConvTranspose2dParams {
+  outChannels: number;
+  kernel:      number;
+  stride:      number;
+  padding:     number;   // symmetric; output_padding is 0
+  activation:  Activation;
+}
+
+export interface WarpParams {
+  // flow.xy is multiplied by this before sampling. Folds the backward-warp
+  // negation (gather from a forward flow) and any base→warp magnitude rescale
+  // into one constant (e.g. -(warpW / baseW)).
+  flowScale: number;
+}
+
+export interface StabilizeParams {
+  tLo:     number;   // gate opens above this flow magnitude
+  tHi:     number;   // gate fully open (trust fresh pred) at/above this
+  leak:    number;   // floor on the pred weight even where static (lets it heal)
+  release: number;   // envelope decay per frame (peak-hold attack/slow release)
+}
+
 export interface UpsampleParams {
   outH: number;
   outW: number;
@@ -113,6 +135,9 @@ export interface Backend {
   ops: {
     // Core
     Conv2d:          (input: Tensor, weights: Conv2DWeights,    params: Conv2dParams)    => Op;
+    // Gather-form transposed conv (flow decoder deconv/upflow). Same flat weight
+    // layout as Conv2d — mat4x4[z][o][i], M[in_sub][out_sub] = W(in,out,ky,kx).
+    ConvTranspose2d: (input: Tensor, weights: Conv2DWeights,    params: ConvTranspose2dParams) => Op;
     DepthwiseConv2d: (input: Tensor, weights: DepthwiseWeights, params: DepthwiseParams) => Op;
     Add:             (a: Tensor, b: Tensor) => Op;
     Sigmoid:         (input: Tensor) => Op;
@@ -123,6 +148,18 @@ export interface Backend {
     // Generic elementwise primitives (temporal models / effects)
     Tanh:            (input: Tensor) => Op;
     ElementwiseMul:  (a: Tensor, b: Tensor) => Op;
+
+    // Optical-flow temporal. Bilinear gather-warp: out[p] = sample(source,
+    // p + flowScale·flow[p].xy), clamped to edge. Source + flow share resolution.
+    // Used by frame-warp propagation and the stabilizer's warped reference.
+    Warp:            (source: Tensor, flow: Tensor, params: WarpParams) => Op;
+
+    // Flow-gated temporal stabilizer. Per pixel:
+    //   env = max(|flow.xy|, release·envPrev.y)                  (peak-hold)
+    //   g   = max(clamp((env - tLo)/(tHi - tLo), 0, 1), leak)
+    //   out = vec4((g·pred + (1-g)·ref).x, env, 0, 0)
+    // Thread the output back as next frame's envPrev (copyTensor) — .y is env.
+    Stabilize:       (flow: Tensor, pred: Tensor, ref: Tensor, envPrev: Tensor, params: StabilizeParams) => Op;
 
     // Fused ConvGRU (production config c_up=2, recurrent=1). GatesFused emits
     // (z, r); CandUpdateFused consumes it + does candidate/update/output.
