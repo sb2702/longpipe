@@ -11,6 +11,7 @@ import { ElementwiseMulWebGPU } from "~/model/backends/webgpu/ops/elementwise_mu
 import { WarpWebGPU } from "~/model/backends/webgpu/ops/warp.ts";
 import { StabilizeWebGPU } from "~/model/backends/webgpu/ops/stabilize.ts";
 import { BilinearUpsampleWebGPU } from "~/model/backends/webgpu/ops/bilinear_upsample.ts";
+import { CropWebGPU } from "~/model/backends/webgpu/ops/crop.ts";
 import { BicubicUpsampleWebGPU  } from "~/model/backends/webgpu/ops/bicubic_upsample.ts";
 import { ChannelConcatWebGPU } from "~/model/backends/webgpu/ops/channel_concat.ts";
 import { Conv2dAddWebGPU } from "~/model/backends/webgpu/ops/conv2d_add.ts";
@@ -80,6 +81,7 @@ export class WebGPUBackend implements Backend {
       Warp:             (source, flow, params)          => new WarpWebGPU(this, source, flow, params),
       Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGPU(this, flow, pred, ref, envPrev, params),
       BilinearUpsample: (input, params)                 => new BilinearUpsampleWebGPU(this, input, params),
+      Crop:             (input, params)                 => new CropWebGPU(this, input, params),
       BicubicUpsample:  (input, params)                 => new BicubicUpsampleWebGPU(this, input, params),
       ChannelConcat:    (a, b)                          => new ChannelConcatWebGPU(this, a, b),
       Conv2dAdd:        (input, skip, weights, params)  => new Conv2dAddWebGPU(this, input, skip, weights, params),

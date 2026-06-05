@@ -142,6 +142,9 @@ export interface Backend {
     Add:             (a: Tensor, b: Tensor) => Op;
     Sigmoid:         (input: Tensor) => Op;
     BilinearUpsample:(input: Tensor, params: UpsampleParams) => Op;
+    // Top-left crop to (outH, outW) — for flow-decoder skip alignment (training
+    // crop_like). outH/outW must be <= the input dims.
+    Crop:            (input: Tensor, params: UpsampleParams) => Op;
     BicubicUpsample: (input: Tensor, params: UpsampleParams) => Op;
     ChannelConcat:   (a: Tensor, b: Tensor) => Op;
 

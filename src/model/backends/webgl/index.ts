@@ -11,6 +11,7 @@ import { ElementwiseMulWebGL } from '~/model/backends/webgl/ops/elementwise_mul.
 import { WarpWebGL } from '~/model/backends/webgl/ops/warp.ts'
 import { StabilizeWebGL } from '~/model/backends/webgl/ops/stabilize.ts'
 import { BilinearUpsampleWebGL } from '~/model/backends/webgl/ops/bilinear_upsample.ts'
+import { CropWebGL } from '~/model/backends/webgl/ops/crop.ts'
 import { BicubicUpsampleWebGL  } from '~/model/backends/webgl/ops/bicubic_upsample.ts'
 import { ChannelConcatWebGL } from '~/model/backends/webgl/ops/channel_concat.ts'
 import { UpsampleSigmoidWebGL } from '~/model/backends/webgl/ops/upsample_sigmoid.ts'
@@ -76,6 +77,7 @@ export class WebGLBackend implements Backend {
       Warp:             (source, flow, params)          => new WarpWebGL(this, source, flow, params),
       Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGL(this, flow, pred, ref, envPrev, params),
       BilinearUpsample: (input, params)                => new BilinearUpsampleWebGL(this, input, params),
+      Crop:             (input, params)                => new CropWebGL(this, input, params),
       BicubicUpsample:  (input, params)                => new BicubicUpsampleWebGL(this, input, params),
       ChannelConcat:    (a, b)                           => new ChannelConcatWebGL(this, a, b),
       Conv2dAdd:        (input, skip, weights, params)   => new Conv2dAddWebGL(this, input, skip, weights, params),

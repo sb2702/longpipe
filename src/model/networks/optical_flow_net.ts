@@ -6,16 +6,16 @@ import type { FlowWeights } from '~/model/weights.ts'
 const STAGE_K = [5, 5, 3, 3]
 const STAGE_P = [2, 2, 1, 1]
 
-// Resize `t` to ref's resolution if they differ. The learned-path stages vs the
-// encoder taps (and the decoder's deconv/upflow vs the skip) can disagree by a
-// pixel from padding/rounding — training uses nearest `_match` / `crop_like`; we
-// bilinear-match (a base/4-and-below, low-frequency field, so the difference is
-// negligible — quantified by the fidelity test).
+// Crop `t` to ref's resolution if it's larger (training crop_like). Encoder tap
+// sizes always equal the matching stage (so the fusion concat never resizes); the
+// only mismatch is the decoder's deconv/upflow (an exact 2×) overshooting a skip
+// whose dim rounded down — always larger, so a top-left crop matches training
+// exactly. (Also a no-op once the retrain's bilinear-upsample decoder lands.)
 function matchSize(backend: Backend, t: Tensor, ref: Tensor, steps: Op[]): Tensor {
   if (t.h === ref.h && t.w === ref.w) return t
-  const r = backend.ops.BilinearUpsample(t, { outH: ref.h, outW: ref.w })
-  steps.push(r)
-  return r.output
+  const c = backend.ops.Crop(t, { outH: ref.h, outW: ref.w })
+  steps.push(c)
+  return c.output
 }
 
 // Optical-flow head: a thin learned contracting path on the base-res RGB frame
