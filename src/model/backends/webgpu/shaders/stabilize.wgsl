@@ -1,12 +1,16 @@
 // Flow-gated temporal stabilizer (f32). See stabilize_f16.wgsl for the math.
 
 struct Params {
-    h       : u32,
-    w       : u32,
-    t_lo    : f32,
-    t_hi    : f32,
-    leak    : f32,
-    release : f32,
+    h        : u32,
+    w        : u32,
+    t_lo     : f32,
+    t_hi     : f32,
+    leak     : f32,
+    release  : f32,
+    t_div    : f32,
+    div_scale: f32,
+    step_x   : u32,
+    step_y   : u32,
 }
 
 @group(0) @binding(0) var<storage, read>       flow_buf     : array<vec4<f32>>;

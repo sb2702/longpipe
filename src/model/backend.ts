@@ -69,6 +69,14 @@ export interface StabilizeParams {
   tHi:     number;   // gate fully open (trust fresh pred) at/above this
   leak:    number;   // floor on the pred weight even where static (lets it heal)
   release: number;   // envelope decay per frame (peak-hold attack/slow release)
+  // Occlusion-seam gate: the gate ALSO opens where the flow field diverges (an
+  // occlusion/disocclusion boundary the magnitude gate is blind to, since the
+  // revealed background is static). |div(flow)| is a finite-difference over a step
+  // that spans ~1 base/4 pixel (stepX/stepY ≈ canvas/flow resolution ratio).
+  tDiv:     number;  // divergence above which the seam gate starts opening
+  divScale: number;  // soft-gate width for the divergence term
+  stepX:    number;  // finite-difference step (px) in x / y
+  stepY:    number;
 }
 
 export interface UpsampleParams {

@@ -17,7 +17,7 @@ const FLOW_DEC_W = 16   // shipping flow-head width
 // Flow-gated stabilizer params. tLo/tHi are flow magnitudes in BASE-res pixels
 // (the flow predicts base-res-unit displacements); envelope peak-hold mirrors the
 // eval harness's known-good (leak 0.2, release 0.9). Tunable.
-const FLOW_STAB = { tLo: 0.5, tHi: 2.0, leak: 0.2, release: 0.9 }
+const FLOW_STAB = { tLo: 0.5, tHi: 2.0, leak: 0.15, release: 0.9}
 import type { ManualPreset } from '../presets'
 import type { Background } from '../background'
 import type { RendererStats } from '../messages'
@@ -82,7 +82,8 @@ export class Renderer {
   // against the warp-aligned previous stabilized alpha.
   //   everyFrame : skipFrames===0 (large/xl) → run flow BEFORE matting each frame
   //   warm       : false until the first inference seeds the carrier
-  //   curBase    : current frame at base res (flow frame-b), set every frame
+  //   curBaseDown: current frame at base res = canvas frame downsampled (flow
+  //                frame-b). NOT a direct source→base resample — that aliases.
   //   frameAHeld : last matting frame at base res (flow frame-a)
   //   net/up     : flow → base→canvas spatial upsample (values stay base-res-px)
   //   predBuf    : fresh per-frame alpha (matting or warp), canvas res
@@ -92,7 +93,7 @@ export class Renderer {
   //   alphaHeld/predWarp : skip-tier only — last inference alpha + its skip-frame warp
   private flow: {
     tier: TierModel; everyFrame: boolean; warm: boolean
-    curBase: InputOp; frameAHeld: Tensor
+    networkInput: InputOp; curBaseDown: Op; frameAHeld: Tensor
     net: OpticalFlowNet; up: Op
     predBuf: Tensor; stabPrev: Tensor; refWarp: Op; stab: Op
     alphaHeld: Tensor | null; predWarp: Op | null
@@ -164,8 +165,6 @@ export class Renderer {
     const previewTick   = this.isPreviewTick(now)
     const previewEffect = previewTick && hasNet && this.previewBg !== null && this.previewBg.kind !== 'none'
 
-    // Flow temporal: feed the current frame to the base-res flow input every frame.
-    if (this.flow && mainEffect) { this.flow.curBase.setSource(frame); this.flow.curBase.run() }
 
     // Model gate. Flow tiers run the matting + flow + stabilizer in stepFlow;
     // non-flow tiers follow the plain skip cadence. A preview tick that needs alpha
@@ -259,14 +258,19 @@ export class Renderer {
     const f = this.flow!
     let ranModel = false
 
+    // Resample the current frame to canvas, then downsample to base for the flow
+    // stem (matches training). runModelOnce re-runs networkInput — cheap + harmless.
+    f.networkInput.run()
+    f.curBaseDown.run()
+
     if (f.everyFrame) {
       f.net.run(); f.up.run()                                  // before matting → taps are prev's
       this.runModelOnce(); ranModel = true
-      this.backend.copyTensor(f.curBase.output, f.frameAHeld)  // current = next frame-a
+      this.backend.copyTensor(f.curBaseDown.output, f.frameAHeld)  // current = next frame-a
       this.backend.copyTensor(f.tier.output, f.predBuf)
     } else if (this.shouldRunModel()) {                        // skip tier, inference frame
       this.runModelOnce(); ranModel = true
-      this.backend.copyTensor(f.curBase.output, f.frameAHeld)
+      this.backend.copyTensor(f.curBaseDown.output, f.frameAHeld)
       this.backend.copyTensor(f.tier.output, f.alphaHeld!)     // warp source for the coming skips
       this.backend.copyTensor(f.tier.output, f.predBuf)
       // flow not recomputed — the gate reuses f.up's cached (last skip) flow
@@ -397,9 +401,13 @@ export class Renderer {
       const b = cfg.baseRes, c = cfg.canvasRes
       const everyFrame = preset.skipFrames === 0
       const zeros = (h: number, wd: number) => this.backend.tensor(h, wd, 4, new Float32Array(h * wd * 4))
-      const curBase    = this.backend.ops.Input(b.h, b.w)
-      const frameAHeld = zeros(b.h, b.w)
-      const net = new OpticalFlowNet(this.backend, frameAHeld, curBase.output, tier.encoderTaps, w.flow, FLOW_DEC_W,
+      // Flow stem input = the canvas frame (matting's input) downsampled to base,
+      // matching training (x_base = interpolate(canvas → base)). A direct
+      // source→base Input op is a single ~5× bilinear pass and aliases → garbles
+      // the flow at edges.
+      const curBaseDown = this.backend.ops.BilinearUpsample(networkInput.output, { outH: b.h, outW: b.w })
+      const frameAHeld  = zeros(b.h, b.w)
+      const net = new OpticalFlowNet(this.backend, frameAHeld, curBaseDown.output, tier.encoderTaps, w.flow, FLOW_DEC_W,
         cfg.flowFuseStem ? { fuseStem: true, halfTap: tier.halfTap } : {})
       const up = this.backend.ops.BilinearUpsample(net.output, { outH: c.h, outW: c.w })
       const flowScale = -(c.w / b.w)
@@ -413,7 +421,7 @@ export class Renderer {
       const alphaHeld = everyFrame ? null : zeros(c.h, c.w)
       const predWarp  = alphaHeld ? this.backend.ops.Warp(alphaHeld, up.output, { flowScale }) : null
 
-      this.flow = { tier, everyFrame, warm: false, curBase, frameAHeld, net, up,
+      this.flow = { tier, everyFrame, warm: false, networkInput, curBaseDown, frameAHeld, net, up,
                     predBuf, stabPrev, refWarp, stab, alphaHeld, predWarp }
     }
 

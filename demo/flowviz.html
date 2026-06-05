@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Longpipe — flow diagnostic</title>
+    <style>
+      body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+      a { color: #6cf; }
+      .topbar { padding: 8px 16px; }
+      h2 { padding: 0 16px; margin: 8px 0; }
+      .desc { padding: 0 16px 8px; color: #aaa; font-size: 13px; max-width: 820px; line-height: 1.5; }
+      .controls { padding: 8px 16px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+      label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: #bbb; }
+      select, input { background: #222; color: #ddd; border: 1px solid #444; padding: 4px 6px; }
+      button { background: #2a6; color: #fff; border: none; padding: 6px 16px; cursor: pointer; border-radius: 4px; }
+      #status { padding: 8px 16px; font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; }
+      .panels { display: flex; gap: 12px; flex-wrap: wrap; padding: 12px 16px; }
+      .panel { display: flex; flex-direction: column; gap: 4px; }
+      .panel span { font-size: 12px; color: #888; }
+      canvas { background: #000; width: 380px; height: auto; }
+      /* flow is base/4 — upscale crisply so artifacts are visible */
+      #flow { image-rendering: pixelated; }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><a href="/">← demos</a></div>
+    <h2>Optical-flow diagnostic</h2>
+    <p class="desc">
+      Matting + flow run <b>every frame</b> on the production flow checkpoints
+      (the SDK <code>OpticalFlowNet</code> is fidelity-exact to them, so this matches
+      what the renderer runs — no Python). <b>Flow field</b>: hue = direction,
+      brightness = magnitude (raw base/4 output). Watch the flow at moving / trailing
+      edges to see whether artifacts there originate in the flow itself.
+    </p>
+    <div class="controls">
+      <label>tier
+        <select id="tier">
+          <option value="medium">medium</option>
+          <option value="small">small</option>
+          <option value="large">large</option>
+          <option value="xs">xs</option>
+        </select>
+      </label>
+      <label>backend
+        <select id="backend"><option value="webgpu">webgpu</option><option value="webgl">webgl</option></select>
+      </label>
+      <label>precision
+        <select id="dtype"><option value="f16">f16</option><option value="f32">f32</option></select>
+      </label>
+      <label>flow gain
+        <input id="gain" type="range" min="0.05" max="3" step="0.05" value="0.5" style="width:120px" />
+      </label>
+      <button id="run">Run</button>
+    </div>
+    <div id="status">idle — pick a tier and press Run</div>
+    <div class="panels">
+      <div class="panel"><span>input</span><canvas id="input"></canvas></div>
+      <div class="panel"><span>optical flow (HSV)</span><canvas id="flow"></canvas></div>
+      <div class="panel"><span>greenscreen</span><canvas id="green"></canvas></div>
+    </div>
+    <script type="module" src="./flowviz.ts"></script>
+  </body>
+</html>
