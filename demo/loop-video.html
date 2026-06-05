@@ -59,6 +59,7 @@
 
     <script type="module">
       import { Pipeline } from '~/pipeline'
+      import { PRESETS } from '~/pipeline/presets'   // tier-name → ManualPreset (for ?preset=medium etc.)
 
       const $status = document.getElementById('status')
       const $ua     = document.getElementById('ua')
@@ -141,11 +142,22 @@
           : (currentBgConfig() ?? { blur: { sigma: 8 } })
 
         setStatus('constructing pipeline (autotune + weights fetched from default CDN by SDK)…')
-        const pipeline = new Pipeline(inputStream, {
+        // ?weights=/flow&preset=medium loads the locally-staged flow-bundled .bins
+        // (demo/public/flow/) → the renderer wires the optical-flow temporal path.
+        // Only set weightsBaseUrl when the param is present — passing undefined
+        // would override the SDK's CDN default (bootstrap reads opts directly).
+        const params = new URLSearchParams(location.search)
+        // A tier name (medium/small/large/xs/xl) resolves to its ManualPreset; a
+        // quality name (fast/balanced/quality) or 'auto' passes through as a string.
+        const presetParam = params.get('preset') || 'auto'
+        const pipelineOpts = {
           background: initialBgConfig,
-          preset:     'auto',   // worker microbenches each preset, picks largest that fits 15fps budget
+          preset:     PRESETS.find(p => p.model === presetParam) || presetParam,
           audio:      'drop',
-        })
+        }
+        const weightsParam = params.get('weights')
+        if (weightsParam) pipelineOpts.weightsBaseUrl = weightsParam
+        const pipeline = new Pipeline(inputStream, pipelineOpts)
 
         // 3. Hook output stream BEFORE awaiting ready — pipeline.stream is
         //    available synchronously; output element starts blank and the

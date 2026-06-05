@@ -2,7 +2,7 @@
 // with frame-skipping logic. Adapters call process(frame) per input frame;
 // renderer decides whether to run the model this frame.
 
-import type { Backend, Tensor, InputOp, RenderTarget } from '~/model/backend.ts'
+import type { Backend, Tensor, InputOp, Op, RenderTarget } from '~/model/backend.ts'
 // Note: this file builds the GPU compute chain (network + RenderOp). The
 // Streams API pipe chain (inputReadable → transform → outputWritable) is
 // wired in worker/index.ts handleInit() where transport adapters are
@@ -10,7 +10,14 @@ import type { Backend, Tensor, InputOp, RenderTarget } from '~/model/backend.ts'
 import { RenderOp, type BackgroundConfig as RenderOpBackgroundConfig, type CompositeSpec } from '~/model/render_op.ts'
 import { loadWeightsFromBinary } from '~/utils/loadWeights.ts'
 import { TierModel } from '~/model/tier_model.ts'
+import { OpticalFlowNet } from '~/model/networks/optical_flow_net.ts'
 import { TIER_CONFIG } from '~/model/tier_config.ts'
+
+const FLOW_DEC_W = 16   // shipping flow-head width
+// Flow-gated stabilizer params. tLo/tHi are flow magnitudes in BASE-res pixels
+// (the flow predicts base-res-unit displacements); envelope peak-hold mirrors the
+// eval harness's known-good (leak 0.2, release 0.9). Tunable.
+const FLOW_STAB = { tLo: 0.5, tHi: 2.0, leak: 0.2, release: 0.9 }
 import type { ManualPreset } from '../presets'
 import type { Background } from '../background'
 import type { RendererStats } from '../messages'
@@ -68,6 +75,28 @@ export class Renderer {
   private modelTimingCounter: number = 0
 
   private renderOp:     RenderOp
+  // Optical-flow temporal state — null unless the loaded .bin carries a `flow` blob.
+  // The renderer owns it (carriers + base-res inputs), like the old GRU hidden.
+  // Flow is forward (prev→current): frame-a = last matting frame, frame-b = current.
+  // Every frame the fresh alpha (matting on inference / warp on skips) is gated
+  // against the warp-aligned previous stabilized alpha.
+  //   everyFrame : skipFrames===0 (large/xl) → run flow BEFORE matting each frame
+  //   warm       : false until the first inference seeds the carrier
+  //   curBase    : current frame at base res (flow frame-b), set every frame
+  //   frameAHeld : last matting frame at base res (flow frame-a)
+  //   net/up     : flow → base→canvas spatial upsample (values stay base-res-px)
+  //   predBuf    : fresh per-frame alpha (matting or warp), canvas res
+  //   stabPrev   : previous stabilized alpha (.x) + envelope (.y), canvas res
+  //   refWarp    : warp_prev(stabPrev) — the gate's held reference, every frame
+  //   stab       : flow-gated blend g·pred + (1-g)·ref
+  //   alphaHeld/predWarp : skip-tier only — last inference alpha + its skip-frame warp
+  private flow: {
+    tier: TierModel; everyFrame: boolean; warm: boolean
+    curBase: InputOp; frameAHeld: Tensor
+    net: OpticalFlowNet; up: Op
+    predBuf: Tensor; stabPrev: Tensor; refWarp: Op; stab: Op
+    alphaHeld: Tensor | null; predWarp: Op | null
+  } | null = null
   // Per-target Input ops + ports for 'image'/'video' background modes. Keyed by
   // RenderTarget so main and preview can each show a different image/video bg
   // without colliding on one input op. Each video port receives a fresh
@@ -135,10 +164,16 @@ export class Renderer {
     const previewTick   = this.isPreviewTick(now)
     const previewEffect = previewTick && hasNet && this.previewBg !== null && this.previewBg.kind !== 'none'
 
-    // Model gate. Main follows its skip cadence; a preview tick that needs
-    // alpha forces a run when main didn't already produce one this frame.
+    // Flow temporal: feed the current frame to the base-res flow input every frame.
+    if (this.flow && mainEffect) { this.flow.curBase.setSource(frame); this.flow.curBase.run() }
+
+    // Model gate. Flow tiers run the matting + flow + stabilizer in stepFlow;
+    // non-flow tiers follow the plain skip cadence. A preview tick that needs alpha
+    // forces a run when main didn't already produce one this frame.
     let ranModel = false
-    if (mainEffect) {
+    if (mainEffect && this.flow) {
+      ranModel = this.stepFlow()
+    } else if (mainEffect) {
       if (this.shouldRunModel()) { this.runModelOnce(); ranModel = true }
       else this.skippedCount++
     }
@@ -212,6 +247,47 @@ export class Renderer {
       }).catch(() => { /* sync errors during shutdown are expected */ })
     }
     this.modelTimingCounter++
+  }
+
+  // One flow-tier frame: forward flow (prev→current) → a fresh alpha (matting on
+  // inference frames, warp on skips) → gate it against the warp-aligned previous
+  // stabilized alpha. The gate reads the last-available flow:
+  //   every-frame tiers (large/xl): run flow BEFORE matting (taps still hold prev)
+  //   skip tiers: flow runs on skip frames; inference frames reuse the cached flow
+  // Returns whether the matting model ran this frame.
+  private stepFlow(): boolean {
+    const f = this.flow!
+    let ranModel = false
+
+    if (f.everyFrame) {
+      f.net.run(); f.up.run()                                  // before matting → taps are prev's
+      this.runModelOnce(); ranModel = true
+      this.backend.copyTensor(f.curBase.output, f.frameAHeld)  // current = next frame-a
+      this.backend.copyTensor(f.tier.output, f.predBuf)
+    } else if (this.shouldRunModel()) {                        // skip tier, inference frame
+      this.runModelOnce(); ranModel = true
+      this.backend.copyTensor(f.curBase.output, f.frameAHeld)
+      this.backend.copyTensor(f.tier.output, f.alphaHeld!)     // warp source for the coming skips
+      this.backend.copyTensor(f.tier.output, f.predBuf)
+      // flow not recomputed — the gate reuses f.up's cached (last skip) flow
+    } else {                                                   // skip tier, skip frame
+      this.skippedCount++
+      f.net.run(); f.up.run()                                  // flow = last-inference → current
+      f.predWarp!.run()
+      this.backend.copyTensor(f.predWarp!.output, f.predBuf)   // pred = warped last inference
+    }
+
+    if (!f.warm) {                                             // first inference seeds the carrier;
+      this.backend.copyTensor(f.tier.output, f.stabPrev)       // matting is already in upscaler.output
+      f.warm = ranModel                                        // (runModelOnce ran it) — no applyAlpha
+      return ranModel
+    }
+
+    f.refWarp.run()                                            // ref = warp_prev(stabPrev)
+    f.stab.run()                                               // alpha_stab = g·pred + (1-g)·ref
+    this.backend.copyTensor(f.stab.output, f.stabPrev)         // threads stab (.x) + env (.y)
+    this.renderOp.applyAlpha(f.stab.output)
+    return ranModel
   }
 
   // True when the preview should composite this frame: a canvas is attached, a
@@ -310,6 +386,37 @@ export class Renderer {
       upscaler:   'bilinear',
       background: this.translateBackgroundFor('main', this.currentBackground),
     })
+
+    // Optical-flow temporal: wired iff the .bin carries a `flow` blob. The flow net
+    // rides the tier's cached encoder taps; warps run at canvas res (network output),
+    // flowScale = -(canvasW/baseW) folds the backward-gather negation + the base→
+    // canvas magnitude rescale. The stabilizer gates each fresh alpha against the
+    // warp-aligned previous, on the last-available flow.
+    this.flow = null
+    if (w.flow) {
+      const b = cfg.baseRes, c = cfg.canvasRes
+      const everyFrame = preset.skipFrames === 0
+      const zeros = (h: number, wd: number) => this.backend.tensor(h, wd, 4, new Float32Array(h * wd * 4))
+      const curBase    = this.backend.ops.Input(b.h, b.w)
+      const frameAHeld = zeros(b.h, b.w)
+      const net = new OpticalFlowNet(this.backend, frameAHeld, curBase.output, tier.encoderTaps, w.flow, FLOW_DEC_W,
+        cfg.flowFuseStem ? { fuseStem: true, halfTap: tier.halfTap } : {})
+      const up = this.backend.ops.BilinearUpsample(net.output, { outH: c.h, outW: c.w })
+      const flowScale = -(c.w / b.w)
+
+      const predBuf  = zeros(c.h, c.w)
+      const stabPrev = zeros(c.h, c.w)
+      const refWarp  = this.backend.ops.Warp(stabPrev, up.output, { flowScale })
+      const stab     = this.backend.ops.Stabilize(up.output, predBuf, refWarp.output, stabPrev, FLOW_STAB)
+
+      // Skip tiers also warp the held last-inference alpha to make the skip-frame pred.
+      const alphaHeld = everyFrame ? null : zeros(c.h, c.w)
+      const predWarp  = alphaHeld ? this.backend.ops.Warp(alphaHeld, up.output, { flowScale }) : null
+
+      this.flow = { tier, everyFrame, warm: false, curBase, frameAHeld, net, up,
+                    predBuf, stabPrev, refWarp, stab, alphaHeld, predWarp }
+    }
+
     this.preset      = preset
     this.skipCounter = 0
   }

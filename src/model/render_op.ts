@@ -170,6 +170,17 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
     handle.run()
   }
 
+  // Flow-warped skip frame: replace the network alpha with `alpha` (the warped
+  // previous inference) and re-run the upscaler, so the SAME composite path then
+  // shows the warped result. Keeps the temporal state (flow net, warp, carrier) in
+  // the renderer; render_op stays a thin orchestrator. `alpha` must match
+  // network.output's shape (canvas-res alpha). Call before the per-frame composite.
+  applyAlpha(alpha: Tensor): void {
+    if (!this.network || !this.upscaler) throw new Error('RenderOp.applyAlpha called before attachNetwork')
+    this.backend.copyTensor(alpha, this.network.output)
+    this.upscaler.run()
+  }
+
   // Expensive, runs at preset.modelFps: refresh the alpha tensor.
   runModel(): void {
     if (!this.network || !this.networkInput || !this.upscaler) {

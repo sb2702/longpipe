@@ -24,6 +24,9 @@ export interface TierConfig {
   // Base-network input resolution (the wrapper's adapted base input). Also the
   // resolution the optical-flow net predicts at (base/4) before warp-res upsample.
   baseRes:   Res
+  // Optical-flow head fuses the /2 tap at the stem (predicts base/2). XS only.
+  // The flow net is wired iff the loaded .bin carries a `flow` blob.
+  flowFuseStem?: boolean
 }
 
 const SMALL = EfficientNetLiteMattingSmall as unknown as BaseNetworkCtor
@@ -31,7 +34,7 @@ const LARGE = EfficientNetLiteMattingLarge as unknown as BaseNetworkCtor
 const XL    = EfficientNetLiteMattingXL    as unknown as BaseNetworkCtor
 
 export const TIER_CONFIG: Record<string, TierConfig> = {
-  xs:     { base: SMALL, wrapper: { variant: 'B', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 384,  h: 216 }, baseRes: { w: 128, h: 72  } },
+  xs:     { base: SMALL, wrapper: { variant: 'B', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 384,  h: 216 }, baseRes: { w: 128, h: 72  }, flowFuseStem: true },
   small:  { base: SMALL, wrapper: { variant: 'A', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 384,  h: 216 }, baseRes: { w: 192, h: 108 } },
   medium: { base: LARGE, wrapper: { variant: 'A', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 512,  h: 288 }, baseRes: { w: 256, h: 144 } },
   large:  { base: LARGE, wrapper: { variant: 'D', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 640,  h: 360 }, baseRes: { w: 256, h: 144 } },

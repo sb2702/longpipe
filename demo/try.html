@@ -480,7 +480,13 @@
 
     let currentSource = 'video'
     let currentBg     = 'image'
-    let currentPreset = 'auto'
+    // ?weights=/flow → default to a staged flow tier (medium, or ?preset=) so the
+    // initial build doesn't autotune into XL (not staged). Pick another tier live
+    // from the Model row. Without ?weights, normal 'auto'.
+    const _flowParams = new URLSearchParams(location.search)
+    let currentPreset = _flowParams.get('weights')
+      ? (PRESETS.find(p => p.model === (_flowParams.get('preset') || 'medium')) || 'auto')
+      : 'auto'
 
     // Preview state. previewCanvasEl is recreated per pipeline build —
     // transferControlToOffscreen (inside attachPreview) is one-shot per element.
@@ -622,10 +628,16 @@
       }
       const bg = await resolveBg()
 
+      // ?weights=/flow loads the locally-staged flow-bundled .bins → the renderer
+      // wires the optical-flow temporal path. Pick an explicit model (medium/small/
+      // large/xs) so the resolved tier matches a staged .bin. Spread so it's omitted
+      // (not undefined) when absent — passing undefined overrides the CDN default.
+      const flowWeights = new URLSearchParams(location.search).get('weights')
       pipeline = new EffectsPipeline(inputStream, {
         background: bg,
         preset: currentPreset,
         audio: 'drop',
+        ...(flowWeights ? { weightsBaseUrl: flowWeights } : {}),
         onError: (err) => setStatus('error: ' + (err.message || err), false),
       })
       $output.srcObject = pipeline.stream
