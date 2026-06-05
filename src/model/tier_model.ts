@@ -1,6 +1,6 @@
 import type { Backend, Tensor, Op } from '~/model/backend.ts'
 import type { ModelWeights } from '~/model/weights.ts'
-import type { UNetWrapperWeights, ConvGRUWeights } from '~/model/weights.ts'
+import type { UNetWrapperWeights } from '~/model/weights.ts'
 import {
   buildWrapperDown, buildWrapperUp, type UNetWrapperParams,
 } from '~/model/blocks/unet_wrapper.ts'
@@ -9,6 +9,9 @@ import {
 // feature). The 5 production tiers reuse 3 base classes (small/large/xl).
 export interface BaseNetwork {
   readonly featLowRes: Tensor
+  // Encoder pyramid (/4../32, finest→coarsest), computed on the adapted input —
+  // exposed so the optical-flow net can ride the cached activations next frame.
+  readonly encoderTaps: Tensor[]
   run(): void
 }
 export type BaseNetworkCtor = new (backend: Backend, input: Tensor, w: ModelWeights) => BaseNetwork
@@ -23,9 +26,9 @@ export type BaseNetworkCtor = new (backend: Backend, input: Tensor, w: ModelWeig
 export class TierModel implements Op {
   readonly inputs: Tensor[]
   readonly output: Tensor
-  // Only set when `gru` is supplied: the output-GRU carrier (a, b_out, h_new, 0).
-  // Feed it back as the next frame's `gru.hPrev` to thread temporal state.
-  readonly hiddenState: Tensor | null
+  // Base encoder pyramid (finest→coarsest), computed on the adapted frame — the
+  // optical-flow net reads these to ride the cached matting activations.
+  readonly encoderTaps: Tensor[]
 
   private readonly steps: { run(): void }[]
 
@@ -36,7 +39,6 @@ export class TierModel implements Op {
     wrapperWeights: UNetWrapperWeights,
     params: UNetWrapperParams,
     BaseCtor: BaseNetworkCtor,
-    gru?: { weights: ConvGRUWeights; hPrev: Tensor },
   ) {
     this.inputs = [x_hr]
 
@@ -54,12 +56,12 @@ export class TierModel implements Op {
 
     const up = buildWrapperUp(
       backend, x_hr, featUp.output, down.d1, down.dFull, down.midH, down.midW,
-      wrapperWeights, params, gru,
+      wrapperWeights, params,
     )
 
     this.steps = [...down.steps, base, featUp, ...up.steps]
     this.output = up.alpha
-    this.hiddenState = up.hiddenState
+    this.encoderTaps = base.encoderTaps
   }
 
   run(): void {

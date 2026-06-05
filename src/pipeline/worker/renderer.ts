@@ -68,12 +68,6 @@ export class Renderer {
   private modelTimingCounter: number = 0
 
   private renderOp:     RenderOp
-  // Current tier model + its recurrent hidden carrier (GRU tiers only). After
-  // each model run we copyTensor(tierModel.hiddenState → hPrev) so the ConvGRU
-  // samples last frame's hidden (.z) on the next run. Both null for static
-  // tiers (xs/small) and before the first setPreset.
-  private tierModel: TierModel | null = null
-  private hPrev:     Tensor    | null = null
   // Per-target Input ops + ports for 'image'/'video' background modes. Keyed by
   // RenderTarget so main and preview can each show a different image/video bg
   // without colliding on one input op. Each video port receives a fresh
@@ -203,16 +197,11 @@ export class Renderer {
       : { mode: 'passthrough' }
   }
 
-  // Run the model once + thread recurrent ConvGRU state (GRU tiers only): carry
-  // this run's hidden (.z of the GRU output) into the buffer the GRU samples
-  // next run. GPU-resident copy, queued after the model's commands and before
-  // the next frame's — no CPU round-trip. Static tiers have no hidden state.
+  // Run the model once. All tiers are static — temporal stability comes from the
+  // separate optical-flow path, not recurrent state threaded here.
   private runModelOnce(): void {
     const t = performance.now()
     this.renderOp.runModel()
-    if (this.hPrev && this.tierModel?.hiddenState) {
-      this.backend.copyTensor(this.tierModel.hiddenState, this.hPrev)
-    }
     // GPU-time sampling: WebGPU only (cheap native promise per sync; WebGL's
     // setTimeout-polling fence is too heavy at per-frame rate). Even on WebGPU,
     // sample 1 in N runs to keep concurrent in-flight syncs bounded.
@@ -313,27 +302,14 @@ export class Renderer {
     // (the wrapper down-path strides this to base res internally).
     const networkInput = this.backend.ops.Input(cfg.canvasRes.h, cfg.canvasRes.w)
 
-    // GRU tiers: a zero-initialised hidden carrier at the resolution the GRU
-    // runs (base res for gru-at-base, else canvas res). Reset on every swap —
-    // temporal state restarting is acceptable for an adaptive preset change.
-    let gru: { weights: any; hPrev: Tensor } | undefined
-    let hPrev: Tensor | null = null
-    if (cfg.hasGru) {
-      const r = cfg.wrapper.gruAtBase ? cfg.baseRes : cfg.canvasRes
-      hPrev = this.backend.tensor(r.h, r.w, 4, new Float32Array(r.h * r.w * 4))
-      gru   = { weights: w.gru, hPrev }
-    }
-
     const tier = new TierModel(
-      this.backend, networkInput.output, w.base, w.wrapper, cfg.wrapper, cfg.base, gru,
+      this.backend, networkInput.output, w.base, w.wrapper, cfg.wrapper, cfg.base,
     )
 
     this.renderOp.attachNetwork(tier, networkInput, {
       upscaler:   'bilinear',
       background: this.translateBackgroundFor('main', this.currentBackground),
     })
-    this.tierModel   = tier
-    this.hPrev       = hPrev
     this.preset      = preset
     this.skipCounter = 0
   }

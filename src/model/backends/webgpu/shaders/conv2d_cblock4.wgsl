@@ -37,6 +37,7 @@ const KB = 4u;
 fn act(v: vec4<f32>, a: u32) -> vec4<f32> {
     if (a == 1u) { return clamp(v, vec4<f32>(0.0), vec4<f32>(6.0)); }
     if (a == 2u) { return max(v, vec4<f32>(0.0)); }
+    if (a == 3u) { return max(v, 0.1 * v); }   // leaky relu (slope 0.1)
     return v;
 }
 

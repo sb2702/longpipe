@@ -10,6 +10,8 @@ export class EfficientNetLiteMattingLarge {
   // Pre-head feature (finalUp output, at base-input/2 res). A UNet wrapper
   // consumes this (upsampled to input res) instead of `output`.
   readonly featLowRes: Tensor
+  // Encoder taps (/4,/8,/16,/32), finest→coarsest — consumed by the optical-flow net.
+  readonly encoderTaps: Tensor[]
 
   // Encoder
   private readonly stem:  Op
@@ -222,6 +224,7 @@ export class EfficientNetLiteMattingLarge {
       activation:  'relu6',
     })
     this.featLowRes = this.finalUp.output
+    this.encoderTaps = [this.s1b1.output, this.s2b1.output, this.s4b2.output, this.s6b0.output]
 
     this.outConv = backend.ops.Conv2d(this.finalUp.output, w.decoder.outputConv, {
       outChannels: 4,

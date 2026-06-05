@@ -44,16 +44,7 @@ describe.each(BACKENDS)('production .bin round-trip ($name)', ({ create }) => {
     const H = ref.canvas_h, W = ref.canvas_w
     const x = backend.tensor(H, W, 4, new Float32Array(ref.x_hr))
 
-    let gru: { weights: any; hPrev: any } | undefined
-    if (cfg.hasGru) {
-      // hidden carrier sized to where the GRU runs: base res for gru-at-base.
-      const hH = cfg.wrapper.gruAtBase ? ref.base_h : H
-      const hW = cfg.wrapper.gruAtBase ? ref.base_w : W
-      const hPrev = backend.tensor(hH, hW, 4, new Float32Array(hH * hW * 4))
-      gru = { weights: w.gru, hPrev }
-    }
-
-    const model = new TierModel(backend, x, w.base, w.wrapper, cfg.wrapper, cfg.base, gru)
+    const model = new TierModel(backend, x, w.base, w.wrapper, cfg.wrapper, cfg.base)
     model.run()
 
     const out = await backend.readback(model.output)

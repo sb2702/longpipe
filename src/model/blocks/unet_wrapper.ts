@@ -1,6 +1,5 @@
 import type { Backend, Tensor, Op } from '~/model/backend.ts'
-import type { UNetWrapperWeights, ConvGRUWeights } from '~/model/weights.ts'
-import { ConvGRU } from '~/model/blocks/convgru.ts'
+import type { UNetWrapperWeights } from '~/model/weights.ts'
 
 export type UNetVariant = 'A' | 'B' | 'E' | 'D'
 
@@ -12,11 +11,6 @@ export interface UNetWrapperParams {
   cHigh:   number   // down1 output (E/D); down conv output (A/B). Expected 4.
   cLow:    number   // adapter input. Expected 4.
   cUp:     number   // expand_feat / up1_combine output. Expected 2.
-  // GRU placement (only consulted when a `gru` is supplied). true = apply the
-  // output ConvGRU on the c_up carrier at BASE resolution, before the up-path
-  // bilinear upsamples (production policy for medium/large/xl). false/undefined
-  // = canvas resolution (legacy). Mirrors UNetMattingModel(gru_at_base=...).
-  gruAtBase?: boolean
 }
 
 // Result of the wrapper down-path. `adapted` is the base input (vec4 .xyz);
@@ -93,8 +87,7 @@ export function buildWrapperUp(
   backend: Backend, x_hr: Tensor, feat: Tensor,
   d1: Tensor | null, dFull: Tensor | null, midH: number, midW: number,
   w: UNetWrapperWeights, params: UNetWrapperParams,
-  gru?: { weights: ConvGRUWeights; hPrev: Tensor },
-): { steps: Op[]; alpha: Tensor; hiddenState: Tensor | null } {
+): { steps: Op[]; alpha: Tensor } {
   const variant = params.variant
   const isTwoStage = variant === 'E' || variant === 'D'
   const hasSkip = variant === 'D'
@@ -102,21 +95,7 @@ export function buildWrapperUp(
 
   const expand = backend.ops.ConvExpand(feat, w.expandFeat)   // → c_up=2 carrier at base
   steps.push(expand)
-  let carrier = expand.output                                 // c_up=2 at base resolution
-
-  // The output-stage ConvGRU smooths the c_up carrier; its output (a, b_out,
-  // h_new, 0) is BOTH the smoothed carrier (.xy → downstream) AND next frame's
-  // hPrev (hidden in .z) — option-A threading. Placement is gruAtBase-gated.
-  let hiddenState: Tensor | null = null
-
-  // gru-at-base: smooth at BASE res, before the up-path upsamples (cheaper —
-  // base has canvas_mul² fewer pixels). Production for medium/large/xl.
-  if (gru && params.gruAtBase) {
-    const g = new ConvGRU(backend, carrier, gru.hPrev, gru.weights)
-    steps.push(g)
-    carrier = g.output
-    hiddenState = g.output
-  }
+  const carrier = expand.output                               // c_up=2 at base resolution
 
   let uAtCanvas: Tensor
   if (isTwoStage) {
@@ -134,20 +113,12 @@ export function buildWrapperUp(
     uAtCanvas = u_a_up.output
   }
 
-  // gru-at-canvas (legacy): smooth at canvas res before the head.
-  if (gru && !params.gruAtBase) {
-    const g = new ConvGRU(backend, uAtCanvas, gru.hPrev, gru.weights)
-    steps.push(g)
-    uAtCanvas = g.output
-    hiddenState = g.output
-  }
-
   const head = hasSkip
     ? backend.ops.UpFinalSkip(uAtCanvas, dFull!, x_hr, w.upCombine)   // 9→1 (D)
     : backend.ops.UpFinal(uAtCanvas, x_hr, w.upCombine)              // 5→1 (A/B/E)
   steps.push(head)
 
-  return { steps, alpha: head.output, hiddenState }
+  return { steps, alpha: head.output }
 }
 
 // Static-only UNet wrapper on the native narrow path (c_up=2 carrier in .xy).

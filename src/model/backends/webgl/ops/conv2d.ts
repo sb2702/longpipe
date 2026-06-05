@@ -55,7 +55,7 @@ export class Conv2DWebGL extends WebGLOp {
       u_stride:       params.stride,
       u_pad_top:      padTop,
       u_pad_left:     padLeft,
-      u_activation:   params.activation === 'relu6' ? 1 : params.activation === 'relu' ? 2 : 0,
+      u_activation:   params.activation === 'relu6' ? 1 : params.activation === 'relu' ? 2 : params.activation === 'leaky' ? 3 : 0,
     }
 
     this.defaultSetup()

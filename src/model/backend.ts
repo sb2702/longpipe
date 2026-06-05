@@ -32,7 +32,7 @@ export interface Presenter {
 // single-output callers are unaffected.
 export type RenderTarget = "main" | "preview";
 
-export type Activation = "none" | "relu6" | "relu";
+export type Activation = "none" | "relu6" | "relu" | "leaky";
 
 export interface Conv2dParams {
   outChannels: number;
