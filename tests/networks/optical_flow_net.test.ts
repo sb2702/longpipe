@@ -3,63 +3,70 @@ import { BACKENDS } from '../helpers/backends'
 import { OpticalFlowNet } from '~/model/networks/optical_flow_net'
 import type { FlowWeights } from '~/model/weights'
 
-// Structural smoke test for the flow head: synthetic weights, real medium dims
-// (base 144×256 — its /32 level rounds 9→5 so the decoder's 2× deconv overshoots
-// the skip by a pixel, exercising matchSize). Fidelity vs PyTorch is step 4.
+// Structural smoke for the flow head across encoder shapes: synthetic weights at
+// real tier dims. Includes XL (lite4) — its real checkpoint was trained on the
+// newer flow_model.py schema, so it's smoke-only here; fidelity (real weights) is
+// covered for lite0 tiers in optical_flow_fidelity.test.ts.
 
-const decW = 16
-const TAPC = [24, 40, 112, 320]              // full-encoder taps (medium/large)
+const DEC_W = 16
 const KS = [5, 5, 3, 3]
-const baseH = 144, baseW = 256
+const TIERS = [
+  { name: 'medium-lite0', taps: [24, 40, 112, 320], baseH: 144, baseW: 256 },
+  { name: 'xl-lite4',     taps: [32, 56, 160, 448], baseH: 180, baseW: 320 },
+]
 
 const convOut = (n: number, k: number, s: number, p: number) => Math.floor((n + 2 * p - k) / s) + 1
 const convW = (inC: number, outC: number, k: number) => ({
   weights: Float32Array.from({ length: k * k * (outC / 4) * (inC / 4) * 16 }, (_, i) => Math.sin(i * 0.017) * 0.05),
   bias:    new Float32Array(outC),
 })
+const sinFill = (n: number) => Float32Array.from({ length: n }, (_, i) => Math.sin(i * 0.01))
 
-const fusedC   = TAPC.map(t => decW + t)                            // [40,56,128,336]
-const stageInC = TAPC.map((_, i) => (i === 0 ? decW : fusedC[i - 1]))  // [16,40,56,128]
-const catC     = fusedC.map(f => f + decW + 4)                     // [60,76,148,360]
-
-const weights: FlowWeights = {
-  stem:       convW(8, decW, 7),
-  stages:     TAPC.map((_, i) => convW(stageInC[i], decW, KS[i])),
-  predictBot: convW(fusedC[3], 4, 3),
-  deconv:     [convW(fusedC[3], decW, 4), convW(catC[2], decW, 4), convW(catC[1], decW, 4)],
-  upflow:     [convW(4, 4, 4), convW(4, 4, 4), convW(4, 4, 4)],
-  predict:    [convW(catC[2], 4, 3), convW(catC[1], 4, 3), convW(catC[0], 4, 3)],
-}
-
-// stage output sizes — taps are placed here so the fusion concat lines up.
-const stageHW: Array<[number, number]> = []
-{
-  let h = convOut(baseH, 7, 2, 3), w = convOut(baseW, 7, 2, 3)
-  for (let i = 0; i < TAPC.length; i++) {
-    const p = (KS[i] - 1) / 2
-    h = convOut(h, KS[i], 2, p); w = convOut(w, KS[i], 2, p)
-    stageHW.push([h, w])
+function buildWeights(taps: number[]): FlowWeights {
+  const fusedC   = taps.map(t => DEC_W + t)
+  const stageInC = taps.map((_, i) => (i === 0 ? DEC_W : fusedC[i - 1]))
+  const catC     = fusedC.map(f => f + DEC_W + 4)
+  return {
+    stem:       convW(8, DEC_W, 7),
+    stages:     taps.map((_, i) => convW(stageInC[i], DEC_W, KS[i])),
+    predictBot: convW(fusedC[fusedC.length - 1], 4, 3),
+    deconv:     taps.slice(1).map((_, j) => convW(j === 0 ? fusedC[fusedC.length - 1] : catC[catC.length - 1 - j], DEC_W, 4)),
+    upflow:     taps.slice(1).map(() => convW(4, 4, 4)),
+    predict:    taps.slice(1).map((_, j) => convW(catC[catC.length - 2 - j], 4, 3)),
   }
 }
 
-const sinFill = (n: number) => Float32Array.from({ length: n }, (_, i) => Math.sin(i * 0.01))
+function stageSizes(taps: number[], baseH: number, baseW: number): Array<[number, number]> {
+  const out: Array<[number, number]> = []
+  let h = convOut(baseH, 7, 2, 3), w = convOut(baseW, 7, 2, 3)
+  for (let i = 0; i < taps.length; i++) {
+    const p = (KS[i] - 1) / 2
+    h = convOut(h, KS[i], 2, p); w = convOut(w, KS[i], 2, p)
+    out.push([h, w])
+  }
+  return out
+}
 
 describe.each(BACKENDS)('OpticalFlowNet ($name)', ({ create }) => {
-  it('builds + runs, emits base/4 4-ch flow with finite values', async () => {
-    const backend = await create()
-    const frameA = backend.tensor(baseH, baseW, 4, sinFill(baseH * baseW * 4))
-    const frameB = backend.tensor(baseH, baseW, 4, sinFill(baseH * baseW * 4))
-    const taps = TAPC.map((c, i) =>
-      backend.tensor(stageHW[i][0], stageHW[i][1], c, sinFill(stageHW[i][0] * stageHW[i][1] * c)))
+  for (const tier of TIERS) {
+    it(`${tier.name}: builds + runs, emits base/4 4-ch flow`, async () => {
+      const backend = await create()
+      const weights = buildWeights(tier.taps)
+      const hw = stageSizes(tier.taps, tier.baseH, tier.baseW)
 
-    const net = new OpticalFlowNet(backend, frameA, frameB, taps, weights, decW)
-    net.run()
-    const out = await backend.readback(net.output)
-    backend.destroy()
+      const frameA = backend.tensor(tier.baseH, tier.baseW, 4, sinFill(tier.baseH * tier.baseW * 4))
+      const frameB = backend.tensor(tier.baseH, tier.baseW, 4, sinFill(tier.baseH * tier.baseW * 4))
+      const taps = tier.taps.map((c, i) => backend.tensor(hw[i][0], hw[i][1], c, sinFill(hw[i][0] * hw[i][1] * c)))
 
-    expect(net.output.h).toBe(stageHW[0][0])   // base/4 height
-    expect(net.output.w).toBe(stageHW[0][1])   // base/4 width
-    expect(net.output.c).toBe(4)               // flow in .xy
-    expect(out.every(Number.isFinite)).toBe(true)
-  })
+      const net = new OpticalFlowNet(backend, frameA, frameB, taps, weights, DEC_W)
+      net.run()
+      const out = await backend.readback(net.output)
+      backend.destroy()
+
+      expect(net.output.h).toBe(hw[0][0])   // base/4
+      expect(net.output.w).toBe(hw[0][1])
+      expect(net.output.c).toBe(4)
+      expect(out.every(Number.isFinite)).toBe(true)
+    })
+  }
 })

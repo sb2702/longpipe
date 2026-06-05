@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Longpipe — optical-flow temporal</title>
+    <style>
+      body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+      a { color: #6cf; }
+      .topbar { padding: 8px 16px; }
+      h2 { padding: 0 16px; margin: 8px 0; }
+      .desc { padding: 0 16px 8px; color: #aaa; font-size: 13px; max-width: 760px; line-height: 1.5; }
+      .controls { padding: 8px 16px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+      label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: #bbb; }
+      select, input { background: #222; color: #ddd; border: 1px solid #444; padding: 4px 6px; }
+      button { background: #2a6; color: #fff; border: none; padding: 6px 16px; cursor: pointer; border-radius: 4px; }
+      #status { padding: 8px 16px; font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; }
+      #outputCanvas { margin: 16px; background: #000; max-width: 96vw; }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><a href="/">← demos</a></div>
+    <h2>Optical-flow temporal</h2>
+    <p class="desc">
+      Matting runs every N frames; on the in-between frames the alpha is
+      <b>warped forward by predicted optical flow</b> (OpticalFlowNet riding the
+      cached matting encoder taps) instead of being re-inferred or frozen. Source
+      is <code>/loop_video.mp4</code>. Raise <b>infer every</b> to stress the warp
+      (1 = matting every frame, no warping).
+    </p>
+    <div class="controls">
+      <label>tier
+        <select id="tier">
+          <option value="medium">medium</option>
+          <option value="small">small</option>
+          <option value="large">large</option>
+          <option value="xs">xs (tap-half)</option>
+        </select>
+      </label>
+      <label>backend
+        <select id="backend"><option value="webgpu">webgpu</option><option value="webgl">webgl</option></select>
+      </label>
+      <label>precision
+        <select id="dtype"><option value="f16">f16</option><option value="f32">f32</option></select>
+      </label>
+      <label>infer every
+        <input id="inferEvery" type="number" min="1" max="10" value="3" style="width:48px" />
+      </label>
+      <button id="run">Run</button>
+    </div>
+    <div id="status">idle — pick a tier and press Run</div>
+    <canvas id="outputCanvas"></canvas>
+    <script type="module" src="./flow.ts"></script>
+  </body>
+</html>

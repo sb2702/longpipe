@@ -4,6 +4,7 @@ import { OpticalFlowNet } from '~/model/networks/optical_flow_net'
 import flow_medium from '../fixtures/flow_medium.json'
 import flow_small from '../fixtures/flow_small.json'
 import flow_large from '../fixtures/flow_large.json'
+import flow_xs from '../fixtures/flow_xs.json'
 
 // Fidelity: the SDK OpticalFlowNet vs a PyTorch reference forward (training
 // semantics: leaky + nearest _match + crop_like) on the same packed weights +
@@ -13,6 +14,7 @@ const FIXTURES = [
   { name: 'medium', fx: flow_medium as any },   // full encoder, variant A
   { name: 'small',  fx: flow_small  as any },   // small encoder (3 taps), variant A
   { name: 'large',  fx: flow_large  as any },   // full encoder, variant D
+  { name: 'xs',     fx: flow_xs     as any },   // small encoder, tap-half (base/2)
 ]
 
 describe.each(BACKENDS)('OpticalFlowNet fidelity ($name)', ({ name: backendName, create }) => {
@@ -26,7 +28,13 @@ describe.each(BACKENDS)('OpticalFlowNet fidelity ($name)', ({ name: backendName,
         return backend.tensor(h, w, c, new Float32Array(t))
       })
 
-      const net = new OpticalFlowNet(backend, frameA, frameB, taps, fx.flowWeights, fx.decW)
+      const opts: { fuseStem?: boolean; halfTap?: any } = {}
+      if (fx.fuseStem) {
+        const [hh, hw, hc] = fx.halfTapShape
+        opts.fuseStem = true
+        opts.halfTap = backend.tensor(hh, hw, hc, new Float32Array(fx.halfTap))
+      }
+      const net = new OpticalFlowNet(backend, frameA, frameB, taps, fx.flowWeights, fx.decW, opts)
       net.run()
       const got = await backend.readback(net.output)
       backend.destroy()

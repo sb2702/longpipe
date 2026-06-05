@@ -167,15 +167,8 @@ async function run() {
   // so setSource() fans out to display + network paths.
   const networkInput = backend.ops.Input(NET_H, NET_W)
 
-  // gru-at-base: zero hidden carrier at base res (single frame → no history).
-  let gru: { weights: any; hPrev: Tensor } | undefined
-  if (TIER_CFG.hasGru) {
-    const r = TIER_CFG.wrapper.gruAtBase ? TIER_CFG.baseRes : TIER_CFG.canvasRes
-    const hPrev = backend.tensor(r.h, r.w, 4, new Float32Array(r.h * r.w * 4))
-    gru = { weights: w.gru, hPrev }
-  }
   const model = new TierModel(
-    backend, networkInput.output, w.base, w.wrapper, TIER_CFG.wrapper, TIER_CFG.base, gru,
+    backend, networkInput.output, w.base, w.wrapper, TIER_CFG.wrapper, TIER_CFG.base,
   )
 
   // Resolve background config — for image mode, ingest demo.jpg via a one-

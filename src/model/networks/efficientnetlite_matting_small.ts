@@ -13,6 +13,8 @@ export class EfficientNetLiteMattingSmall {
   readonly featLowRes: Tensor
   // Encoder taps (/4,/8,/16), finest→coarsest — consumed by the optical-flow net.
   readonly encoderTaps: Tensor[]
+  // /2 tap (s0 output, 16ch) — only the tap-half flow head (XS) fuses it at the stem.
+  readonly halfTap: Tensor
 
   // Encoder
   private readonly stem:  Op
@@ -170,6 +172,7 @@ export class EfficientNetLiteMattingSmall {
     })
     this.featLowRes = this.finalUp.output
     this.encoderTaps = [this.s1b1.output, this.s2b1.output, this.s4b2.output]
+    this.halfTap = this.s0.output
 
     this.outConv = backend.ops.Conv2d(this.finalUp.output, w.decoder.outputConv, {
       outChannels: 4,

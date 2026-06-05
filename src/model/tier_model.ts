@@ -12,6 +12,8 @@ export interface BaseNetwork {
   // Encoder pyramid (/4../32, finest→coarsest), computed on the adapted input —
   // exposed so the optical-flow net can ride the cached activations next frame.
   readonly encoderTaps: Tensor[]
+  // /2 tap — present only on small-encoder networks (XS tap-half flow head).
+  readonly halfTap?: Tensor
   run(): void
 }
 export type BaseNetworkCtor = new (backend: Backend, input: Tensor, w: ModelWeights) => BaseNetwork
@@ -29,6 +31,8 @@ export class TierModel implements Op {
   // Base encoder pyramid (finest→coarsest), computed on the adapted frame — the
   // optical-flow net reads these to ride the cached matting activations.
   readonly encoderTaps: Tensor[]
+  // /2 tap (small-encoder tiers only) — the XS tap-half flow head fuses it.
+  readonly halfTap?: Tensor
 
   private readonly steps: { run(): void }[]
 
@@ -62,6 +66,7 @@ export class TierModel implements Op {
     this.steps = [...down.steps, base, featUp, ...up.steps]
     this.output = up.alpha
     this.encoderTaps = base.encoderTaps
+    this.halfTap = base.halfTap
   }
 
   run(): void {

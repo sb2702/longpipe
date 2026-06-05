@@ -36,8 +36,9 @@ export class OpticalFlowNet implements Op {
   constructor(
     backend: Backend, frameA: Tensor, frameB: Tensor, taps: Tensor[],
     w: FlowWeights, decW = 16,
+    opts: { fuseStem?: boolean; halfTap?: Tensor } = {},
   ) {
-    this.inputs = [frameA, frameB, ...taps]
+    this.inputs = [frameA, frameB, ...taps, ...(opts.halfTap ? [opts.halfTap] : [])]
     const steps: Op[] = []
 
     // Stem: 8-ch (6 real) frame pair → /2.
@@ -48,9 +49,20 @@ export class OpticalFlowNet implements Op {
     })
     steps.push(stem)
 
-    // Contracting stages, each fused (concat) with its encoder tap.
     const fused: Tensor[] = []
     let s = stem.output
+
+    // tap-half: fuse the /2 encoder tap at the stem → the decoder predicts down to
+    // base/2 instead of base/4 (the stem level becomes the finest fused level).
+    if (opts.fuseStem && opts.halfTap) {
+      const ht = matchSize(backend, opts.halfTap, stem.output, steps)
+      const cat0 = backend.ops.ChannelConcat(stem.output, ht)
+      steps.push(cat0)
+      fused.push(cat0.output)
+      s = cat0.output
+    }
+
+    // Contracting stages, each fused (concat) with its encoder tap.
     for (let i = 0; i < taps.length; i++) {
       const stage = backend.ops.Conv2d(s, w.stages[i], {
         outChannels: decW, kernel: STAGE_K[i], stride: 2, padding: STAGE_P[i], activation: 'leaky',
