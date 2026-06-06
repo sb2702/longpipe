@@ -28,14 +28,11 @@ struct Params {
 
 const KB = 4u;
 
-// Accumulate in f32 (storage stays f16) — the BN-free flow net sums ~1000+ terms
-// with cancellation, which f16 accumulation can't hold. Convs are memory-bound so
-// this is ~free. act runs in f32, then narrows to f16 for output.
-fn act(v: vec4<f32>, a: u32) -> vec4<f16> {
-    if (a == 1u) { return vec4<f16>(clamp(v, vec4<f32>(0.0), vec4<f32>(6.0))); }
-    if (a == 2u) { return vec4<f16>(max(v, vec4<f32>(0.0))); }
-    if (a == 3u) { return vec4<f16>(max(v, 0.1 * v)); }   // leaky relu (slope 0.1)
-    return vec4<f16>(v);
+fn act(v: vec4<f16>, a: u32) -> vec4<f16> {
+    if (a == 1u) { return clamp(v, vec4<f16>(0.0h), vec4<f16>(6.0h)); }
+    if (a == 2u) { return max(v, vec4<f16>(0.0h)); }
+    if (a == 3u) { return max(v, 0.1h * v); }   // leaky relu (slope 0.1)
+    return v;
 }
 
 @compute @workgroup_size(8, 8, 1)
@@ -57,10 +54,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let o2 = select(o0, o0 + 2u, has2);
     let o3 = select(o0, o0 + 3u, has3);
 
-    var acc0 = vec4<f32>(bias_buf[o0]);
-    var acc1 = vec4<f32>(bias_buf[o1]);
-    var acc2 = vec4<f32>(bias_buf[o2]);
-    var acc3 = vec4<f32>(bias_buf[o3]);
+    var acc0 = bias_buf[o0];
+    var acc1 = bias_buf[o1];
+    var acc2 = bias_buf[o2];
+    var acc3 = bias_buf[o3];
 
     for (var ky = 0u; ky < params.kernel_h; ky++) {
         for (var kx = 0u; kx < params.kernel_w; kx++) {
@@ -80,10 +77,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             let wb3 = z * O * I + o3 * I;
             for (var i = 0u; i < I; i++) {
                 let iv = input_buf[inB + i];
-                acc0 += vec4<f32>(weight_buf[wb0 + i] * iv);
-                acc1 += vec4<f32>(weight_buf[wb1 + i] * iv);
-                acc2 += vec4<f32>(weight_buf[wb2 + i] * iv);
-                acc3 += vec4<f32>(weight_buf[wb3 + i] * iv);
+                acc0 += weight_buf[wb0 + i] * iv;
+                acc1 += weight_buf[wb1 + i] * iv;
+                acc2 += weight_buf[wb2 + i] * iv;
+                acc3 += weight_buf[wb3 + i] * iv;
             }
         }
     }
