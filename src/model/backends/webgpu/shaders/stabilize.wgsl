@@ -31,8 +31,17 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let env_prev = env_prev_buf[idx].y;
     let env      = max(mag, params.release * env_prev);
 
-    var g = clamp((env - params.t_lo) / max(params.t_hi - params.t_lo, 1e-3), 0.0, 1.0);
-    g = max(g, params.leak);
+    let xr = min(x + params.step_x, params.w - 1u);
+    let xl = select(x - params.step_x, 0u, x < params.step_x);
+    let yd = min(y + params.step_y, params.h - 1u);
+    let yu = select(y - params.step_y, 0u, y < params.step_y);
+    let dfx = flow_buf[y * params.w + xr].x - flow_buf[y * params.w + xl].x;
+    let dfy = flow_buf[yd * params.w + x].y - flow_buf[yu * params.w + x].y;
+    let divg = abs(dfx + dfy);
+
+    let g_mag = clamp((env - params.t_lo) / max(params.t_hi - params.t_lo, 1e-3), 0.0, 1.0);
+    let g_div = clamp((divg - params.t_div) / max(params.div_scale, 1e-3), 0.0, 1.0);
+    let g = max(max(g_mag, g_div), params.leak);
 
     let pred = pred_buf[idx].x;
     let refv = ref_buf[idx].x;

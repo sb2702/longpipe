@@ -17,6 +17,10 @@ uniform float u_t_lo;
 uniform float u_t_hi;
 uniform float u_leak;
 uniform float u_release;
+uniform float u_t_div;
+uniform float u_div_scale;
+uniform int   u_step_x;
+uniform int   u_step_y;
 
 out vec4 fragColor;
 
@@ -28,8 +32,18 @@ void main() {
     float envPrev = texelFetch(u_env_prev, ivec2(x, y), 0).y;
     float env     = max(mag, u_release * envPrev);
 
-    float g = clamp((env - u_t_lo) / max(u_t_hi - u_t_lo, 1e-3), 0.0, 1.0);
-    g = max(g, u_leak);
+    // Flow divergence over a ±step finite-difference (clamped to the edges).
+    int xr = min(x + u_step_x, u_w - 1);
+    int xl = max(x - u_step_x, 0);
+    int yd = min(y + u_step_y, u_h - 1);
+    int yu = max(y - u_step_y, 0);
+    float dfx = texelFetch(u_flow, ivec2(xr, y), 0).x - texelFetch(u_flow, ivec2(xl, y), 0).x;
+    float dfy = texelFetch(u_flow, ivec2(x, yd), 0).y - texelFetch(u_flow, ivec2(x, yu), 0).y;
+    float divg = abs(dfx + dfy);
+
+    float gMag = clamp((env - u_t_lo) / max(u_t_hi - u_t_lo, 1e-3), 0.0, 1.0);
+    float gDiv = clamp((divg - u_t_div) / max(u_div_scale, 1e-3), 0.0, 1.0);
+    float g = max(max(gMag, gDiv), u_leak);
 
     float pred = texelFetch(u_pred, ivec2(x, y), 0).x;
     float refv = texelFetch(u_ref,  ivec2(x, y), 0).x;

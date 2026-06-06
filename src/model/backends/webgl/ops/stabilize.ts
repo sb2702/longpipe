@@ -28,9 +28,10 @@ export class StabilizeWebGL extends WebGLOp {
       { name: 'u_ref',      texture: (ref     as WebGLTensor).texture },
       { name: 'u_env_prev', texture: (envPrev as WebGLTensor).texture },
     ]
-    this.uniformInts   = { u_w: W, u_h: H }
+    this.uniformInts   = { u_w: W, u_h: H, u_step_x: params.stepX, u_step_y: params.stepY }
     this.uniformFloats = {
       u_t_lo: params.tLo, u_t_hi: params.tHi, u_leak: params.leak, u_release: params.release,
+      u_t_div: params.tDiv, u_div_scale: params.divScale,
     }
 
     this.defaultSetup()

@@ -1,4 +1,4 @@
-import type { Backend, Dtype } from '~/model/backend'
+import type { Backend, Dtype, Tensor, Op } from '~/model/backend'
 import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { WebGLBackend } from '~/model/backends/webgl/index'
 import { TierModel } from '~/model/tier_model'
@@ -6,15 +6,17 @@ import { TIER_CONFIG } from '~/model/tier_config'
 import { OpticalFlowNet } from '~/model/networks/optical_flow_net'
 import { loadWeightsFromBinary } from '~/utils/loadWeights'
 
-// Optical-flow diagnostic: matting + flow run EVERY frame on the same checkpoints
-// the production flow path uses (the SDK OpticalFlowNet is fidelity-exact to them),
-// so this sidesteps the diverged training flow_model.py. Three live panels:
-//   input | flow field (HSV: hue=direction, value=magnitude) | greenscreen
-// The flow field is the raw base/4 OpticalFlowNet output, read back + drawn.
+// Flow-stabilizer probe — the EXACT SDK stabilizer (same ops as the renderer),
+// isolated from the production pipeline (no skip cadence, preview, applyAlpha, or
+// display upscale). Runs every frame like a skipFrames=0 tier:
+//   flow(prev→cur) → matting(pred) → [warp ref] → gate-blend → carrier
+// Panels: input | flow (HSV) | STABILIZED greenscreen. Sliders mirror the Python
+// harness trackbars so settings are directly comparable.
 
 const DEC_W = 16
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const status = (s: string) => { $('status').textContent = s }
+const numv = (id: string) => parseFloat($<HTMLInputElement>(id).value)
 
 async function createBackend(name: string, dtype: Dtype, canvas: HTMLCanvasElement): Promise<Backend> {
   if (name === 'webgpu') {
@@ -78,37 +80,68 @@ async function run() {
     const backend = await createBackend(backendName, dtype, green)
     const w = loadWeightsFromBinary(wbuf) as any
     if (!w.flow) throw new Error('weights have no flow blob')
+    const zeros = (h: number, wd: number) => backend.tensor(h, wd, 4, new Float32Array(h * wd * 4))
 
     const netInput = backend.ops.Input(c.h, c.w)
     const matting = new TierModel(backend, netInput.output, w.base, w.wrapper, cfg.wrapper, cfg.base)
-    // Flow stem input = CANVAS frame downsampled to base (matches training:
-    // x_base = interpolate(canvas → base)). NOT a direct source→base resample —
-    // that's a single ~5× bilinear pass and aliases, garbling the flow at edges.
     const curBaseDown = backend.ops.BilinearUpsample(netInput.output, { outH: b.h, outW: b.w })
-    const frameAHeld = backend.tensor(b.h, b.w, 4, new Float32Array(b.h * b.w * 4))
+    const frameAHeld = zeros(b.h, b.w)
     const flow = new OpticalFlowNet(backend, frameAHeld, curBaseDown.output, matting.encoderTaps, w.flow, DEC_W,
       tier === 'xs' ? { fuseStem: true, halfTap: matting.halfTap } : {})
-    const greenComp = backend.presenters.CompositeSolid(netInput.output, matting.output, [0, 1, 0])
+    const up = backend.ops.BilinearUpsample(flow.output, { outH: c.h, outW: c.w })
+    const flowScale = -(c.w / b.w)
+    const stepX = Math.max(1, Math.round(c.w / flow.output.w))
+    const stepY = Math.max(1, Math.round(c.h / flow.output.h))
+
+    const stabPrev = zeros(c.h, c.w)                 // (.x stab, .y env) carrier — stable tensor
+    const refWarp  = backend.ops.Warp(stabPrev, up.output, { flowScale })
+    const greenComp = backend.presenters.CompositeSolid(netInput.output, stabPrev, [0, 1, 0])
+
+    // Rebuild the stabilize op when a slider / warp toggle changes (params + the
+    // ref source bind at construction). Its output is copied into stabPrev, which
+    // greenComp composites — so greenComp never needs rebinding.
+    let stab: Op
+    const buildStab = () => {
+      const warpOn = $<HTMLInputElement>('warp').checked
+      stab = backend.ops.Stabilize(up.output, matting.output, warpOn ? refWarp.output : stabPrev, stabPrev, {
+        tLo: numv('tLo'), tHi: numv('tHi'), leak: numv('leak'), release: numv('release'),
+        tDiv: numv('tDiv'), divScale: numv('divScale'), stepX, stepY,
+      })
+    }
+    buildStab()
+    for (const id of ['tLo', 'tHi', 'leak', 'release', 'tDiv', 'divScale'])
+      $(id).addEventListener('input', buildStab)
+    $('warp').addEventListener('change', buildStab)
 
     const fw = flow.output.w, fh = flow.output.h
     flowC.width = fw; flowC.height = fh
     const flowCtx = flowC.getContext('2d')!
     const flowImg = flowCtx.createImageData(fw, fh)
 
-    status(`running — input | flow (base/4 ${fw}×${fh}) | greenscreen`)
+    let warm = false
+    status(`running ${tier} — input | flow (base/4 ${fw}×${fh}) | stabilized`)
     const tick = async () => {
       if (!running) return
       const bm = await createImageBitmap(video)
       netInput.setSource(bm)
       netInput.run()
-      curBaseDown.run()                            // canvas → base (matches training stem input)
-      flow.run()                                   // flow before matting → taps are prev's
+      curBaseDown.run()                              // canvas → base (matches training stem input)
+      flow.run(); up.run()                           // flow before matting → taps are prev's
       matting.run()
       backend.copyTensor(curBaseDown.output, frameAHeld)
+
+      if (!warm) {                                   // seed carrier with first matte
+        backend.copyTensor(matting.output, stabPrev)
+        warm = true
+      } else {
+        if ($<HTMLInputElement>('warp').checked) refWarp.run()
+        stab.run()
+        backend.copyTensor(stab.output, stabPrev)
+      }
       greenComp.run()
 
       const fd = await backend.readback(flow.output)
-      const gain = parseFloat($<HTMLInputElement>('gain').value)
+      const gain = numv('gain')
       for (let p = 0; p < fh * fw; p++) {
         const fx = fd[p * 4], fy = fd[p * 4 + 1]
         const mag = Math.hypot(fx, fy)
@@ -128,5 +161,11 @@ async function run() {
     console.error(err)
   }
 }
+
+// Live value readouts next to each slider (wired at load — sliders exist before Run).
+const SLIDERS = ['tLo', 'tHi', 'leak', 'release', 'tDiv', 'divScale', 'gain']
+const syncVals = () => { for (const id of SLIDERS) $(`${id}-v`).textContent = $<HTMLInputElement>(id).value }
+for (const id of SLIDERS) $(id).addEventListener('input', syncVals)
+syncVals()
 
 $('run').addEventListener('click', () => run())

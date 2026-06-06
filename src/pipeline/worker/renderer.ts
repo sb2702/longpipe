@@ -17,7 +17,11 @@ const FLOW_DEC_W = 16   // shipping flow-head width
 // Flow-gated stabilizer params. tLo/tHi are flow magnitudes in BASE-res pixels
 // (the flow predicts base-res-unit displacements); envelope peak-hold mirrors the
 // eval harness's known-good (leak 0.2, release 0.9). Tunable.
-const FLOW_STAB = { tLo: 0.5, tHi: 2.0, leak: 0.15, release: 0.9}
+// tDiv/divScale: the occlusion-seam term — the gate also opens where |div(flow)|
+// exceeds tDiv (a boundary the magnitude gate is blind to, since the revealed
+// background is static). stepX/stepY are added per-tier in setPreset (≈ canvas/flow
+// resolution ratio so the finite-difference spans one base/4 pixel). Tunable.
+const FLOW_STAB = { tLo: 0.15, tHi: 2.5, leak: 0.15, release: 0.9, tDiv:1.0, divScale: 2.0 }
 import type { ManualPreset } from '../presets'
 import type { Background } from '../background'
 import type { RendererStats } from '../messages'
@@ -415,7 +419,11 @@ export class Renderer {
       const predBuf  = zeros(c.h, c.w)
       const stabPrev = zeros(c.h, c.w)
       const refWarp  = this.backend.ops.Warp(stabPrev, up.output, { flowScale })
-      const stab     = this.backend.ops.Stabilize(up.output, predBuf, refWarp.output, stabPrev, FLOW_STAB)
+      // Divergence finite-difference step ≈ canvas/flow ratio, so it spans ~1
+      // base/4 pixel on the upsampled flow (where the occlusion seam lives).
+      const stepX = Math.max(1, Math.round(c.w / net.output.w))
+      const stepY = Math.max(1, Math.round(c.h / net.output.h))
+      const stab     = this.backend.ops.Stabilize(up.output, predBuf, refWarp.output, stabPrev, { ...FLOW_STAB, stepX, stepY })
 
       // Skip tiers also warp the held last-inference alpha to make the skip-frame pred.
       const alphaHeld = everyFrame ? null : zeros(c.h, c.w)
