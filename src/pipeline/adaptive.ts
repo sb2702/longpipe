@@ -27,8 +27,8 @@ const HEADROOM_MS      = 15000   // upgrade is more conservative than downgrade
 export interface AdaptiveOptions {
   backendKind:     'webgpu' | 'webgl'
   initialModel:    ModelName
-  weightsBaseUrl:  string
-  buildWeightsUrl: (baseUrl: string, model: string) => string
+  // Fetch weights for a model (resolves f16/f32 pack + fallback in the caller).
+  fetchWeights:    (model: ModelName) => Promise<ArrayBuffer>
   getStats:        () => Promise<RendererStats>
   // Caller is responsible for the actual setPreset wire-up; adaptive
   // just hands over fresh weights and the new preset name.
@@ -116,10 +116,7 @@ export class AdaptiveController {
     this.overshootStart = 0
     this.headroomStart  = 0
     try {
-      const url = this.opts.buildWeightsUrl(this.opts.weightsBaseUrl, preset.model)
-      const r   = await fetch(url)
-      if (!r.ok) throw new Error(`weights fetch failed: ${r.status} ${url}`)
-      const weights = await r.arrayBuffer()
+      const weights = await this.opts.fetchWeights(preset.model)
       await this.opts.swapPreset(preset.model as PresetName, weights)
       this.currentPresetIdx = idx
       log(`swap to ${preset.model} done`)

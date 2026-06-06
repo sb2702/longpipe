@@ -8,6 +8,7 @@
 // delegates to a submodule (topology selection, transport setup, audio
 // passthrough, worker spawn). See docs/PIPELINE.md.
 
+import type { Dtype } from '~/model/backend'
 import type { ManualPreset, PresetName } from './presets'
 import { AdaptiveController } from './adaptive'
 import type { BackgroundInput, Background } from './background'
@@ -122,10 +123,27 @@ function pickOutputSize(
   }
 }
 
-// Build the full weights URL for a resolved preset. Convention matches
-// the training pipeline's binary export naming (model_${name}.bin).
-function weightsUrlFor(baseUrl: string, model: string): string {
-  return `${baseUrl.replace(/\/$/, '')}/model_${model}.bin`
+// Build the full weights URL for a resolved preset. Convention matches the
+// training pipeline's binary export naming: model_${name}.bin (f32) and
+// model_${name}.f16.bin (f16-packed, ~half the size).
+function weightsUrlFor(baseUrl: string, model: string, dtype: Dtype): string {
+  const suffix = dtype === 'f16' ? '.f16.bin' : '.bin'
+  return `${baseUrl.replace(/\/$/, '')}/model_${model}${suffix}`
+}
+
+// Fetch a model's weights, preferring the f16 pack when the backend resolved to
+// f16 (≈half the download). Falls back to the f32 .bin if the f16 one isn't
+// hosted (e.g. a CDN that only ships f32) — the f16 backend converts on upload,
+// and the loader decodes f16 bits correctly either way (see utils/weights.ts).
+async function fetchModelWeights(baseUrl: string, model: string, dtype: Dtype): Promise<ArrayBuffer> {
+  if (dtype === 'f16') {
+    const r = await fetch(weightsUrlFor(baseUrl, model, 'f16'))
+    if (r.ok) return r.arrayBuffer()
+  }
+  const url = weightsUrlFor(baseUrl, model, 'f32')
+  const r = await fetch(url)
+  if (!r.ok) throw new Error(`weights fetch failed: ${r.status} ${url}`)
+  return r.arrayBuffer()
 }
 
 export class Pipeline implements PromiseLike<Pipeline> {
@@ -258,11 +276,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
       const initRes = await this.controller.sendMessage('init', initData, initTransferList)
       log('init resolved:', initRes)
 
-      const url = weightsUrlFor(weightsBaseUrl, initRes.resolvedPreset.model)
-      log('fetching weights:', url)
-      const r = await fetch(url)
-      if (!r.ok) throw new Error(`weights fetch failed: ${r.status} ${url}`)
-      const weights = await r.arrayBuffer()
+      log('fetching weights:', initRes.resolvedPreset.model, initRes.resolvedDtype)
+      const weights = await fetchModelWeights(weightsBaseUrl, initRes.resolvedPreset.model, initRes.resolvedDtype)
       log('weights bytes:', weights.byteLength)
 
       log('sending startRender…')
@@ -276,8 +291,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
         this.adaptive = new AdaptiveController({
           backendKind:     initRes.resolvedBackend,
           initialModel:    initRes.resolvedPreset.model,
-          weightsBaseUrl,
-          buildWeightsUrl: weightsUrlFor,
+          fetchWeights:    (model) => fetchModelWeights(weightsBaseUrl, model, initRes.resolvedDtype),
           getStats:        () => this.getStats(),
           swapPreset:      async (preset, weights) => {
             await this.controller.sendMessage('setPreset', { preset, weights }, [weights])
