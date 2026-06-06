@@ -5,16 +5,18 @@ import flow_medium from '../fixtures/flow_medium.json'
 import flow_small from '../fixtures/flow_small.json'
 import flow_large from '../fixtures/flow_large.json'
 import flow_xs from '../fixtures/flow_xs.json'
+import flow_xl from '../fixtures/flow_xl.json'
 
-// Fidelity: the SDK OpticalFlowNet vs a PyTorch reference forward (training
-// semantics: leaky + nearest _match + crop_like) on the same packed weights +
-// taps + frame pair. Exact agreement validates pack_flow + the whole op graph
-// (Conv2d-leaky, ConvTranspose2d, ChannelConcat, Crop) end-to-end.
+// Fidelity: the SDK OpticalFlowNet vs the real trained WrapperFlowNet (relu6 +
+// resize-conv decoder + backward flow) on the same packed weights + taps + frame
+// pair. Exact agreement validates pack_flow + the whole op graph (Conv2d-relu6,
+// BilinearUpsample, ChannelConcat, Crop) end-to-end.
 const FIXTURES = [
-  { name: 'medium', fx: flow_medium as any },   // full encoder, variant A
+  { name: 'medium', fx: flow_medium as any },   // full encoder (lite0), variant A
   { name: 'small',  fx: flow_small  as any },   // small encoder (3 taps), variant A
-  { name: 'large',  fx: flow_large  as any },   // full encoder, variant D
+  { name: 'large',  fx: flow_large  as any },   // full encoder (lite0), variant D
   { name: 'xs',     fx: flow_xs     as any },   // small encoder, tap-half (base/2)
+  { name: 'xl',     fx: flow_xl     as any },   // full encoder (lite4), variant E
 ]
 
 describe.each(BACKENDS)('OpticalFlowNet fidelity ($name)', ({ name: backendName, create }) => {
