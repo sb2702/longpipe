@@ -59,14 +59,15 @@ export interface ConvGRUWeights {
 // Optical-flow head weights — the only learned part of the flow net (the matting
 // encoder + wrapper are already in ModelWeights / UNetWrapperWeights; the flow net
 // rides their cached taps). All convs use the canonical mat4x4 conv layout. Predict
-// heads emit 4 ch (flow in .xy, .zw = 0); upflow is the 2→2 (packed 4→4) flow
-// upsampler. Order/length mirror training FlowEncoderNet (base/4, no tap-half).
+// heads emit 4 ch (flow in .xy, .zw = 0). Decoder is resize-conv: `deconv` is the
+// 3×3 conv applied after a parameter-free bilinear 2× upsample (no transpose-conv);
+// the per-level flow upsample is parameter-free (no weights). Order/length mirror
+// training FlowEncoderNet (base/4, no tap-half).
 export interface FlowWeights {
-  stem:       Conv2DWeights     // 6→decW (packed 8→decW), k7 s2, leaky
-  stages:     Conv2DWeights[]   // (decW+tap)→decW, k5/5/3/3 s2, leaky; one per tap
+  stem:       Conv2DWeights     // 6→decW (packed 8→decW), k7 s2, relu6
+  stages:     Conv2DWeights[]   // (decW+tap)→decW, k5/5/3/3 s2, relu6; one per tap
   predictBot: Conv2DWeights     // fused[-1]→4 (flow .xy), k3
-  deconv:     Conv2DWeights[]   // ConvTranspose decIn→decW, k4 s2 p1, leaky
-  upflow:     Conv2DWeights[]   // ConvTranspose 4→4 (2→2 flow), k4 s2 p1, no act
+  deconv:     Conv2DWeights[]   // (post-upsample) decIn→decW, k3 s1 p1, relu6
   predict:    Conv2DWeights[]   // cat→4 (flow .xy), k3; finest = base/4
 }
 

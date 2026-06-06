@@ -89,7 +89,7 @@ async function run() {
     const flow = new OpticalFlowNet(backend, frameAHeld, curBaseDown.output, matting.encoderTaps, w.flow, DEC_W,
       tier === 'xs' ? { fuseStem: true, halfTap: matting.halfTap } : {})
     const up = backend.ops.BilinearUpsample(flow.output, { outH: c.h, outW: c.w })
-    const flowScale = -(c.w / b.w)
+    const flowScale = c.w / b.w   // backward flow (b→a): gather at p + flow (positive)
     const stepX = Math.max(1, Math.round(c.w / flow.output.w))
     const stepY = Math.max(1, Math.round(c.h / flow.output.h))
 

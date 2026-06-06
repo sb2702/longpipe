@@ -396,10 +396,11 @@ export class Renderer {
     })
 
     // Optical-flow temporal: wired iff the .bin carries a `flow` blob. The flow net
-    // rides the tier's cached encoder taps; warps run at canvas res (network output),
-    // flowScale = -(canvasW/baseW) folds the backward-gather negation + the base→
-    // canvas magnitude rescale. The stabilizer gates each fresh alpha against the
-    // warp-aligned previous, on the last-available flow.
+    // rides the tier's cached encoder taps; warps run at canvas res (network output).
+    // The net predicts BACKWARD flow (frame-b→frame-a), so the warp gathers at
+    // p + flow: flowScale = +(canvasW/baseW) (base→canvas magnitude rescale, no
+    // negation). The stabilizer gates each fresh alpha against the warp-aligned
+    // previous, on the last-available flow.
     this.flow = null
     if (w.flow) {
       const b = cfg.baseRes, c = cfg.canvasRes
@@ -414,7 +415,7 @@ export class Renderer {
       const net = new OpticalFlowNet(this.backend, frameAHeld, curBaseDown.output, tier.encoderTaps, w.flow, FLOW_DEC_W,
         cfg.flowFuseStem ? { fuseStem: true, halfTap: tier.halfTap } : {})
       const up = this.backend.ops.BilinearUpsample(net.output, { outH: c.h, outW: c.w })
-      const flowScale = -(c.w / b.w)
+      const flowScale = c.w / b.w   // backward flow (b→a): gather at p + flow (positive)
 
       const predBuf  = zeros(c.h, c.w)
       const stabPrev = zeros(c.h, c.w)

@@ -30,8 +30,8 @@ function buildWeights(taps: number[]): FlowWeights {
     stem:       convW(8, DEC_W, 7),
     stages:     taps.map((_, i) => convW(stageInC[i], DEC_W, KS[i])),
     predictBot: convW(fusedC[fusedC.length - 1], 4, 3),
-    deconv:     taps.slice(1).map((_, j) => convW(j === 0 ? fusedC[fusedC.length - 1] : catC[catC.length - 1 - j], DEC_W, 4)),
-    upflow:     taps.slice(1).map(() => convW(4, 4, 4)),
+    // resize-conv deconv: k3 conv applied after a parameter-free bilinear 2× upsample
+    deconv:     taps.slice(1).map((_, j) => convW(j === 0 ? fusedC[fusedC.length - 1] : catC[catC.length - 1 - j], DEC_W, 3)),
     predict:    taps.slice(1).map((_, j) => convW(catC[catC.length - 2 - j], 4, 3)),
   }
 }

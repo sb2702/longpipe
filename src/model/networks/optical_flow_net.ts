@@ -21,9 +21,14 @@ function matchSize(backend: Backend, t: Tensor, ref: Tensor, steps: Op[]): Tenso
 // Optical-flow head: a thin learned contracting path on the base-res RGB frame
 // pair, fused with the matting encoder's cached taps at each scale, then a small
 // decoder regresses base/4 flow (vector in .xy). Composition mirrors training
-// WrapperFlowNet + FlowEncoderNet for the shipping config (base/4, dense, leaky,
+// WrapperFlowNet + FlowEncoderNet for the shipping config (base/4, dense, relu6,
 // no tap-half). It owns no encoder — `taps` come from TierModel.encoderTaps,
 // computed on the previous full frame and read here for free.
+//
+// Decoder is resize-conv (bilinear 2× upsample + 3×3 conv), NOT transpose-conv,
+// and the per-level flow upsample is parameter-free bilinear 2× (training _up2).
+// The supervised flow is BACKWARD (frame-b→frame-a), so the warp that consumes it
+// gathers at p + flow (renderer uses flowScale > 0).
 //
 //   frameA, frameB : base-res RGB (4-ch each; concat → 8-ch, 6 real + 2 dead)
 //   taps           : encoder pyramid, finest→coarsest
@@ -45,7 +50,7 @@ export class OpticalFlowNet implements Op {
     const pair = backend.ops.ChannelConcat(frameA, frameB)
     steps.push(pair)
     const stem = backend.ops.Conv2d(pair.output, w.stem, {
-      outChannels: decW, kernel: 7, stride: 2, padding: 3, activation: 'leaky',
+      outChannels: decW, kernel: 7, stride: 2, padding: 3, activation: 'relu6',
     })
     steps.push(stem)
 
@@ -65,7 +70,7 @@ export class OpticalFlowNet implements Op {
     // Contracting stages, each fused (concat) with its encoder tap.
     for (let i = 0; i < taps.length; i++) {
       const stage = backend.ops.Conv2d(s, w.stages[i], {
-        outChannels: decW, kernel: STAGE_K[i], stride: 2, padding: STAGE_P[i], activation: 'leaky',
+        outChannels: decW, kernel: STAGE_K[i], stride: 2, padding: STAGE_P[i], activation: 'relu6',
       })
       steps.push(stage)
       const tap = matchSize(backend, taps[i], stage.output, steps)
@@ -85,15 +90,16 @@ export class OpticalFlowNet implements Op {
 
     for (let j = 0; j < fused.length - 1; j++) {
       const i = fused.length - 2 - j
-      const deconv = backend.ops.ConvTranspose2d(dec, w.deconv[j], {
-        outChannels: decW, kernel: 4, stride: 2, padding: 1, activation: 'leaky',
+      // Feature deconv = bilinear 2× upsample + 3×3 conv (relu6) — training UpsampleConv.
+      const decUp = backend.ops.BilinearUpsample(dec, { outH: dec.h * 2, outW: dec.w * 2 })
+      const deconv = backend.ops.Conv2d(decUp.output, w.deconv[j], {
+        outChannels: decW, kernel: 3, stride: 1, padding: 1, activation: 'relu6',
       })
-      const upflow = backend.ops.ConvTranspose2d(flow, w.upflow[j], {
-        outChannels: 4, kernel: 4, stride: 2, padding: 1, activation: 'none',
-      })
-      steps.push(deconv, upflow)
+      // Flow upsample = parameter-free bilinear 2× (training _up2).
+      const flowUp = backend.ops.BilinearUpsample(flow, { outH: flow.h * 2, outW: flow.w * 2 })
+      steps.push(decUp, deconv, flowUp)
       const up  = matchSize(backend, deconv.output, fused[i], steps)
-      const fup = matchSize(backend, upflow.output, fused[i], steps)
+      const fup = matchSize(backend, flowUp.output, fused[i], steps)
       const cat1 = backend.ops.ChannelConcat(fused[i], up)
       const cat2 = backend.ops.ChannelConcat(cat1.output, fup)
       steps.push(cat1, cat2)
