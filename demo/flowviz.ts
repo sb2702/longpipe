@@ -32,11 +32,12 @@ async function fetchBin(url: string): Promise<ArrayBuffer | null> {
   if (!r.ok || (r.headers.get('content-type') ?? '').startsWith('text/html')) return null
   return r.arrayBuffer()
 }
-async function fetchWeights(tier: string, dtype: Dtype): Promise<ArrayBuffer> {
-  const base = `/model_${tier}_flow`
-  if (dtype === 'f16') { const f16 = await fetchBin(`${base}.f16.bin`); if (f16) return f16 }
-  const f32 = await fetchBin(`${base}.bin`)
-  if (!f32) throw new Error(`failed to fetch ${base}.bin`)
+async function fetchWeights(tier: string): Promise<ArrayBuffer> {
+  // Always load the f32 .bin and let the backend convert on upload — this is exactly
+  // what the production pipeline does (buildWeightsUrl → model_<m>.bin, never .f16.bin).
+  // The matting demos never load an .f16.bin, so fetching it here was an untested path.
+  const f32 = await fetchBin(`/model_${tier}_flow.bin`)
+  if (!f32) throw new Error(`failed to fetch /model_${tier}_flow.bin`)
   return f32
 }
 async function loadWebcam(): Promise<HTMLVideoElement> {
@@ -76,7 +77,7 @@ async function run() {
     const flowC = $<HTMLCanvasElement>('flow')
 
     status(`loading ${tier}…`)
-    const [wbuf, video] = await Promise.all([fetchWeights(tier, dtype), loadWebcam()])
+    const [wbuf, video] = await Promise.all([fetchWeights(tier), loadWebcam()])
     const backend = await createBackend(backendName, dtype, green)
     const w = loadWeightsFromBinary(wbuf) as any
     if (!w.flow) throw new Error('weights have no flow blob')

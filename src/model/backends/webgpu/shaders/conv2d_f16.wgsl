@@ -1,9 +1,9 @@
 enable f16;
 
-// Conv2d — full f16 variant.
-// All buffers (input, output, weights, bias) are f16. Weights are converted
-// from f32→f16 in JavaScript before upload. mat4x4<f16> * vec4<f16> runs
-// entirely in f16 on hardware that has native f16 ALUs.
+// Conv2d — f16 storage, f32 accumulation. All buffers (input, output, weights,
+// bias) are f16; the mat4x4<f16> * vec4<f16> matmul runs in f16, but the kernel×
+// channel reduction accumulates in f32 (the BN-free flow net sums ~1000+ terms
+// with cancellation, which f16 accumulation can't hold). Memory-bound, so ~free.
 
 struct Params {
     in_h        : u32,
@@ -39,7 +39,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let I = params.in_groups;
     let O = params.out_groups;
 
-    var result = bias_buf[o];
+    var result = vec4<f32>(bias_buf[o]);
 
     for (var ky = 0u; ky < params.kernel_h; ky++) {
         for (var kx = 0u; kx < params.kernel_w; kx++) {
@@ -58,16 +58,16 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             for (var i = 0u; i < I; i++) {
                 let in_idx = in_y * params.in_w * I + in_x * I + i;
                 let w_idx  = z * O * I + o * I + i;
-                result += weight_buf[w_idx] * input_buf[in_idx];
+                result += vec4<f32>(weight_buf[w_idx] * input_buf[in_idx]);
             }
         }
     }
 
     if (params.activation == 1u) {
-        result = clamp(result, vec4<f16>(0.0h), vec4<f16>(6.0h));
+        result = clamp(result, vec4<f32>(0.0), vec4<f32>(6.0));
     } else if (params.activation == 2u) {
-        result = max(result, vec4<f16>(0.0h));
+        result = max(result, vec4<f32>(0.0));
     }
 
-    output_buf[y * params.out_w * O + x * O + o] = result;
+    output_buf[y * params.out_w * O + x * O + o] = vec4<f16>(result);
 }
