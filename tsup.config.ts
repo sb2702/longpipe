@@ -48,6 +48,32 @@ const inlineWorker: esbuild.Plugin = {
   },
 }
 
+// Bundles the AudioWorklet processor as a self-contained ESM string and injects
+// it as WORKLET_SOURCE of `src/audio/worklet_inline.ts`. AudioWorklet scopes
+// have no ESM import support, so the processor MUST be pre-bundled (unlike the
+// video worker, which can fall back to a URL-based module load in dev). The
+// denoiser wraps the string in a Blob URL and audioWorklet.addModule()s it.
+const inlineWorklet: esbuild.Plugin = {
+  name: 'inline-worklet',
+  setup(build) {
+    build.onLoad({ filter: /audio\/worklet_inline\.ts$/ }, async () => {
+      const result = await esbuild.build({
+        entryPoints: [resolve(__dirname, 'src/audio/worklet/processor.ts')],
+        bundle: true,
+        format: 'esm',
+        write: false,
+        target: 'es2020',
+        minify: true,
+        plugins: [tildeAlias],
+      })
+      return {
+        contents: `export const WORKLET_SOURCE = ${JSON.stringify(result.outputFiles[0].text)};`,
+        loader: 'ts',
+      }
+    })
+  },
+}
+
 export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm', 'cjs'],
@@ -60,5 +86,5 @@ export default defineConfig({
     '.wgsl': 'text',
     '.glsl': 'text',
   },
-  esbuildPlugins: [tildeAlias, inlineWorker],
+  esbuildPlugins: [tildeAlias, inlineWorker, inlineWorklet],
 })

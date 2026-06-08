@@ -6,7 +6,7 @@ export type {
   PipelineOptions,
   BackgroundInput, Background, BlurInput, ColorInput, ImageInput, VideoInput,
   PresetName, ManualPreset, ModelName,
-  AudioMode,
+  AudioMode, AudioInput, DenoiseOptions, DenoiseModel, DenoiseTier, DenoiseModelOption, AudioStats,
   PipelineError, ErrorSource,
 } from '~/pipeline/index.ts'
 

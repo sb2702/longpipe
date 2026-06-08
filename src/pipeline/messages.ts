@@ -121,6 +121,7 @@ export type ErrorSource =
   | 'worker'         // generic worker / pipe failure
   | 'adaptive'       // adaptive preset swap failed
   | 'background'    // background setup or runtime issue (e.g. video track ended)
+  | 'audio'         // audio denoise subsystem (worklet init, asset fetch, etc.)
   | 'unknown'
 
 export interface PipelineError {

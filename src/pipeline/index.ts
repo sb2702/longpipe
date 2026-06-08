@@ -13,10 +13,13 @@ import type { ManualPreset, PresetName } from './presets'
 import { AdaptiveController } from './adaptive'
 import type { BackgroundInput, Background } from './background'
 import { normalizeBackground } from './background'
-import type { AudioMode } from './audio'
+import type { AudioInput } from './audio'
 import type { InitData, PipelineError } from './messages'
 import { selectTopology } from './topology'
-import { buildOutputStream } from './audio'
+import { buildOutputStream, normalizeAudio } from './audio'
+import { AudioDenoiser } from '~/audio/denoiser.ts'
+import type { DenoiseOptions } from './audio'
+import type { AudioStats } from '~/audio/messages.ts'
 import { WorkerController } from './worker_controller'
 import { setupInput }  from './setup_input'
 import { setupOutput } from './setup_output'
@@ -52,7 +55,12 @@ export interface PipelineOptions {
   background?:     BackgroundInput
   preset?:         PresetName | ManualPreset    // default: 'auto' (worker microbenches, picks best fit)
   weightsBaseUrl?: string                       // default: DEFAULT_WEIGHTS_BASE_URL
-  audio?:          AudioMode                    // default: 'passthrough'
+  // 'passthrough' | 'drop' | 'denoise' | { denoise: DenoiseOptions }.
+  // 'denoise' runs input audio through the AudioWorklet denoiser (separate from
+  // the video worker). Default: 'passthrough'.
+  audio?:          AudioInput
+  // Base URL for audio-denoise wasm + weights. Default: DEFAULT_AUDIO_BASE_URL.
+  audioWeightsBaseUrl?: string
   enabled?:        boolean                      // default: true
   // Output canvas dimensions. Default: matches the input video track's
   // intrinsic size (preserves aspect ratio + avoids pointless rescale).
@@ -89,15 +97,19 @@ export interface PipelineOptions {
 // path so SDK upgrades that change weight shapes can move to a new prefix
 // without breaking older SDKs in the wild.
 const DEFAULT_WEIGHTS_BASE_URL = 'https://cdn.longpipe.dev/models/v/0.0.3/'
+// Audio-denoise assets (kernel wasm + weights packs) — versioned separately
+// from the video models since they evolve independently.
+const DEFAULT_AUDIO_BASE_URL = 'https://cdn.longpipe.dev/audio/v/0.0.1/'
 
 const DEFAULTS = {
-  background:     'blur'                      as BackgroundInput,
-  preset:         'auto'                  as PresetName,
-  weightsBaseUrl: DEFAULT_WEIGHTS_BASE_URL,
-  audio:          'passthrough'               as AudioMode,
-  enabled:        true,
-  adaptive:       true,
-  debug:          false,
+  background:          'blur'                  as BackgroundInput,
+  preset:             'auto'                  as PresetName,
+  weightsBaseUrl:     DEFAULT_WEIGHTS_BASE_URL,
+  audio:              'passthrough'           as AudioInput,
+  audioWeightsBaseUrl: DEFAULT_AUDIO_BASE_URL,
+  enabled:            true,
+  adaptive:           true,
+  debug:              false,
 }
 
 // Fallback output canvas size — only used when neither the caller nor the
@@ -167,6 +179,10 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // adaptive option isn't explicitly disabled.
   private adaptive: AdaptiveController | null = null
 
+  // Audio denoiser — only set when audio: 'denoise' (or {denoise}) was passed
+  // AND the input stream has an audio track. Independent of the video worker.
+  private denoiser: AudioDenoiser | null = null
+
   // Cleanup callback for the current background. Set by normalizeBackground
   // for kinds that own resources (currently: video, which holds a hidden
   // <video> element + rVFC loop + MessageChannel). Called when bg is
@@ -202,8 +218,30 @@ export class Pipeline implements PromiseLike<Pipeline> {
     // its first bitmap). MSTG/transfer-capture write to surfaces main
     // doesn't own, so passthrough is bitmap-shuttle-only — those topologies
     // just emit nothing until the worker is ready.
-    // Audio passthrough wires the input's audio tracks if requested.
-    this.stream = buildOutputStream(outputSetup.videoTrack, inputStream, opts.audio)
+    // Audio: passthrough/drop wire (or not) the input tracks; 'denoise' spins up
+    // the AudioDenoiser (separate AudioWorklet subsystem) and routes its output
+    // track. The denoiser's track is live immediately (passthrough until its
+    // worklet loads), so the output stream is whole synchronously. Video `ready`
+    // does NOT wait on audio — denoise joins asynchronously.
+    const audio = normalizeAudio(opts.audio)
+    let denoisedTrack: MediaStreamTrack | undefined
+    if (audio.mode === 'denoise') {
+      const inputAudioTrack = inputStream.getAudioTracks()[0]
+      if (inputAudioTrack) {
+        this.denoiser = new AudioDenoiser(inputAudioTrack, {
+          model:          audio.denoise?.model ?? 'auto',
+          weightsBaseUrl: opts.audioWeightsBaseUrl,
+          postFilterBeta: audio.denoise?.postFilterBeta,
+          gruLeak:        audio.denoise?.gruLeak,
+          enabled:        audio.denoise?.enabled,
+          onError:        (message) => opts.onError?.({ message, source: 'audio', recoverable: true }),
+        })
+        denoisedTrack = this.denoiser.outputTrack
+      } else {
+        opts.onError?.({ message: 'audio: "denoise" requested but the input stream has no audio track', source: 'audio', recoverable: true })
+      }
+    }
+    this.stream = buildOutputStream(outputSetup.videoTrack, inputStream, audio, denoisedTrack)
     outputSetup.startPassthrough?.(inputStream)
 
     // Worker spawn — Blob-URL pattern when WORKER_SOURCE is inlined by the
@@ -402,10 +440,33 @@ export class Pipeline implements PromiseLike<Pipeline> {
     return this.controller.sendMessage('getStats', {} as Record<string, never>)
   }
 
+  // Reconfigure the audio denoiser at runtime. `true`/`false` toggles
+  // denoise vs. passthrough (cheap); an object updates DFN β / GRU-leak live.
+  // Only effective when audio: 'denoise' was set at construction (the
+  // AudioContext graph is built there); no-op otherwise. Live model swap is a
+  // later addition (re-fetch + re-splice).
+  setDenoise(input: boolean | DenoiseOptions): void {
+    if (!this.denoiser) return
+    if (typeof input === 'boolean') { this.denoiser.setEnabled(input); return }
+    if (input.postFilterBeta != null || input.gruLeak != null) {
+      this.denoiser.setConfig({ postFilterBeta: input.postFilterBeta, gruLeak: input.gruLeak })
+    }
+    if (input.enabled != null) this.denoiser.setEnabled(input.enabled)
+  }
+
+  // Latest per-hop audio telemetry (p50/p95 ms vs the render-quantum deadline,
+  // buffered latency, resolved sample rate). null until the worklet reports, or
+  // when denoise isn't active. Synchronous — the worklet pushes stats; we cache.
+  getAudioStats(): AudioStats | null {
+    return this.denoiser?.getStats() ?? null
+  }
+
 
   destroy(): void {
     this.adaptive?.stop()
     this.adaptive = null
+    this.denoiser?.destroy()
+    this.denoiser = null
     this.bgCleanup?.()
     this.bgCleanup = null
     this.previewBgCleanup?.()
@@ -423,5 +484,7 @@ export type {
   BackgroundInput, Background, BlurInput, ColorInput, ImageInput, VideoInput,
 }                                                             from './background'
 export type { PresetName, ManualPreset, ModelName }           from './presets'
-export type { AudioMode }                                     from './audio'
+export type { AudioMode, AudioInput, DenoiseOptions }         from './audio'
+export type { DenoiseModel, DenoiseTier, DenoiseModelOption } from '~/audio/kernels.ts'
+export type { AudioStats }                                    from '~/audio/messages.ts'
 export type { PipelineError, ErrorSource }                    from './messages'
