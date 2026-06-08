@@ -88,7 +88,7 @@ export interface PipelineOptions {
 // Public CDN where Longpipe hosts its own model weights. Versioned in the
 // path so SDK upgrades that change weight shapes can move to a new prefix
 // without breaking older SDKs in the wild.
-const DEFAULT_WEIGHTS_BASE_URL = 'https://cdn.longpipe.dev/models/v/0.0.2/'
+const DEFAULT_WEIGHTS_BASE_URL = 'https://cdn.longpipe.dev/models/v/0.0.3/'
 
 const DEFAULTS = {
   background:     'blur'                      as BackgroundInput,

@@ -138,7 +138,7 @@ pipeline.destroy()
 
 ## Self-hosting weights
 
-By default Longpipe fetches model weights from `https://cdn.longpipe.dev/models/v/0.0.2/`. You can browse the available files, sizes, and SHA-256 hashes at [cdn.longpipe.dev/models/v/0.0.2/index.html](https://cdn.longpipe.dev/models/v/0.0.2/index.html) (machine-readable list at [manifest.json](https://cdn.longpipe.dev/models/v/0.0.2/manifest.json)).
+By default Longpipe fetches model weights from `https://cdn.longpipe.dev/models/v/0.0.3/`. You can browse the available files, sizes, and SHA-256 hashes at [cdn.longpipe.dev/models/v/0.0.2/index.html](https://cdn.longpipe.dev/models/v/0.0.2/index.html) (machine-readable list at [manifest.json](https://cdn.longpipe.dev/models/v/0.0.2/manifest.json)).
 
 To serve them yourself, mirror the files under any base URL with the same `model_${name}.bin` naming convention and pass it via `weightsBaseUrl`:
 

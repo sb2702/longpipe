@@ -142,21 +142,16 @@
           : (currentBgConfig() ?? { blur: { sigma: 8 } })
 
         setStatus('constructing pipeline (autotune + weights fetched from default CDN by SDK)…')
-        // ?weights=/flow&preset=medium loads the locally-staged flow-bundled .bins
-        // (demo/public/flow/) → the renderer wires the optical-flow temporal path.
-        // Only set weightsBaseUrl when the param is present — passing undefined
-        // would override the SDK's CDN default (bootstrap reads opts directly).
+        // ?preset=<tier> picks a specific tier (medium/small/large/xs/xl); a quality
+        // name (fast/balanced/quality) or 'auto' passes through. Weights load from the
+        // SDK's default CDN (flow-bundled .bins).
         const params = new URLSearchParams(location.search)
-        // A tier name (medium/small/large/xs/xl) resolves to its ManualPreset; a
-        // quality name (fast/balanced/quality) or 'auto' passes through as a string.
         const presetParam = params.get('preset') || 'auto'
         const pipelineOpts = {
           background: initialBgConfig,
           preset:     PRESETS.find(p => p.model === presetParam) || presetParam,
           audio:      'drop',
         }
-        const weightsParam = params.get('weights')
-        if (weightsParam) pipelineOpts.weightsBaseUrl = weightsParam
         const pipeline = new Pipeline(inputStream, pipelineOpts)
 
         // 3. Hook output stream BEFORE awaiting ready — pipeline.stream is

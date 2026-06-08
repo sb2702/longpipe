@@ -5,12 +5,12 @@ Scans for model_*.bin (and .f16.bin) files, computes size and sha256 for each,
 and writes both a machine-readable JSON manifest and a human-readable HTML
 listing into the output directory. Designed for the CDN bucket layout — drop
 the resulting files next to the weights to expose a browsable + scriptable
-index at e.g. https://cdn.longpipe.dev/models/v/0.0.2/.
+index at e.g. https://cdn.longpipe.dev/models/v/0.0.3/.
 
 Usage:
     python scripts/generate_weights_index.py
     python scripts/generate_weights_index.py --src weights --out weights
-    python scripts/generate_weights_index.py --base-url https://cdn.longpipe.dev/models/v/0.0.2/
+    python scripts/generate_weights_index.py --base-url https://cdn.longpipe.dev/models/v/0.0.3/
 """
 
 import argparse
