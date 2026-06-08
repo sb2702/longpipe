@@ -82,7 +82,9 @@
           setStatus('constructing pipeline…')
           pipeline = new Pipeline(inputStream, {
             background:     'blur',
-            weightsBaseUrl: '/weights/',          // served locally by demo/vite.config.ts
+            // weightsBaseUrl omitted → SDK default CDN (cdn.longpipe.dev/models/v/0.0.4/).
+            // For local assets instead, pass weightsBaseUrl: '/weights/' (served
+            // by demo/vite.config.ts).
             audio:          { denoise: { model: $('model').value, postFilterBeta: +$('beta').value, gruLeak: +$('gruLeak').value } },
             debug:          true,
             onError:        (e) => { if (e.source === 'audio') setStatus('audio: ' + e.message, false) },

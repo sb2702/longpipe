@@ -12,6 +12,7 @@ import {
   type DenoiseModel, type DenoiseModelOption,
 } from './kernels'
 import { fetchKernel, simdSupported } from './fetch_assets'
+import { selectTier } from './probe'
 import type { ProcessorInit, FromWorklet, AudioStats } from './messages'
 import { WORKLET_SOURCE } from './worklet_inline'
 
@@ -56,12 +57,9 @@ export class AudioDenoiser {
     })
   }
 
-  private resolveModelChoice(): DenoiseModel {
-    // 'auto' is a capability gate for now (DFN high if SIMD, else RNNoise floor).
-    // The weight-free calibration probe (probe.ts) replaces this before publish.
-    if (this.opts.model === 'auto') return simdSupported() ? 'dfn' : 'rnnoise'
-    const model = resolveModel(this.opts.model)
-    // Explicit DFN on a no-SIMD device can't run — fall back with a warning.
+  // Explicit model/tier choice (NOT 'auto') → resolve, with a SIMD fallback.
+  private resolveExplicit(): DenoiseModel {
+    const model = resolveModel(this.opts.model as Exclude<DenoiseModelOption, 'auto'>)
     if (KERNELS[model].needsSimd && !simdSupported()) {
       this.opts.onError?.(`${model} needs wasm SIMD; falling back to rnnoise`)
       return 'rnnoise'
@@ -70,7 +68,10 @@ export class AudioDenoiser {
   }
 
   private async init(): Promise<void> {
-    const model = this.resolveModelChoice()
+    // 'auto' runs the weight-free tier probe; an explicit model/tier skips it.
+    const model = this.opts.model === 'auto'
+      ? await selectTier(this.opts.weightsBaseUrl, this.opts.onError)
+      : this.resolveExplicit()
     this.model = model
 
     const assets = await fetchKernel(model, this.opts.weightsBaseUrl)
