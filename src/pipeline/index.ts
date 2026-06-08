@@ -59,8 +59,6 @@ export interface PipelineOptions {
   // 'denoise' runs input audio through the AudioWorklet denoiser (separate from
   // the video worker). Default: 'passthrough'.
   audio?:          AudioInput
-  // Base URL for audio-denoise wasm + weights. Default: DEFAULT_AUDIO_BASE_URL.
-  audioWeightsBaseUrl?: string
   enabled?:        boolean                      // default: true
   // Output canvas dimensions. Default: matches the input video track's
   // intrinsic size (preserves aspect ratio + avoids pointless rescale).
@@ -96,20 +94,19 @@ export interface PipelineOptions {
 // Public CDN where Longpipe hosts its own model weights. Versioned in the
 // path so SDK upgrades that change weight shapes can move to a new prefix
 // without breaking older SDKs in the wild.
-const DEFAULT_WEIGHTS_BASE_URL = 'https://cdn.longpipe.dev/models/v/0.0.3/'
-// Audio-denoise assets (kernel wasm + weights packs) — versioned separately
-// from the video models since they evolve independently.
-const DEFAULT_AUDIO_BASE_URL = 'https://cdn.longpipe.dev/audio/v/0.0.1/'
+// One versioned path hosts everything — video model weights (model_*.bin) and
+// audio denoise assets (rnnoise.wasm / dfn.wasm / dfn_weights.pack). Filenames
+// disambiguate; no per-kind subfolder.
+const DEFAULT_WEIGHTS_BASE_URL = 'https://cdn.longpipe.dev/v/0.0.4/'
 
 const DEFAULTS = {
-  background:          'blur'                  as BackgroundInput,
-  preset:             'auto'                  as PresetName,
-  weightsBaseUrl:     DEFAULT_WEIGHTS_BASE_URL,
-  audio:              'passthrough'           as AudioInput,
-  audioWeightsBaseUrl: DEFAULT_AUDIO_BASE_URL,
-  enabled:            true,
-  adaptive:           true,
-  debug:              false,
+  background:     'blur'                  as BackgroundInput,
+  preset:         'auto'                  as PresetName,
+  weightsBaseUrl: DEFAULT_WEIGHTS_BASE_URL,
+  audio:          'passthrough'           as AudioInput,
+  enabled:        true,
+  adaptive:       true,
+  debug:          false,
 }
 
 // Fallback output canvas size — only used when neither the caller nor the
@@ -230,7 +227,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
       if (inputAudioTrack) {
         this.denoiser = new AudioDenoiser(inputAudioTrack, {
           model:          audio.denoise?.model ?? 'auto',
-          weightsBaseUrl: opts.audioWeightsBaseUrl,
+          weightsBaseUrl: opts.weightsBaseUrl,
           postFilterBeta: audio.denoise?.postFilterBeta,
           gruLeak:        audio.denoise?.gruLeak,
           enabled:        audio.denoise?.enabled,

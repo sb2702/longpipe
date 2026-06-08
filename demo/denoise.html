@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Longpipe — audio denoise (mic → pipeline → playback)</title>
+    <style>
+      body { margin: 0; background: #11141a; color: #dfe3ea; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .topbar { padding: 8px 16px; }
+      a { color: #6cf; }
+      h2 { padding: 0 16px; margin: 8px 0; }
+      .muted { color: #8b93a3; font-size: 13px; }
+      #status { padding: 8px 16px; font-size: 12px; color: #6cf; }
+      .row { display: flex; gap: 16px; padding: 12px 16px; align-items: flex-start; flex-wrap: wrap; }
+      video { width: 360px; height: 203px; background: #000; border: 1px solid #333; }
+      .controls { padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 10px; max-width: 560px; }
+      .controls .line { display: flex; gap: 10px; align-items: center; }
+      button { font: inherit; padding: 6px 12px; background: #2d6cdf; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+      button.toggle { background: #5bd6a0; color: #08130d; }
+      button.toggle.dry { background: #e0b25b; color: #1a1303; }
+      button:disabled { background: #3a3f4b; cursor: default; }
+      select, input[type=range] { vertical-align: middle; }
+      #stats { white-space: pre; background: #0c0e13; padding: .7rem 1rem; border-radius: 6px; min-height: 5rem; }
+      .warn { color: #e0b25b; }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><a href="/">← demos</a></div>
+    <h2>Audio denoise: mic → EffectsPipeline → playback</h2>
+    <p class="muted warn" style="padding: 0 16px;">⚠ Use headphones — playing the denoised mic on speakers feeds back into the mic.</p>
+    <div id="status">idle.</div>
+
+    <div class="controls">
+      <div class="line">
+        <label>model
+          <select id="model">
+            <option value="dfn" selected>dfn (high, f32)</option>
+            <option value="dfnint8">dfnint8 (mid, 7.6 MB)</option>
+            <option value="rnnoise">rnnoise (low)</option>
+            <option value="auto">auto</option>
+          </select>
+        </label>
+        <button id="start">Start mic</button>
+        <button id="toggle" class="toggle" disabled>Denoise: ON</button>
+        <button id="stop" disabled>Stop</button>
+      </div>
+      <div class="line"><label>post-filter β
+        <input id="beta" type="range" min="0" max="0.25" step="0.01" value="0.03"><span id="betaVal">0.030</span></label>
+      </div>
+      <div class="line"><label>GRU-leak
+        <input id="gruLeak" type="range" min="0.90" max="1.0" step="0.005" value="0.995"><span id="gruLeakVal">0.995</span></label>
+        <span class="muted">(dfn only)</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div><div class="muted">output video (effect runs; denoised audio plays via a low-latency monitor)</div>
+        <video id="out" autoplay playsinline muted></video></div>
+    </div>
+    <pre id="stats">stats: (start the mic)</pre>
+
+    <script type="module">
+      import { Pipeline } from '~/pipeline'
+
+      const $ = (id) => document.getElementById(id)
+      const setStatus = (s, ok = true) => { $('status').textContent = s; $('status').style.color = ok ? '#6cf' : '#f66'; console.log('[denoise]', s) }
+
+      let pipeline = null, inputStream = null, enabled = true, statsTimer = null, monitorCtx = null
+
+      async function start() {
+        $('start').disabled = true
+        try {
+          // Mic with the browser's own processing OFF, so we hear OUR denoiser.
+          setStatus('getUserMedia (mic + cam)…')
+          // All browser audio processing OFF — we hear ONLY our denoiser. The
+          // self-monitoring echo is avoided by playing the output through a
+          // low-latency AudioContext (below), not the high-latency <video>.
+          inputStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
+          })
+
+          setStatus('constructing pipeline…')
+          pipeline = new Pipeline(inputStream, {
+            background:     'blur',
+            weightsBaseUrl: '/weights/',          // served locally by demo/vite.config.ts
+            audio:          { denoise: { model: $('model').value, postFilterBeta: +$('beta').value, gruLeak: +$('gruLeak').value } },
+            debug:          true,
+            onError:        (e) => { if (e.source === 'audio') setStatus('audio: ' + e.message, false) },
+          })
+          $('out').srcObject = pipeline.stream   // <video> shows the processed video (muted)
+          enabled = true; $('toggle').textContent = 'Denoise: ON'; $('toggle').classList.remove('dry')
+
+          // Play the denoised audio track through a fresh AudioContext (Web Audio
+          // render path → ~ms latency) rather than the <video> element (~100-300 ms
+          // buffer). Low latency means any self-monitoring bleed fuses instead of
+          // building into an echo — same as the standalone PoC, no EC needed.
+          monitorCtx = new AudioContext()
+          await monitorCtx.resume()
+          const audioTrack = pipeline.stream.getAudioTracks()[0]
+          if (audioTrack) monitorCtx.createMediaStreamSource(new MediaStream([audioTrack])).connect(monitorCtx.destination)
+
+          await pipeline.ready                    // video ready (audio joins async)
+          setStatus('live — speak into the mic; toggle to A/B')
+          $('toggle').disabled = false; $('stop').disabled = false
+
+          statsTimer = setInterval(() => {
+            const s = pipeline?.getAudioStats()
+            $('stats').textContent = s
+              ? `model:     ${s.model}\n` +
+                `sampleRate:${s.sampleRate} Hz${s.sampleRate !== 48000 ? '  (resampling)' : ''}\n` +
+                `per-hop:   p50 ${s.p50Ms?.toFixed(3) ?? '—'} ms · p95 ${s.p95Ms?.toFixed(3) ?? '—'} ms  (deadline 2.67 ms)\n` +
+                `latency:   ${s.latencyMs.toFixed(1)} ms buffered\n` +
+                `active:    ${s.active}`
+              : 'stats: (audio worklet warming up…)'
+          }, 500)
+        } catch (err) {
+          setStatus('error: ' + (err.message || err), false); console.error(err); $('start').disabled = false
+        }
+      }
+
+      async function stop() {
+        clearInterval(statsTimer); statsTimer = null
+        monitorCtx?.close(); monitorCtx = null
+        pipeline?.destroy(); pipeline = null
+        inputStream?.getTracks().forEach((t) => t.stop()); inputStream = null
+        $('toggle').disabled = true; $('stop').disabled = true; $('start').disabled = false
+        setStatus('stopped.')
+      }
+
+      $('start').addEventListener('click', start)
+      $('stop').addEventListener('click', stop)
+      $('model').addEventListener('change', async () => { if (pipeline) { await stop(); start() } })  // model is set at construction
+      $('toggle').addEventListener('click', () => {
+        enabled = !enabled
+        pipeline?.setDenoise(enabled)
+        $('toggle').textContent = enabled ? 'Denoise: ON' : 'Denoise: OFF (passthrough)'
+        $('toggle').classList.toggle('dry', !enabled)
+      })
+      $('beta').addEventListener('input', () => { $('betaVal').textContent = (+$('beta').value).toFixed(3); pipeline?.setDenoise({ postFilterBeta: +$('beta').value }) })
+      $('gruLeak').addEventListener('input', () => { $('gruLeakVal').textContent = (+$('gruLeak').value).toFixed(3); pipeline?.setDenoise({ gruLeak: +$('gruLeak').value }) })
+    </script>
+  </body>
+</html>

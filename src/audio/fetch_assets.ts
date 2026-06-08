@@ -6,8 +6,8 @@
 import { KERNELS, type DenoiseModel } from './kernels'
 
 export interface KernelAssets {
-  module:  WebAssembly.Module
-  weights: ArrayBuffer | null
+  wasmBytes: ArrayBuffer        // compiled in the worklet, not here (see ProcessorInit)
+  weights:   ArrayBuffer | null
 }
 
 function urlFor(baseUrl: string, file: string): string {
@@ -28,15 +28,18 @@ export async function fetchKernel(model: DenoiseModel, baseUrl: string): Promise
     fetchBuffer(urlFor(baseUrl, spec.wasm)),
     spec.weights ? fetchBuffer(urlFor(baseUrl, spec.weights)) : Promise.resolve(null),
   ])
-  return { module: await WebAssembly.compile(wasmBytes), weights }
+  return { wasmBytes, weights }
 }
 
 // wasm-SIMD capability probe (DFN kernels require simd128; rnnoise has a scalar
 // fallback). Used by tier selection to gate DFN out on no-SIMD devices.
 export function simdSupported(): boolean {
   try {
+    // Minimal `() -> v128` module (a v128.const). v128.const takes 16 immediate
+    // bytes — getting that count wrong makes validate() always return false.
     return WebAssembly.validate(new Uint8Array([
-      0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 253, 12, 0, 0, 0, 0, 0, 0, 0, 0, 11,
+      0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0,
+      10, 22, 1, 20, 0, 253, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11,
     ]))
   } catch { return false }
 }

@@ -35,7 +35,10 @@ export interface AudioStats {
 // fetched on the main thread because the worklet scope can't fetch.
 export interface ProcessorInit {
   model:           DenoiseModel
-  module:          WebAssembly.Module
+  // Raw wasm bytes (not a compiled Module) — ArrayBuffers structured-clone into
+  // the AudioWorklet reliably; a WebAssembly.Module does not always. Compiled in
+  // the processor (sync compile is fine off the main thread).
+  wasmBytes:       ArrayBuffer
   weights:         ArrayBuffer | null
   enabled:         boolean
   postFilterBeta?: number

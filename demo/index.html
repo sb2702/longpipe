@@ -23,6 +23,10 @@
         <span class="desc">Local mirror of the website's <code>/demo</code> page. Source toggle (sample video / webcam), all background modes (image, blur, color, video, none), preset picker. Imports from <code>~/pipeline</code> so it tracks local SDK changes.</span>
       </li>
       <li>
+        <a href="/denoise.html">Audio denoise (mic → pipeline → playback)</a>
+        <span class="desc">Audio-denoise subsystem (separate AudioWorklet). Mic + cam → <code>EffectsPipeline</code> with <code>audio: {denoise}</code> → playback. Model picker (dfn/dfnint8/rnnoise/auto), wet/dry toggle, β + GRU-leak sliders, per-hop stats. Weights served locally from <code>/weights/</code>. <strong>Use headphones.</strong></span>
+      </li>
+      <li>
         <a href="/matting.html">Matting (static image)</a>
         <span class="desc">End-to-end matting on a still image. Pick backend (WebGPU/WebGL), precision (fp32/fp16), upscaler, and background mode.</span>
       </li>

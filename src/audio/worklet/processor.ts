@@ -3,17 +3,20 @@
 // The bare wasm Module is compiled on the main thread and handed in via
 // processorOptions; we instantiate it here (the worklet scope has no fetch /
 // no ESM). process() delivers 128-sample render quanta but the kernels work on
-// 480-sample (10 ms @ 48 kHz) hops and 480/128 = 3.75, so an input accumulator
-// + a primed output ring decouple the two. See the audio-denoising worklet PoC.
+// 480-sample (10 ms @ 48 kHz) hops, so an input accumulator + a primed output
+// ring decouple the two.
+//
+// When the AudioContext can't run at 48 kHz, two stateful rubato resamplers
+// (exposed by the DFN wasm) bridge device-rate ⇄ 48 kHz around the net. They
+// engage only when sampleRate ≠ 48000 and the kernel exposes them (DFN does;
+// rnnoise doesn't — at non-48k on rnnoise we error rather than corrupt).
 //
 // Bundled to a self-contained ESM by the inline-worklet tsup plugin and loaded
 // via Blob URL + audioWorklet.addModule (see ../worklet_inline.ts).
 
 import { KERNELS, HOP, SAMPLE_RATE, type KernelSpec } from '~/audio/kernels.ts'
-import type { ProcessorInit, ToWorklet, AudioStats } from '~/audio/messages.ts'
+import type { ProcessorInit, ToWorklet, FromWorklet, AudioStats } from '~/audio/messages.ts'
 
-// AudioWorklet globals — not in lib.dom. Minimal ambient declarations avoid an
-// @types/audioworklet dependency.
 declare const sampleRate: number
 declare abstract class AudioWorkletProcessor {
   readonly port: MessagePort
@@ -24,7 +27,9 @@ declare function registerProcessor(
   ctor: new (options: { processorOptions: ProcessorInit }) => AudioWorkletProcessor,
 ): void
 
-type WasmExports = Record<string, (...a: number[]) => number> & { memory: WebAssembly.Memory }
+type Fn = (...a: number[]) => number
+type WasmExports = Record<string, Fn> & { memory: WebAssembly.Memory }
+const RS_CAP = 4096   // resampler output-burst scratch capacity (frames)
 
 class DenoiseProcessor extends AudioWorkletProcessor {
   private cfg: KernelSpec
@@ -33,22 +38,29 @@ class DenoiseProcessor extends AudioWorkletProcessor {
   private state = 0
   private inPtr = 0
   private outPtr = 0
-  private setBeta: ((st: number, v: number) => number) | null = null
-  private setGruLeak: ((st: number, v: number) => number) | null = null
+  private setBeta: Fn | null = null
+  private setGruLeak: Fn | null = null
+
+  // Resampling (engaged only when sampleRate ≠ 48000 and the wasm supports it).
+  private resample = false
+  private rsPush: ((rs: number, inPtr: number, n: number, outPtr: number, cap: number) => number) | null = null
+  private inRs = 0
+  private outRs = 0
+  private rsDevInPtr = 0   // device-rate input scratch (one quantum)
+  private rsOutPtr = 0     // resampler output-burst scratch (RS_CAP)
 
   private enabled: boolean
   private model: ProcessorInit['model']
 
-  // 128 ⇄ 480 buffering.
+  // 128 ⇄ 480 buffering (at 48 kHz). outRing is at the OUTPUT (device) rate.
   private inAcc = new Float32Array(HOP)
   private inFill = 0
-  private outRing = new Float32Array(2048)
+  private outRing = new Float32Array(4096)
   private outRead = 0
   private outWrite = 0
   private outCount = 0
   private primed = false
 
-  // p50/p95 telemetry.
   private now: (() => number) | null
   private times = new Float32Array(256)
   private tIdx = 0
@@ -62,14 +74,8 @@ class DenoiseProcessor extends AudioWorkletProcessor {
     this.enabled = init.enabled
     this.cfg = KERNELS[init.model]
 
-    // 48 kHz only for now; the streaming resampler is the next increment. Fail
-    // loud rather than silently corrupt the net with wrong-rate samples.
-    if (sampleRate !== SAMPLE_RATE) {
-      this.post({ type: 'error', message: `AudioContext is ${sampleRate} Hz; denoise needs ${SAMPLE_RATE} Hz (resampler not yet wired)` })
-    }
-
     try {
-      const ex = this.instantiate(init.module)
+      const ex = this.instantiate(init.wasmBytes)
       const pick = (name?: string) => (name ? ex[name] : undefined)
       this.mem = ex.memory
       const malloc = ex[this.cfg.exports.malloc]
@@ -77,22 +83,31 @@ class DenoiseProcessor extends AudioWorkletProcessor {
       this.inPtr = malloc(HOP * 4)
       this.outPtr = malloc(HOP * 4)
 
-      // Build streaming state. DFN uploads the weights pack; rnnoise is parameterless.
-      if (init.weights) {
-        const wptr = this.upload(malloc, init.weights)
-        this.state = ex[this.cfg.exports.create](wptr, init.weights.byteLength)
-      } else {
-        this.state = ex[this.cfg.exports.create]()
-      }
+      if (init.weights) this.state = ex[this.cfg.exports.create](this.upload(malloc, init.weights), init.weights.byteLength)
+      else this.state = ex[this.cfg.exports.create]()
 
-      this.setBeta = (pick(this.cfg.exports.setBeta) ?? null) as typeof this.setBeta
-      this.setGruLeak = (pick(this.cfg.exports.setGruLeak) ?? null) as typeof this.setGruLeak
-      // Apply initial settings before the first hop (GRU-leak active from frame 1
-      // *prevents* drift rather than correcting it later).
+      this.setBeta = (pick(this.cfg.exports.setBeta) ?? null) as Fn | null
+      this.setGruLeak = (pick(this.cfg.exports.setGruLeak) ?? null) as Fn | null
       if (this.setBeta && (init.postFilterBeta ?? 0) > 0) this.setBeta(this.state, init.postFilterBeta!)
       if (this.setGruLeak && (init.gruLeak ?? 1) < 1) this.setGruLeak(this.state, init.gruLeak!)
+
+      // Non-48k → wire the resamplers if this wasm provides them.
+      if (sampleRate !== SAMPLE_RATE) {
+        const rsCreate = ex['df_resampler_create']
+        this.rsPush = (ex['df_resampler_push'] as typeof this.rsPush) ?? null
+        if (rsCreate && this.rsPush) {
+          this.resample = true
+          this.inRs = rsCreate(sampleRate, SAMPLE_RATE)      // device → 48k
+          this.outRs = rsCreate(SAMPLE_RATE, sampleRate)     // 48k → device
+          this.rsDevInPtr = malloc(256 * 4)
+          this.rsOutPtr = malloc(RS_CAP * 4)
+        } else {
+          this.post({ type: 'error', message: `${init.model} can't resample ${sampleRate}→48000 Hz; needs a 48 kHz AudioContext` })
+        }
+      }
     } catch (err) {
-      this.post({ type: 'error', message: `denoise init failed: ${(err as Error).message ?? String(err)}` })
+      const e = err as Error
+      this.post({ type: 'error', message: `denoise init failed: ${e.message ?? String(err)}${e.stack ? '\n' + e.stack : ''}` })
     }
 
     this.now = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : null
@@ -108,9 +123,8 @@ class DenoiseProcessor extends AudioWorkletProcessor {
     this.post({ type: 'ready' })
   }
 
-  // Instantiate the bare wasm, auto-stubbing any imports (a standalone module
-  // references at most a couple of wasi/clock fns the denoise path never hits).
-  private instantiate(module: WebAssembly.Module): WasmExports {
+  private instantiate(bytes: ArrayBuffer): WasmExports {
+    const module = new WebAssembly.Module(bytes)   // sync compile — fine off the main thread
     const imports: Record<string, Record<string, unknown>> = {}
     for (const im of WebAssembly.Module.imports(module)) {
       ;(imports[im.module] ??= {})
@@ -125,7 +139,7 @@ class DenoiseProcessor extends AudioWorkletProcessor {
   private upload(malloc: (n: number) => number, buf: ArrayBuffer): number {
     const u8 = new Uint8Array(buf)
     const ptr = malloc(u8.length)
-    new Uint8Array(this.mem.buffer).set(u8, ptr)   // re-view after malloc (may have grown)
+    new Uint8Array(this.mem.buffer).set(u8, ptr)
     return ptr
   }
 
@@ -134,10 +148,24 @@ class DenoiseProcessor extends AudioWorkletProcessor {
     return this._f32
   }
 
-  private post(msg: import('~/audio/messages.ts').FromWorklet): void { this.port.postMessage(msg) }
+  private post(msg: FromWorklet): void { this.port.postMessage(msg) }
+
+  private pushOut(v: number): void {
+    this.outRing[this.outWrite] = v
+    this.outWrite = (this.outWrite + 1) % this.outRing.length
+    this.outCount++
+  }
+
+  // Accumulate 48 kHz samples; run a hop each time 480 fill.
+  private feed48k(s: ArrayLike<number>, n: number): void {
+    for (let i = 0; i < n; i++) {
+      this.inAcc[this.inFill++] = s[i]
+      if (this.inFill === HOP) { this.runHop(); this.inFill = 0 }
+    }
+  }
 
   private runHop(): void {
-    const f32 = this.heap()
+    let f32 = this.heap()
     const inBase = this.inPtr >> 2
     for (let i = 0; i < HOP; i++) f32[inBase + i] = this.inAcc[i] * this.cfg.scaleIn
 
@@ -145,11 +173,16 @@ class DenoiseProcessor extends AudioWorkletProcessor {
     this.run(this.state, this.inPtr, this.outPtr)
     if (this.now) this.times[this.tIdx = (this.tIdx + 1) & 255] = this.now() - t0
 
-    const outBase = this.outPtr >> 2
-    for (let i = 0; i < HOP; i++) {
-      this.outRing[this.outWrite] = f32[outBase + i] * this.cfg.scaleOut
-      this.outWrite = (this.outWrite + 1) % this.outRing.length
-      this.outCount++
+    if (this.resample && this.rsPush) {
+      // outPtr holds the 48 kHz net output (DFN scaleOut === 1) — resample it to
+      // device rate and ring the result. df_resampler_push may grow memory.
+      const got = this.rsPush(this.outRs, this.outPtr, HOP, this.rsOutPtr, RS_CAP)
+      f32 = this.heap()
+      const ob = this.rsOutPtr >> 2
+      for (let i = 0; i < got; i++) this.pushOut(f32[ob + i])
+    } else {
+      const ob = this.outPtr >> 2
+      for (let i = 0; i < HOP; i++) this.pushOut(f32[ob + i] * this.cfg.scaleOut)
     }
     if (++this.hops >= 50) { this.reportStats(); this.hops = 0 }
   }
@@ -161,7 +194,7 @@ class DenoiseProcessor extends AudioWorkletProcessor {
       model: this.model,
       p50Ms: this.now ? q(0.5) : null,
       p95Ms: this.now ? q(0.95) : null,
-      latencyMs: (this.outCount / SAMPLE_RATE) * 1000,
+      latencyMs: (this.outCount / sampleRate) * 1000,
       active: this.enabled && this.state !== 0,
       sampleRate,
     }
@@ -180,13 +213,20 @@ class DenoiseProcessor extends AudioWorkletProcessor {
       return true
     }
 
-    for (let i = 0; i < n; i++) {
-      this.inAcc[this.inFill++] = inCh[i]
-      if (this.inFill === HOP) { this.runHop(); this.inFill = 0 }
+    // Feed the 480-hop accumulator with 48 kHz samples — resampled from the
+    // device rate when needed, else the input directly.
+    if (this.resample && this.rsPush) {
+      let f32 = this.heap()
+      const ib = this.rsDevInPtr >> 2
+      for (let i = 0; i < n; i++) f32[ib + i] = inCh[i]
+      const got = this.rsPush(this.inRs, this.rsDevInPtr, n, this.rsOutPtr, RS_CAP)
+      f32 = this.heap()
+      this.feed48k(f32.subarray(this.rsOutPtr >> 2, (this.rsOutPtr >> 2) + got), got)
+    } else {
+      this.feed48k(inCh, n)
     }
 
-    // Prime one full hop before draining so the ring never underruns in steady
-    // state (production is bursty: 480 every ~3.75 quanta, drained 128/quantum).
+    // Prime one hop before draining so the device-rate ring never underruns.
     if (!this.primed) {
       if (this.outCount >= HOP) this.primed = true
       else { outCh.fill(0); return true }

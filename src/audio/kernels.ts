@@ -45,7 +45,7 @@ export const KERNELS: Record<DenoiseModel, KernelSpec> = {
   rnnoise: {
     wasm: 'rnnoise.wasm', weights: null,
     scaleIn: 32768, scaleOut: 1 / 32768, needsSimd: false,
-    exports: { malloc: 'rn_malloc', create: 'rn_create', process: 'rn_process' },
+    exports: { malloc: 'malloc', create: 'rn_create', process: 'rn_process' },
   },
   dfn: {
     wasm: 'dfn.wasm', weights: 'dfn_weights.pack',
@@ -56,10 +56,12 @@ export const KERNELS: Record<DenoiseModel, KernelSpec> = {
     },
   },
   dfnint8: {
-    wasm: 'dfnint8.wasm', weights: 'dfn_weights_int8.pack',
+    // Same dfn.wasm; its own pre-quantized pack (~7.6 MB vs 13.2) — bit-identical
+    // to quantizing the f32 pack at load, just a smaller download.
+    wasm: 'dfn.wasm', weights: 'dfn_weights_int8.pack',
     scaleIn: 1, scaleOut: 1, needsSimd: true,
     exports: {
-      malloc: 'df_lite_malloc', create: 'df_lite_create', process: 'df_lite_process',
+      malloc: 'df_lite_malloc', create: 'df_lite_create_i8', process: 'df_lite_process',
       setBeta: 'df_lite_set_beta', setGruLeak: 'df_lite_set_gru_leak',
     },
   },

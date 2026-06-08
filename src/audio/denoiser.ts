@@ -79,7 +79,7 @@ export class AudioDenoiser {
 
     const processorOptions: ProcessorInit = {
       model,
-      module:         assets.module,
+      wasmBytes:      assets.wasmBytes,
       weights:        assets.weights,
       enabled:        this.opts.enabled ?? true,
       postFilterBeta: this.opts.postFilterBeta ?? DEFAULT_BETA,

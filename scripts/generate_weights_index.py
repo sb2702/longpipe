@@ -5,12 +5,12 @@ Scans for model_*.bin (and .f16.bin) files, computes size and sha256 for each,
 and writes both a machine-readable JSON manifest and a human-readable HTML
 listing into the output directory. Designed for the CDN bucket layout — drop
 the resulting files next to the weights to expose a browsable + scriptable
-index at e.g. https://cdn.longpipe.dev/models/v/0.0.3/.
+index at e.g. https://cdn.longpipe.dev/models/v/0.0.4/.
 
 Usage:
     python scripts/generate_weights_index.py
     python scripts/generate_weights_index.py --src weights --out weights
-    python scripts/generate_weights_index.py --base-url https://cdn.longpipe.dev/models/v/0.0.3/
+    python scripts/generate_weights_index.py --base-url https://cdn.longpipe.dev/models/v/0.0.4/
 """
 
 import argparse
@@ -21,6 +21,10 @@ import struct
 from pathlib import Path
 
 PATTERN = "model_*.bin"
+# Audio-denoise assets live in the same CDN dir but aren't model_*.bin and have
+# no SDK header (wasm is wasm; the dfn pack is its own format) — indexed as
+# opaque binaries (size + sha256 only).
+AUDIO_FILES = ("dfn.wasm", "rnnoise.wasm", "dfn_weights.pack", "dfn_weights_int8.pack")
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_SRC = SCRIPT_DIR.parent / "weights"
 
@@ -62,6 +66,15 @@ def read_header(path: Path) -> dict:
     else:
         kind = "unknown"
     return {"dtype": dtype, "kind": kind, "hasGru": "gru" in keys, "top": keys}
+
+
+def describe(path: Path) -> dict:
+    """Structure metadata for video model_*.bin (via the SDK header); opaque
+    metadata for the audio denoise assets (no header — size + sha256 only)."""
+    if path.suffix == ".bin" and path.name.startswith("model_"):
+        return read_header(path)
+    kind = {".wasm": "audio-wasm", ".pack": "audio-weights"}.get(path.suffix, "audio")
+    return {"dtype": "-", "kind": kind, "hasGru": False, "top": []}
 
 
 def render_html(files, generated, base_url):
@@ -131,15 +144,15 @@ def main():
         raise SystemExit(f"Source directory not found: {src}")
     out.mkdir(parents=True, exist_ok=True)
 
-    paths = sorted(src.glob(PATTERN))
+    paths = sorted(src.glob(PATTERN)) + [src / n for n in AUDIO_FILES if (src / n).exists()]
     if not paths:
-        raise SystemExit(f"No files matching {PATTERN} in {src}")
+        raise SystemExit(f"No files matching {PATTERN} (or audio assets) in {src}")
 
     files = []
     for p in paths:
         size = p.stat().st_size
         digest = sha256_of(p)
-        hdr = read_header(p)
+        hdr = describe(p)
         files.append({"name": p.name, "size": size, "sha256": digest,
                       "dtype": hdr["dtype"], "kind": hdr["kind"], "hasGru": hdr["hasGru"]})
         gru = " gru" if hdr["hasGru"] else ""
