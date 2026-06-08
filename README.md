@@ -108,6 +108,45 @@ new EffectsPipeline(stream, {
 })
 ```
 
+## Audio denoise
+
+Real-time speech denoising runs as a **separate AudioWorklet pipeline** on the audio render thread — independent of the video/GPU pipeline, in parallel. Pass `audio: 'denoise'` and the input stream's mic is cleaned in place; `pipeline.stream` carries the denoised audio track.
+
+```ts
+const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+new EffectsPipeline(stream, { audio: 'denoise' })   // auto-picks a model for the device
+```
+
+Three models back three tiers. `auto` (the default) runs a tiny **weight-free probe** at init — it times the real network on this device *without* downloading the multi-MB weights — and picks the best fit:
+
+| `model`   | tier | what it is |
+|-----------|------|------------|
+| `dfn`     | high | DeepFilterNet3, full f32 — best quality |
+| `dfnint8` | mid  | DeepFilterNet3 with int8 GRUs — smaller download, faster on weak hardware |
+| `rnnoise` | low  | classic RNNoise — tiny, and the fallback where wasm SIMD is unavailable |
+
+```ts
+// force a specific model or tier instead of probing
+new EffectsPipeline(stream, { audio: { denoise: { model: 'dfn' } } })
+
+interface DenoiseOptions {
+  model?:          'auto' | 'high' | 'mid' | 'low' | 'rnnoise' | 'dfn' | 'dfnint8'  // default 'auto'
+  postFilterBeta?: number    // DFN post-filter, suppresses residual noise (default 0.03)
+  gruLeak?:        number     // DFN recurrent-drift bound (default 0.995)
+  enabled?:        boolean    // start denoising vs. passthrough (default true)
+}
+```
+
+Toggle, reconfigure, and inspect at runtime:
+
+```ts
+pipeline.setDenoise(false)                      // passthrough (cheap to re-enable)
+pipeline.setDenoise({ postFilterBeta: 0.05 })   // tweak DFN params live
+pipeline.getAudioStats()                        // { model, p50Ms, p95Ms, latencyMs, sampleRate, active }
+```
+
+The denoiser handles sample-rate conversion internally (it runs at 48 kHz and resamples when the device can't). `pipeline.ready` resolves on the video first frame and does **not** wait on audio — denoising joins asynchronously, with the mic passing through until it's live.
+
 ## Other options
 
 ```ts
@@ -115,7 +154,7 @@ new EffectsPipeline(stream, {
   background:       'blur',
   preset:           'auto',
   adaptive:         true,                          // default; only applies when preset is 'auto'
-  audio:            'passthrough',                 // or 'drop'
+  audio:            'denoise',                 // 'passthrough' | 'drop' | 'denoise' | { denoise: {...} }
   outputResolution: { w: 1280, h: 720 },           // default: matches the input video track
   weightsBaseUrl:   'https://your-cdn/longpipe/',  // default: cdn.longpipe.dev
   enabled:          true,                          // false = pass input through unchanged
@@ -138,7 +177,7 @@ pipeline.destroy()
 
 ## Self-hosting weights
 
-By default Longpipe fetches model weights from `https://cdn.longpipe.dev/models/v/0.0.3/`. You can browse the available files, sizes, and SHA-256 hashes at [cdn.longpipe.dev/models/v/0.0.2/index.html](https://cdn.longpipe.dev/models/v/0.0.2/index.html) (machine-readable list at [manifest.json](https://cdn.longpipe.dev/models/v/0.0.2/manifest.json)).
+By default Longpipe fetches model weights from `https://cdn.longpipe.dev/models/v/0.0.4/`. You can browse the available files, sizes, and SHA-256 hashes at [cdn.longpipe.dev/models/v/0.0.4/index.html](https://cdn.longpipe.dev/models/v/0.0.4/index.html) (machine-readable list at [manifest.json](https://cdn.longpipe.dev/models/v/0.0.4/manifest.json)).
 
 To serve them yourself, mirror the files under any base URL with the same `model_${name}.bin` naming convention and pass it via `weightsBaseUrl`:
 
@@ -181,13 +220,10 @@ Training scripts, fixture generation, and the weight export pipeline are not yet
 ## Roadmap
 
 - [x] Background segmentation / virtual backgrounds
-- [x] WebGPU + WebGL2 backends, f16 + f32
-- [x] Worker-based pipeline with per-browser transport selection
-- [x] Autotuned + adaptive preset selection
-- [ ] Face landmark detection
+- [x] Background noise removal (audio, separate pipeline)
+- [ ] Face Landmarks / Touchup / AR Effects
 - [ ] Lighting correction
-- [ ] Background noise removal (audio, separate pipeline)
-- [ ] Mobile SDKs
+
 
 ## License
 
