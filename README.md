@@ -33,6 +33,7 @@ const inputStream = await navigator.mediaDevices.getUserMedia({ video: true, aud
 
 const pipeline = new EffectsPipeline(inputStream, {
   background: 'blur',
+  audio: 'denoise'
 })
 
 videoEl.srcObject = pipeline.stream   // available immediately
