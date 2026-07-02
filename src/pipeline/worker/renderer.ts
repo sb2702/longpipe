@@ -488,6 +488,10 @@ export class Renderer {
     switch (bg.kind) {
       case 'none':
         return { mode: 'solid', color: [0, 0, 0] }
+      case 'transparent':
+        return { mode: 'transparent' }
+      case 'matte':
+        return { mode: 'matte' }
       case 'color':
         return { mode: 'solid', color: bg.rgb }
       case 'blur':

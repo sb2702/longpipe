@@ -21,6 +21,8 @@ const SIGMA_HIGH   = 16
 
 export type BackgroundInput =
   | 'blur' | 'none'
+  | 'transparent'                          // isolate subject on transparency (matte → alpha)
+  | 'matte'                                // render the raw alpha matte (white silhouette)
   | string                                 // URL → image
   | ImageBitmap
   | HTMLImageElement
@@ -54,6 +56,8 @@ export type VideoInput =
 
 export type Background =
   | { kind: 'none' }
+  | { kind: 'transparent' }                            // subject isolated on transparency
+  | { kind: 'matte' }                                  // raw alpha matte (white silhouette)
   | { kind: 'color'; rgb: [number, number, number] }   // floats in [0, 1] — shader-ready
   | { kind: 'blur';  sigma: number }
   | { kind: 'image'; bitmap: ImageBitmap }
@@ -78,6 +82,8 @@ export interface NormalizedBackground {
 export async function normalizeBackground(input: BackgroundInput): Promise<NormalizedBackground> {
   if (typeof input === 'string') {
     if (input === 'none') return { background: { kind: 'none' } }
+    if (input === 'transparent') return { background: { kind: 'transparent' } }
+    if (input === 'matte') return { background: { kind: 'matte' } }
     if (input === 'blur') return { background: { kind: 'blur', sigma: SIGMA_MEDIUM } }
     return { background: { kind: 'image', bitmap: await loadImageFromUrl(input) } }
   }

@@ -81,7 +81,21 @@ new EffectsPipeline(stream, { background: { video: 'https://example.com/bg.mp4' 
 // solid color — hex string or [r, g, b] floats in [0, 1]
 new EffectsPipeline(stream, { background: { color: '#00b050' } })       // greenscreen
 new EffectsPipeline(stream, { background: { color: [0, 0.7, 0.3] } })
+
+// isolate the subject on a TRANSPARENT background — the matte becomes the
+// canvas alpha channel, so the subject can be composited over anything (e.g.
+// a WebGL scene) with no keying. Premultiplied output.
+new EffectsPipeline(stream, { background: 'transparent' })
+
+// render the raw alpha matte as a white silhouette — a debug view and a
+// reusable mask you can composite against your own full-resolution source.
+new EffectsPipeline(stream, { background: 'matte' })
 ```
+
+> `transparent` / `matte` only carry alpha on a canvas surface (the output
+> `MediaStream`'s video track is always opaque). Route them to a page-owned
+> canvas via `attachPreview(canvas)` + `setPreview({ background: 'transparent' })`,
+> whose context is configured with premultiplied alpha.
 
 Swap at runtime:
 
