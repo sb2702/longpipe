@@ -31,6 +31,8 @@ import { CompositeSolidWebGL } from '~/model/backends/webgl/ops/composite_solid.
 import { CompositeImageWebGL } from '~/model/backends/webgl/ops/composite_image.ts'
 import { CompositeImageBilinearWebGL } from '~/model/backends/webgl/ops/composite_image_bilinear.ts'
 import { CompositePassthroughWebGL } from '~/model/backends/webgl/ops/composite_passthrough.ts'
+import { CompositeTransparentWebGL } from '~/model/backends/webgl/ops/composite_transparent.ts'
+import { CompositeMatteWebGL } from '~/model/backends/webgl/ops/composite_matte.ts'
 import { InputWebGL } from '~/model/backends/webgl/ops/input.ts'
 
 export interface WebGLBackendOptions {
@@ -111,6 +113,10 @@ export class WebGLBackend implements Backend {
         new CompositeImageBilinearWebGL(this, image, alpha, bg),
       CompositePassthrough: (image) =>
         new CompositePassthroughWebGL(this, image),
+      CompositeTransparent: (image, alpha) =>
+        new CompositeTransparentWebGL(this, image, alpha),
+      CompositeMatte: (alpha) =>
+        new CompositeMatteWebGL(this, alpha),
     }
   }
 

@@ -4,6 +4,8 @@ import { BicubicUpscaler  } from '~/model/effects/upscale_bicubic.ts'
 import { CompositorSolid } from '~/model/effects/compositor_solid.ts'
 import { CompositorImage } from '~/model/effects/compositor_image.ts'
 import { CompositorBlur }  from '~/model/effects/compositor_blur.ts'
+import { CompositorTransparent } from '~/model/effects/compositor_transparent.ts'
+import { CompositorMatte } from '~/model/effects/compositor_matte.ts'
 
 export type UpscalerMode = 'bilinear' | 'bicubic'
 
@@ -11,6 +13,10 @@ export type BackgroundConfig =
   | { mode: 'solid'; color: [number, number, number] }
   | { mode: 'image'; image: Tensor }
   | { mode: 'blur';  sigma: number }
+  // Isolate the subject on a transparent background (matte → canvas alpha).
+  | { mode: 'transparent' }
+  // Render the raw alpha matte as a white silhouette.
+  | { mode: 'matte' }
 
 // What compositeTo() can render: an effect (BackgroundConfig) or raw
 // passthrough (input image straight to the target, no alpha/bg). The renderer
@@ -209,9 +215,11 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
     if (!this.upscaler) throw new Error('RenderOp.compositeTo (effect spec) called before attachNetwork')
     const alpha = this.upscaler.output
     switch (spec.mode) {
-      case 'solid': return new CompositorSolid(backend, image, alpha, spec.color, target)
-      case 'image': return new CompositorImage(backend, image, alpha, spec.image, target)
-      case 'blur':  return new CompositorBlur(backend,  image, alpha, spec.sigma, target)
+      case 'solid':       return new CompositorSolid(backend, image, alpha, spec.color, target)
+      case 'image':       return new CompositorImage(backend, image, alpha, spec.image, target)
+      case 'blur':        return new CompositorBlur(backend,  image, alpha, spec.sigma, target)
+      case 'transparent': return new CompositorTransparent(backend, image, alpha, target)
+      case 'matte':       return new CompositorMatte(backend, alpha, target)
     }
   }
 }
@@ -224,6 +232,9 @@ function sameSpec(a: CompositeSpec, b: CompositeSpec): boolean {
   if (a.mode !== b.mode) return false
   switch (b.mode) {
     case 'passthrough': return true
+    // No parameters — mode equality (checked above) is sufficient.
+    case 'transparent': return true
+    case 'matte':       return true
     case 'solid': {
       const ac = (a as { color: [number, number, number] }).color
       return ac[0] === b.color[0] && ac[1] === b.color[1] && ac[2] === b.color[2]

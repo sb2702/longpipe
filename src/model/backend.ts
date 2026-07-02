@@ -222,6 +222,13 @@ export interface Backend {
     // by RenderOp when the renderer is disabled (true GPU-level passthrough
     // — input frame in, same frame on the canvas).
     CompositePassthrough:    (image: Tensor, target?: RenderTarget) => Presenter;
+    // Transparent: composites image over nothing, using alpha as the canvas
+    // alpha channel — the subject is isolated so whatever sits behind the
+    // canvas shows through. Premultiplied output.
+    CompositeTransparent:    (image: Tensor, alpha: Tensor, target?: RenderTarget) => Presenter;
+    // Matte: renders the raw 1-channel alpha as a premultiplied white
+    // silhouette (rgb = a, alpha = a). Debug view + reusable mask.
+    CompositeMatte:          (alpha: Tensor, target?: RenderTarget) => Presenter;
   };
 
   // Register an additional output canvas under `name` so presenters can target

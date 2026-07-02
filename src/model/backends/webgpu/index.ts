@@ -31,6 +31,8 @@ import { CompositeSolidWebGPU } from "~/model/backends/webgpu/ops/composite_soli
 import { CompositeImageWebGPU } from "~/model/backends/webgpu/ops/composite_image.ts";
 import { CompositeImageBilinearWebGPU } from "~/model/backends/webgpu/ops/composite_image_bilinear.ts";
 import { CompositePassthroughWebGPU } from "~/model/backends/webgpu/ops/composite_passthrough.ts";
+import { CompositeTransparentWebGPU } from "~/model/backends/webgpu/ops/composite_transparent.ts";
+import { CompositeMatteWebGPU } from "~/model/backends/webgpu/ops/composite_matte.ts";
 import { InputWebGPU } from "~/model/backends/webgpu/ops/input.ts";
 
 const STORAGE = navigator.gpu ? GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST : 0;
@@ -133,6 +135,24 @@ export class WebGPUBackend implements Backend {
       },
       CompositePassthrough: (image, target = "main") => {
         const op = new CompositePassthroughWebGPU(this, image);
+        return {
+          run: () => {
+            op.setOutput(this.getCurrentDisplayTexture(target));
+            op.run();
+          },
+        };
+      },
+      CompositeTransparent: (image, alpha, target = "main") => {
+        const op = new CompositeTransparentWebGPU(this, image, alpha);
+        return {
+          run: () => {
+            op.setOutput(this.getCurrentDisplayTexture(target));
+            op.run();
+          },
+        };
+      },
+      CompositeMatte: (alpha, target = "main") => {
+        const op = new CompositeMatteWebGPU(this, alpha);
         return {
           run: () => {
             op.setOutput(this.getCurrentDisplayTexture(target));
