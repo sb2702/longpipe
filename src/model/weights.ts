@@ -71,6 +71,19 @@ export interface FlowWeights {
   predict:    Conv2DWeights[]   // cat→4 (flow .xy), k3; finest = base/4
 }
 
+// Face-landmark regressor weights (training/landmarks, mesh preset: width 0.5,
+// head_c 32). All convs BN-fused, canonical mat4x4 conv layout. `blocks` is the
+// 10-conv dense stack in order (stride pattern lives in the network's config).
+// `fc` ships as a kernel-4 VALID conv over the 4×4×32 head activation — a k×k
+// conv with no padding on a k×k input IS the fully-connected layer, so the
+// PyTorch fc.weight reshapes to [956, 32, 4, 4] with no column permutation.
+export interface LandmarkWeights {
+  stem:     Conv2DWeights     // 3(→4)→8, k3 s2 p1, relu6
+  blocks:   Conv2DWeights[]   // dense k3 p1 stack (see LandmarkNet.BLOCKS)
+  headConv: Conv2DWeights     // 96→32, k1, relu6
+  fc:       Conv2DWeights     // 32→956 as k4 valid conv → 1×1×956 (478 × xy in [0,1])
+}
+
 export interface ModelWeights {
   encoder: {
     stem: Conv2DWeights
