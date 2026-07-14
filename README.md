@@ -105,7 +105,7 @@ You can also pass a manual config:
 
 ```ts
 new EffectsPipeline(stream, {
-  preset: { model: 'large', dtype: 'f32', resolution: { w: 640, h: 360 }, skipFrames: 0 },
+  preset: { model: 'large', dtype: 'f32', resolution: { w: 640, h: 400 }, skipFrames: 0 },
 })
 ```
 
@@ -205,11 +205,11 @@ Five trained presets cover the hardware range. "Resolution" is the model's worki
 
 | Preset | Resolution | Encoder      | Decoder  | Skip frames |
 |--------|------------|--------------|----------|-------------|
-| xl     | 1280×720   | full (lite3) | 2× ch    | 0           |
-| large  | 640×360    | full (lite0) | standard | 0           |
-| medium | 512×288    | full (lite0) | standard | 1           |
-| small  | 384×216    | small        | standard | 1           |
-| xs     | 384×216    | small        | standard | 2           |
+| xl     | 1280×768   | full (lite3) | 2× ch    | 0           |
+| large  | 640×400    | full (lite0) | standard | 0           |
+| medium | 512×320    | full (lite0) | standard | 1           |
+| small  | 384×224    | small        | standard | 1           |
+| xs     | 384×240    | small        | standard | 2           |
 
 `Skip frames` is how many input frames the model sits out between runs — the compositor still renders every frame using the most recent alpha matte. Autotune picks one of these at init based on a microbenchmark of the actual network on the actual device.
 

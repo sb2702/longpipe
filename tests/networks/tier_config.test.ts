@@ -27,11 +27,16 @@ describe('tier_config ↔ presets', () => {
     }
   })
 
-  it('canvasRes / baseRes are 16:9 and canvas ≥ base', () => {
+  // Base shapes mirror train_run.py PRESETS 'landscape' (not exactly 16:9 —
+  // e.g. large is 256×160). The structural invariant is the wrapper stride:
+  // canvasRes = baseRes × canvas_mul for the tier's variant.
+  it('canvasRes = baseRes × wrapper canvas_mul', () => {
+    const CANVAS_MUL: Record<string, number> = { A: 2, B: 3, D: 2.5, E: 4 }
     for (const [name, cfg] of Object.entries(TIER_CONFIG)) {
-      expect(Math.abs(cfg.canvasRes.w / cfg.canvasRes.h - 16 / 9), `${name} canvas`).toBeLessThan(0.02)
-      expect(Math.abs(cfg.baseRes.w   / cfg.baseRes.h   - 16 / 9), `${name} base`).toBeLessThan(0.02)
-      expect(cfg.canvasRes.w, `${name} canvas≥base`).toBeGreaterThanOrEqual(cfg.baseRes.w)
+      const mul = CANVAS_MUL[cfg.wrapper.variant]
+      expect(mul, `${name} known variant`).toBeDefined()
+      expect(cfg.canvasRes.w, `${name} canvas w`).toBe(Math.round(cfg.baseRes.w * mul))
+      expect(cfg.canvasRes.h, `${name} canvas h`).toBe(Math.round(cfg.baseRes.h * mul))
     }
   })
 })

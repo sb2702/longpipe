@@ -4,7 +4,7 @@ import { DepthwiseSeparable } from '~/model/blocks/depthwise_separable.ts'
 import { MBConv } from '~/model/blocks/mbconv.ts'
 import { DecoderBlock } from '~/model/blocks/decoder_block.ts'
 
-// XL: 320×180 base, tf_efficientnet_lite3 encoder (deeper than lite0 — stages
+// XL: 320×192 base, tf_efficientnet_lite3 encoder (deeper than lite0 — stages
 // have 3/3/5/5/6 blocks), xl decoder (256,128,64,32). Skips: stage1 (32ch @/4),
 // stage2 (48ch @/8), stage4 (136ch @/16); bottleneck-in = stage6 (384ch @/32).
 //

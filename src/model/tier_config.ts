@@ -18,8 +18,9 @@ export interface TierConfig {
   wrapper: UNetWrapperParams   // variant, cHigh, cLow, cUp
   // x_hr (network input) AND alpha-output resolution. The wrapper down-path
   // strides this down to baseRes (canvasRes / canvas_mul, mul set by variant:
-  // A=2, B=3, D=2.5, E=4). 16:9 production constants — must match what the
-  // checkpoints were exported at (training/deploy/export_sdk_weights.py).
+  // A=2, B=3, D=2.5, E=4). Production constants mirroring train_run.py PRESETS
+  // 'landscape' shapes (no longer exactly 16:9 — e.g. large is 256×160 = 8:5) —
+  // must match what the checkpoints were exported at (export_sdk_weights.py).
   canvasRes: Res
   // Base-network input resolution (the wrapper's adapted base input). Also the
   // resolution the optical-flow net predicts at (base/4) before warp-res upsample.
@@ -34,9 +35,9 @@ const LARGE = EfficientNetLiteMattingLarge as unknown as BaseNetworkCtor
 const XL    = EfficientNetLiteMattingXL    as unknown as BaseNetworkCtor
 
 export const TIER_CONFIG: Record<string, TierConfig> = {
-  xs:     { base: SMALL, wrapper: { variant: 'B', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 384,  h: 216 }, baseRes: { w: 128, h: 72  }, flowFuseStem: true },
-  small:  { base: SMALL, wrapper: { variant: 'A', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 384,  h: 216 }, baseRes: { w: 192, h: 108 } },
-  medium: { base: LARGE, wrapper: { variant: 'A', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 512,  h: 288 }, baseRes: { w: 256, h: 144 } },
-  large:  { base: LARGE, wrapper: { variant: 'D', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 640,  h: 360 }, baseRes: { w: 256, h: 144 } },
-  xl:     { base: XL,    wrapper: { variant: 'E', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 1280, h: 720 }, baseRes: { w: 320, h: 180 } },
+  xs:     { base: SMALL, wrapper: { variant: 'B', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 384,  h: 240 }, baseRes: { w: 128, h: 80  }, flowFuseStem: true },
+  small:  { base: SMALL, wrapper: { variant: 'A', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 384,  h: 224 }, baseRes: { w: 192, h: 112 } },
+  medium: { base: LARGE, wrapper: { variant: 'A', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 512,  h: 320 }, baseRes: { w: 256, h: 160 } },
+  large:  { base: LARGE, wrapper: { variant: 'D', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 640,  h: 400 }, baseRes: { w: 256, h: 160 } },
+  xl:     { base: XL,    wrapper: { variant: 'E', cHigh: 4, cLow: 4, cUp: 2 }, canvasRes: { w: 1280, h: 768 }, baseRes: { w: 320, h: 192 } },
 }

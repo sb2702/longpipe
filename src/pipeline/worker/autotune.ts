@@ -37,7 +37,7 @@ type RunnableCtor = new (b: Backend, i: Tensor, w: ModelWeights) => { run(): voi
 
 // NOTE: this benches the BASE network alone (encoder+decoder) at base res —
 // the dominant cost and a reasonable proxy for relative tier ordering. It does
-// NOT model the wrapper down/up-path (which at xl runs at 1280×720 and is not
+// NOT model the wrapper down/up-path (which at xl runs at 1280×768 and is not
 // negligible) or the ConvGRU. Adaptive FPS-downgrade corrects an over-pick at
 // runtime. Follow-up: bench the full TierModel (needs synth weights for the
 // wrapper/gru ops, beyond the 4 the synth backend intercepts today).

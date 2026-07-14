@@ -11,8 +11,8 @@ import type { FlowWeights } from '~/model/weights'
 const DEC_W = 16
 const KS = [5, 5, 3, 3]
 const TIERS = [
-  { name: 'medium-lite0', taps: [24, 40, 112, 320], baseH: 144, baseW: 256 },
-  { name: 'xl-lite3',     taps: [32, 48, 136, 384], baseH: 180, baseW: 320 },
+  { name: 'medium-lite0', taps: [24, 40, 112, 320], baseH: 160, baseW: 256 },
+  { name: 'xl-lite3',     taps: [32, 48, 136, 384], baseH: 192, baseW: 320 },
 ]
 
 const convOut = (n: number, k: number, s: number, p: number) => Math.floor((n + 2 * p - k) / s) + 1
