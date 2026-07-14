@@ -71,6 +71,19 @@ export interface FlowWeights {
   predict:    Conv2DWeights[]   // cat→4 (flow .xy), k3; finest = base/4
 }
 
+// Face-keypoint heatmap decoder weights — a separate decoder off the shared
+// matting encoder (training MattingModel.face_*). Rides the tier .bin as an
+// optional top-level `face` key (like `flow`), version-locked to that base's
+// encoder taps. proj: 1×1 coarsest-tap→64 relu6; block1/2: DecoderBlocks up two
+// skip levels (→48, →32); out: 1×1 32→5 padded to 8 — heatmap LOGITS, ch 0-4 =
+// L-eye, R-eye, nose, L-mouth, R-mouth (RetinaFace order), ch 5-7 dead.
+export interface FaceWeights {
+  proj:   Conv2DWeights
+  block1: DecoderBlockWeights
+  block2: DecoderBlockWeights
+  out:    Conv2DWeights
+}
+
 // Face-landmark regressor weights (training/landmarks, mesh preset: width 0.5,
 // head_c 32). All convs BN-fused, canonical mat4x4 conv layout. `blocks` is the
 // 10-conv dense stack in order (stride pattern lives in the network's config).
