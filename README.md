@@ -198,14 +198,14 @@ Works on Chromium (Chrome, Edge), Firefox, and Safari (desktop and iOS). WebGPU 
 
 Two layers:
 
-- **Model** (`src/model/`) — an EfficientNet-Lite encoder (lite0; lite4 on the `xl` tier) with a U-Net decoder, plus a lightweight U-Net *wrapper* that sharpens the matte at higher resolution and a temporal ConvGRU that smooths it across frames. Written as TypeScript op classes — each layer is a class; weights load as binary tensors at init; the backend (WebGPU or WebGL2) is injected at construction. BatchNorm is fused into conv weights at export — there is no BN op at inference.
+- **Model** (`src/model/`) — an EfficientNet-Lite encoder (lite0; lite3 on the `xl` tier) with a U-Net decoder, plus a lightweight U-Net *wrapper* that sharpens the matte at higher resolution and a temporal ConvGRU that smooths it across frames. Written as TypeScript op classes — each layer is a class; weights load as binary tensors at init; the backend (WebGPU or WebGL2) is injected at construction. BatchNorm is fused into conv weights at export — there is no BN op at inference.
 - **Pipeline** (`src/pipeline/`) — capability detection, per-browser frame transport selection, worker spawn, audio passthrough, autotune, and the adaptive controller. Designed to absorb the browser/codec/canvas plumbing complexity so consumers don't have to. 
 
 Five trained presets cover the hardware range. "Resolution" is the model's working (canvas) resolution; the encoder runs at a lower internal resolution and the U-Net wrapper refines back up to this.
 
 | Preset | Resolution | Encoder      | Decoder  | Skip frames |
 |--------|------------|--------------|----------|-------------|
-| xl     | 1280×720   | full (lite4) | 2× ch    | 0           |
+| xl     | 1280×720   | full (lite3) | 2× ch    | 0           |
 | large  | 640×360    | full (lite0) | standard | 0           |
 | medium | 512×288    | full (lite0) | standard | 1           |
 | small  | 384×216    | small        | standard | 1           |

@@ -4,15 +4,15 @@ import { OpticalFlowNet } from '~/model/networks/optical_flow_net'
 import type { FlowWeights } from '~/model/weights'
 
 // Structural smoke for the flow head across encoder shapes: synthetic weights at
-// real tier dims. Includes XL (lite4) — its real checkpoint was trained on the
-// newer flow_model.py schema, so it's smoke-only here; fidelity (real weights) is
-// covered for lite0 tiers in optical_flow_fidelity.test.ts.
+// real tier dims. Includes XL (lite3) — no trained lite3 flow checkpoint yet, so
+// it's smoke-only here; fidelity (real weights) is covered for lite0 tiers in
+// optical_flow_fidelity.test.ts.
 
 const DEC_W = 16
 const KS = [5, 5, 3, 3]
 const TIERS = [
   { name: 'medium-lite0', taps: [24, 40, 112, 320], baseH: 144, baseW: 256 },
-  { name: 'xl-lite4',     taps: [32, 56, 160, 448], baseH: 180, baseW: 320 },
+  { name: 'xl-lite3',     taps: [32, 48, 136, 384], baseH: 180, baseW: 320 },
 ]
 
 const convOut = (n: number, k: number, s: number, p: number) => Math.floor((n + 2 * p - k) / s) + 1

@@ -4,36 +4,35 @@ import { DepthwiseSeparable } from '~/model/blocks/depthwise_separable.ts'
 import { MBConv } from '~/model/blocks/mbconv.ts'
 import { DecoderBlock } from '~/model/blocks/decoder_block.ts'
 
-// XL: 320×180 base, tf_efficientnet_lite4 encoder (deeper than lite0 — stages
-// have 4/4/6/6/8 blocks), xl decoder (256,128,64,32). Skips: stage1 (32ch @/4),
-// stage2 (56ch @/8), stage4 (160ch @/16); bottleneck-in = stage6 (448ch @/32).
+// XL: 320×180 base, tf_efficientnet_lite3 encoder (deeper than lite0 — stages
+// have 3/3/5/5/6 blocks), xl decoder (256,128,64,32). Skips: stage1 (32ch @/4),
+// stage2 (48ch @/8), stage4 (136ch @/16); bottleneck-in = stage6 (384ch @/32).
 //
 // Per-block MBConv spec [in, mid, out, kernel, stride] per stage (from timm
-// tf_efficientnet_lite4). expand-ratio 6; the first block of each stage changes
+// tf_efficientnet_lite3). expand-ratio 6; the first block of each stage changes
 // channels (and strides where shown).
 interface BlockSpec { in: number; mid: number; out: number; k: number; s: number }
 const STAGES: BlockSpec[][] = [
-  // s1 (4)
+  // s1 (3)
   [ { in: 24,  mid: 144,  out: 32,  k: 3, s: 2 }, { in: 32,  mid: 192,  out: 32,  k: 3, s: 1 },
-    { in: 32,  mid: 192,  out: 32,  k: 3, s: 1 }, { in: 32,  mid: 192,  out: 32,  k: 3, s: 1 } ],
-  // s2 (4)
-  [ { in: 32,  mid: 192,  out: 56,  k: 5, s: 2 }, { in: 56,  mid: 336,  out: 56,  k: 5, s: 1 },
-    { in: 56,  mid: 336,  out: 56,  k: 5, s: 1 }, { in: 56,  mid: 336,  out: 56,  k: 5, s: 1 } ],
-  // s3 (6)
-  [ { in: 56,  mid: 336,  out: 112, k: 3, s: 2 }, { in: 112, mid: 672,  out: 112, k: 3, s: 1 },
-    { in: 112, mid: 672,  out: 112, k: 3, s: 1 }, { in: 112, mid: 672,  out: 112, k: 3, s: 1 },
-    { in: 112, mid: 672,  out: 112, k: 3, s: 1 }, { in: 112, mid: 672,  out: 112, k: 3, s: 1 } ],
-  // s4 (6)
-  [ { in: 112, mid: 672,  out: 160, k: 5, s: 1 }, { in: 160, mid: 960,  out: 160, k: 5, s: 1 },
-    { in: 160, mid: 960,  out: 160, k: 5, s: 1 }, { in: 160, mid: 960,  out: 160, k: 5, s: 1 },
-    { in: 160, mid: 960,  out: 160, k: 5, s: 1 }, { in: 160, mid: 960,  out: 160, k: 5, s: 1 } ],
-  // s5 (8)
-  [ { in: 160, mid: 960,  out: 272, k: 5, s: 2 }, { in: 272, mid: 1632, out: 272, k: 5, s: 1 },
-    { in: 272, mid: 1632, out: 272, k: 5, s: 1 }, { in: 272, mid: 1632, out: 272, k: 5, s: 1 },
-    { in: 272, mid: 1632, out: 272, k: 5, s: 1 }, { in: 272, mid: 1632, out: 272, k: 5, s: 1 },
-    { in: 272, mid: 1632, out: 272, k: 5, s: 1 }, { in: 272, mid: 1632, out: 272, k: 5, s: 1 } ],
+    { in: 32,  mid: 192,  out: 32,  k: 3, s: 1 } ],
+  // s2 (3)
+  [ { in: 32,  mid: 192,  out: 48,  k: 5, s: 2 }, { in: 48,  mid: 288,  out: 48,  k: 5, s: 1 },
+    { in: 48,  mid: 288,  out: 48,  k: 5, s: 1 } ],
+  // s3 (5)
+  [ { in: 48,  mid: 288,  out: 96,  k: 3, s: 2 }, { in: 96,  mid: 576,  out: 96,  k: 3, s: 1 },
+    { in: 96,  mid: 576,  out: 96,  k: 3, s: 1 }, { in: 96,  mid: 576,  out: 96,  k: 3, s: 1 },
+    { in: 96,  mid: 576,  out: 96,  k: 3, s: 1 } ],
+  // s4 (5)
+  [ { in: 96,  mid: 576,  out: 136, k: 5, s: 1 }, { in: 136, mid: 816,  out: 136, k: 5, s: 1 },
+    { in: 136, mid: 816,  out: 136, k: 5, s: 1 }, { in: 136, mid: 816,  out: 136, k: 5, s: 1 },
+    { in: 136, mid: 816,  out: 136, k: 5, s: 1 } ],
+  // s5 (6)
+  [ { in: 136, mid: 816,  out: 232, k: 5, s: 2 }, { in: 232, mid: 1392, out: 232, k: 5, s: 1 },
+    { in: 232, mid: 1392, out: 232, k: 5, s: 1 }, { in: 232, mid: 1392, out: 232, k: 5, s: 1 },
+    { in: 232, mid: 1392, out: 232, k: 5, s: 1 }, { in: 232, mid: 1392, out: 232, k: 5, s: 1 } ],
   // s6 (1)
-  [ { in: 272, mid: 1632, out: 448, k: 3, s: 1 } ],
+  [ { in: 232, mid: 1392, out: 384, k: 3, s: 1 } ],
 ]
 
 export class EfficientNetLiteMattingXL {
@@ -88,9 +87,9 @@ export class EfficientNetLiteMattingXL {
 
     const last = (s: number) => this.stages[s][this.stages[s].length - 1].output
     const feat1 = last(0)   // stage1 out, 32ch  @/4
-    const feat2 = last(1)   // stage2 out, 56ch  @/8
-    const feat3 = last(3)   // stage4 out, 160ch @/16
-    const deepest = last(5) // stage6 out, 448ch @/32
+    const feat2 = last(1)   // stage2 out, 48ch  @/8
+    const feat3 = last(3)   // stage4 out, 136ch @/16
+    const deepest = last(5) // stage6 out, 384ch @/32
 
     this.bottleneck = backend.ops.Conv2d(deepest, w.bottleneck, {
       outChannels: 256, kernel: 1, stride: 1, padding: 0, activation: 'relu6',
