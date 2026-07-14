@@ -9,6 +9,9 @@ import { SigmoidWebGL } from '~/model/backends/webgl/ops/sigmoid.ts'
 import { TanhWebGL } from '~/model/backends/webgl/ops/tanh.ts'
 import { ElementwiseMulWebGL } from '~/model/backends/webgl/ops/elementwise_mul.ts'
 import { WarpWebGL } from '~/model/backends/webgl/ops/warp.ts'
+import { FaceBoxWebGL } from '~/model/backends/webgl/ops/face_box.ts'
+import { CropResampleWebGL } from '~/model/backends/webgl/ops/crop_resample.ts'
+import { LandmarkOverlayWebGL } from '~/model/backends/webgl/ops/landmark_overlay.ts'
 import { StabilizeWebGL } from '~/model/backends/webgl/ops/stabilize.ts'
 import { BilinearUpsampleWebGL } from '~/model/backends/webgl/ops/bilinear_upsample.ts'
 import { CropWebGL } from '~/model/backends/webgl/ops/crop.ts'
@@ -75,6 +78,8 @@ export class WebGLBackend implements Backend {
       Tanh:             (input)                          => new TanhWebGL(this, input),
       ElementwiseMul:   (a, b)                          => new ElementwiseMulWebGL(this, a, b),
       Warp:             (source, flow, params)          => new WarpWebGL(this, source, flow, params),
+      FaceBoxFromHeatmaps: (heatmaps, params)            => new FaceBoxWebGL(this, heatmaps, params),
+      CropResample:     (frame, box, params)             => new CropResampleWebGL(this, frame, box, params),
       Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGL(this, flow, pred, ref, envPrev, params),
       BilinearUpsample: (input, params)                => new BilinearUpsampleWebGL(this, input, params),
       Crop:             (input, params)                => new CropWebGL(this, input, params),
@@ -111,6 +116,9 @@ export class WebGLBackend implements Backend {
         new CompositeImageBilinearWebGL(this, image, alpha, bg),
       CompositePassthrough: (image) =>
         new CompositePassthroughWebGL(this, image),
+      // `target` ignored — single GL context, always the main canvas.
+      LandmarkOverlay: (image, landmarks, box, params) =>
+        new LandmarkOverlayWebGL(this, image, landmarks, box, params),
     }
   }
 

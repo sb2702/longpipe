@@ -84,6 +84,31 @@ export interface UpsampleParams {
   outW: number;
 }
 
+// Face-box decode from the 5-keypoint heatmaps (FaceHeatmapNet output). Peaks
+// are refined with a windowed soft-argmax centroid (±win cells) — NEVER hard
+// argmax (whole-cell snapping jitters the crop; see project_face_keypoint_head).
+export interface FaceBoxParams {
+  win:      number;   // soft-argmax window, cells around the peak (training PoC: 3)
+  thresh:   number;   // min per-keypoint peak score; below → box score = 0
+  boxScale: number;   // crop side = boxScale × keypoint-hull long side (px-square)
+}
+
+// Square crop + resample driven by a box tensor, with per-channel normalization
+// folded in ((rgb - mean) / std) — produces the landmark model's input directly.
+export interface CropResampleParams {
+  outH: number;
+  outW: number;
+  mean: [number, number, number];
+  std:  [number, number, number];
+}
+
+export interface LandmarkOverlayParams {
+  count:     number;   // landmarks to draw (LandmarkNet: 478)
+  thresh:    number;   // hide the overlay when box score < thresh
+  pointSize: number;   // dot size in canvas px
+  color:     [number, number, number];
+}
+
 export interface UpsampleConv1x1Params {
   outH:        number;
   outW:        number;
@@ -165,6 +190,20 @@ export interface Backend {
     // Used by frame-warp propagation and the stabilizer's warped reference.
     Warp:            (source: Tensor, flow: Tensor, params: WarpParams) => Op;
 
+    // Face-box decode: 5-keypoint heatmaps → 1×1×4 box tensor
+    // (cx, cy, halfSide, score), all in FRAME FRACTIONS (halfSide as a fraction
+    // of frame WIDTH; the box is square in pixels — the op squares it using the
+    // heatmap grid's aspect, which matches the frame's). score = min keypoint
+    // peak, 0 if any peak < thresh. Everything stays GPU-resident: CropResample
+    // and LandmarkOverlay consume this tensor without a readback.
+    FaceBoxFromHeatmaps: (heatmaps: Tensor, params: FaceBoxParams) => Op;
+
+    // Square crop from `frame` at the box tensor's location, bilinearly
+    // resampled to (outH, outW) and normalized ((rgb - mean)/std) — feeds
+    // LandmarkNet (ImageNet stats). Mirrors landmark training's warpAffine
+    // sampling (src = center + (u - out/2) · side/out).
+    CropResample: (frame: Tensor, box: Tensor, params: CropResampleParams) => Op;
+
     // Flow-gated temporal stabilizer. Per pixel:
     //   env = max(|flow.xy|, release·envPrev.y)                  (peak-hold)
     //   g   = max(clamp((env - tLo)/(tHi - tLo), 0, 1), leak)
@@ -222,6 +261,12 @@ export interface Backend {
     // by RenderOp when the renderer is disabled (true GPU-level passthrough
     // — input frame in, same frame on the canvas).
     CompositePassthrough:    (image: Tensor, target?: RenderTarget) => Presenter;
+    // Vertex-pulled landmark dots over the image — the vertex shader reads the
+    // landmark tensor (LandmarkNet output, [0,1] crop coords) and the box
+    // tensor directly on the GPU and transforms crop → canvas. Hidden when
+    // box score < thresh. The no-readback landmark visualization/consumption
+    // pattern (the touch-up mesh warp consumes the same buffer the same way).
+    LandmarkOverlay:         (image: Tensor, landmarks: Tensor, box: Tensor, params: LandmarkOverlayParams, target?: RenderTarget) => Presenter;
   };
 
   // Register an additional output canvas under `name` so presenters can target

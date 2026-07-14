@@ -9,6 +9,9 @@ import { SigmoidWebGPU } from "~/model/backends/webgpu/ops/sigmoid.ts";
 import { TanhWebGPU } from "~/model/backends/webgpu/ops/tanh.ts";
 import { ElementwiseMulWebGPU } from "~/model/backends/webgpu/ops/elementwise_mul.ts";
 import { WarpWebGPU } from "~/model/backends/webgpu/ops/warp.ts";
+import { FaceBoxWebGPU } from "~/model/backends/webgpu/ops/face_box.ts";
+import { CropResampleWebGPU } from "~/model/backends/webgpu/ops/crop_resample.ts";
+import { LandmarkOverlayWebGPU } from "~/model/backends/webgpu/ops/landmark_overlay.ts";
 import { StabilizeWebGPU } from "~/model/backends/webgpu/ops/stabilize.ts";
 import { BilinearUpsampleWebGPU } from "~/model/backends/webgpu/ops/bilinear_upsample.ts";
 import { CropWebGPU } from "~/model/backends/webgpu/ops/crop.ts";
@@ -79,6 +82,8 @@ export class WebGPUBackend implements Backend {
       Tanh:             (input)                         => new TanhWebGPU(this, input),
       ElementwiseMul:   (a, b)                          => new ElementwiseMulWebGPU(this, a, b),
       Warp:             (source, flow, params)          => new WarpWebGPU(this, source, flow, params),
+      FaceBoxFromHeatmaps: (heatmaps, params)            => new FaceBoxWebGPU(this, heatmaps, params),
+      CropResample:     (frame, box, params)             => new CropResampleWebGPU(this, frame, box, params),
       Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGPU(this, flow, pred, ref, envPrev, params),
       BilinearUpsample: (input, params)                 => new BilinearUpsampleWebGPU(this, input, params),
       Crop:             (input, params)                 => new CropWebGPU(this, input, params),
@@ -133,6 +138,15 @@ export class WebGPUBackend implements Backend {
       },
       CompositePassthrough: (image, target = "main") => {
         const op = new CompositePassthroughWebGPU(this, image);
+        return {
+          run: () => {
+            op.setOutput(this.getCurrentDisplayTexture(target));
+            op.run();
+          },
+        };
+      },
+      LandmarkOverlay: (image, landmarks, box, params, target = "main") => {
+        const op = new LandmarkOverlayWebGPU(this, image, landmarks, box, params);
         return {
           run: () => {
             op.setOutput(this.getCurrentDisplayTexture(target));

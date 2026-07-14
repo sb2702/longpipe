@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Longpipe — landmark probe (GPU-resident)</title>
+    <style>
+      body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+      a { color: #6cf; }
+      .topbar { padding: 8px 16px; }
+      h2 { padding: 0 16px; margin: 8px 0; }
+      .desc { padding: 0 16px 8px; color: #aaa; font-size: 13px; max-width: 860px; line-height: 1.5; }
+      .controls { padding: 8px 16px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+      .sliders  { padding: 4px 16px 8px; display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+      label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: #bbb; }
+      select, input { background: #222; color: #ddd; border: 1px solid #444; padding: 4px 6px; }
+      input[type=range] { width: 120px; padding: 0; }
+      .val { font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; min-width: 38px; }
+      button { background: #2a6; color: #fff; border: none; padding: 6px 16px; cursor: pointer; border-radius: 4px; }
+      #status { padding: 8px 16px; font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; }
+      .panels { display: flex; gap: 12px; flex-wrap: wrap; padding: 12px 16px; }
+      .panel { display: flex; flex-direction: column; gap: 4px; }
+      .panel span { font-size: 12px; color: #888; }
+      canvas { background: #000; width: 768px; height: auto; }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><a href="/">← demos</a></div>
+    <h2>Landmark probe — full GPU-resident chain</h2>
+    <p class="desc">
+      The whole path runs on the GPU with <b>zero per-frame readback</b>:
+      TierModel matting pass → <code>FaceHeatmapNet</code> → <code>FaceBoxFromHeatmaps</code>
+      (soft-argmax box, compute shader) → <code>CropResample</code> (256² crop + ImageNet norm)
+      → <code>LandmarkNet</code> (478 pts) → <code>LandmarkOverlay</code>, whose <b>vertex shader
+      reads the landmark tensor directly</b> (vertex pulling) and transforms crop → canvas via
+      the box tensor. The optional stats line reads the 16-byte box tensor every 30 frames —
+      untick to make the loop literally readback-free.
+    </p>
+    <div class="controls">
+      <label>tier
+        <select id="tier"><option value="small">small</option><option value="xs">xs</option></select>
+      </label>
+      <label>backend
+        <select id="backend"><option value="webgpu">webgpu</option><option value="webgl">webgl</option></select>
+      </label>
+      <label>precision
+        <select id="dtype"><option value="f32">f32</option><option value="f16">f16</option></select>
+      </label>
+      <label>source
+        <select id="source">
+          <option value="webcam">webcam</option>
+          <option value="video">loop video</option>
+          <option value="image">test image</option>
+        </select>
+      </label>
+      <label>stats readback <input id="stats" type="checkbox" checked /></label>
+      <button id="run">Run</button>
+    </div>
+    <div class="sliders">
+      <label>box scale    <input id="boxscale" type="range" min="1.5" max="3.5" step="0.05" value="2.4" /><span id="boxscale-v" class="val"></span></label>
+      <label>score thresh <input id="thresh"   type="range" min="0"   max="0.9" step="0.01" value="0.15" /><span id="thresh-v"   class="val"></span></label>
+      <label>point size   <input id="ptsize"   type="range" min="1"   max="6"   step="0.5"  value="2" /><span id="ptsize-v"   class="val"></span></label>
+    </div>
+    <div id="status">idle — pick a tier and press Run</div>
+    <div class="panels">
+      <div class="panel"><span>GPU overlay (video + 478 vertex-pulled landmarks)</span><canvas id="view"></canvas></div>
+    </div>
+    <script type="module" src="./landmarks.ts"></script>
+  </body>
+</html>
