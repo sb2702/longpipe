@@ -1,4 +1,4 @@
-import type { Backend, Dtype, FaceTopology, Op, Presenter } from '~/model/backend'
+import type { Backend, Dtype, FaceTopology, FaceTouchupStyle, Op, Presenter } from '~/model/backend'
 import { WebGPUBackend } from '~/model/backends/webgpu/index'
 import { WebGLBackend } from '~/model/backends/webgl/index'
 import { TierModel } from '~/model/tier_model'
@@ -143,10 +143,12 @@ async function run() {
         amount: numv('amount'),
         detail: numv('detail'),
         thresh: THRESH,
+        style: $<HTMLSelectElement>('style').value as FaceTouchupStyle,
       })
     }
     buildTouchup()
     for (const id of ['strength', 'amount', 'detail']) $(id).addEventListener('input', buildTouchup)
+    $('style').addEventListener('change', buildTouchup)
     $('compare').addEventListener('change', buildTouchup)
 
     let emaFps = 0, last = performance.now()

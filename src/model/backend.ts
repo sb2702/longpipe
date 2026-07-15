@@ -120,14 +120,22 @@ export interface FaceTopology {
   weightMask: ImageBitmap;    // 512² grayscale (weight in .r)
 }
 
-// UV-space skin smoothing (freq-sep): unwrap the face into a canonical UV
-// atlas via the landmark mesh, smooth there (pose-independent), composite the
-// smoothed skin back through the static weight mask.
+// Smoothing filter applied in UV space — a developer-facing choice:
+//   'freq-sep'  : separable gaussian low band + detail·high band. Smooths skin
+//                 while keeping pore-level texture; the default.
+//   'bilateral' : single edge-preserving pass (range sigma 0.15). Stronger
+//                 blemish removal at edges, no detail-keep knob (detail ignored).
+export type FaceTouchupStyle = "freq-sep" | "bilateral";
+
+// UV-space skin smoothing: unwrap the face into a canonical UV atlas via the
+// landmark mesh, smooth there (pose-independent), composite the smoothed skin
+// back through the static weight mask.
 export interface FaceTouchupParams {
   strength: number;   // 0..1 — blend of smoothed over original (× weight mask)
-  amount:   number;   // gaussian sigma in atlas px
-  detail:   number;   // 0..1 — high-frequency keep (freq-sep; pore texture)
+  amount:   number;   // smoothing sigma in atlas px
+  detail:   number;   // 0..1 — high-frequency keep (freq-sep only)
   thresh:   number;   // skip the effect when box score < thresh (passthrough)
+  style?:   FaceTouchupStyle;   // default 'freq-sep'
 }
 
 export interface UpsampleConv1x1Params {

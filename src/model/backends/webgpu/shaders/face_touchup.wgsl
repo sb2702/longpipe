@@ -132,6 +132,31 @@ fn fs_combine(in: QOut) -> @location(0) vec4<f32> {
     return clamp(lo + (a - lo) * uni.detail, vec4<f32>(0.0), vec4<f32>(1.0));
 }
 
+// Single-pass edge-preserving bilateral (style 'bilateral'). uni.dir carries
+// the 2D texel size here; range sigma 0.15 (edge stop), spatial radius ≤ 12.
+@fragment
+fn fs_bilateral(in: QOut) -> @location(0) vec4<f32> {
+    let ss = max(uni.sigma, 0.001);
+    let R = i32(clamp(ceil(ss), 1.0, 12.0));
+    let sr = 0.15;
+    let c = textureSample(tex0, samp, in.uv).rgb;
+    var sum = vec3<f32>(0.0);
+    var wsum = 0.0;
+    for (var y = -12; y <= 12; y++) {
+        if (y < -R || y > R) { continue; }
+        for (var x = -12; x <= 12; x++) {
+            if (x < -R || x > R) { continue; }
+            let sc = textureSample(tex0, samp, in.uv + uni.dir * vec2<f32>(f32(x), f32(y))).rgb;
+            let ws = exp(-f32(x * x + y * y) / (2.0 * ss * ss));
+            let d = sc - c;
+            let wr = exp(-dot(d, d) / (2.0 * sr * sr));
+            sum += sc * ws * wr;
+            wsum += ws * wr;
+        }
+    }
+    return vec4<f32>(sum / wsum, 1.0);
+}
+
 // ── composite: passthrough + mesh over the face ───────────────────────────
 
 @vertex

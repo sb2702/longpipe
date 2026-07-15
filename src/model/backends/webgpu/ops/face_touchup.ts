@@ -76,6 +76,7 @@ export class FaceTouchupWebGPU {
     const uPlain = mkUni({})
     const uBlurH = mkUni({ sigma: params.amount, dirX: 1 / ATLAS })
     const uBlurV = mkUni({ sigma: params.amount, dirY: 1 / ATLAS })
+    const uBilat = mkUni({ sigma: params.amount, dirX: 1 / ATLAS, dirY: 1 / ATLAS })
 
     const module = device.createShaderModule({ code: backend.dtype === 'f16' ? f16Src : f32Src })
     const meshBuffers: GPUVertexBufferLayout[] = [
@@ -102,20 +103,36 @@ export class FaceTouchupWebGPU {
     const boxB = (box as WebGPUTensor).buffer
 
     const pUnwrap = mkPipe('vs_unwrap', 'fs_unwrap', 'rgba8unorm', true)
-    const pBlur   = mkPipe('vs_quad_fb', 'fs_blur', 'rgba8unorm', false)
-    const pComb   = mkPipe('vs_quad_fb', 'fs_combine', 'rgba8unorm', false)
     const pPass   = mkPipe('vs_pass', 'fs_pass', backend.canvasFormat, false)
     const pComp   = mkPipe('vs_comp', 'fs_comp', backend.canvasFormat, true)
+
+    // Style-dependent smoothing: freq-sep = 3 passes (blur H/V + recombine);
+    // bilateral = 1 edge-preserving pass. Both land in `smoothed`.
+    const smoothing = (params.style ?? 'freq-sep') === 'bilateral'
+      ? (() => {
+          const pBilat = mkPipe('vs_quad_fb', 'fs_bilateral', 'rgba8unorm', false)
+          return [
+            { pipeline: pBilat, target: smoothed.createView(), verts: 3, mesh: false, load: false,
+              bind: bind(pBilat, uBilat, [{ binding: 4, resource: sampler }, tex(5, atlas)]) },
+          ]
+        })()
+      : (() => {
+          const pBlur = mkPipe('vs_quad_fb', 'fs_blur', 'rgba8unorm', false)
+          const pComb = mkPipe('vs_quad_fb', 'fs_combine', 'rgba8unorm', false)
+          return [
+            { pipeline: pBlur, target: ping.createView(), verts: 3, mesh: false, load: false,
+              bind: bind(pBlur, uBlurH, [{ binding: 4, resource: sampler }, tex(5, atlas)]) },
+            { pipeline: pBlur, target: low.createView(), verts: 3, mesh: false, load: false,
+              bind: bind(pBlur, uBlurV, [{ binding: 4, resource: sampler }, tex(5, ping)]) },
+            { pipeline: pComb, target: smoothed.createView(), verts: 3, mesh: false, load: false,
+              bind: bind(pComb, uPlain, [{ binding: 4, resource: sampler }, tex(5, atlas), tex(6, low)]) },
+          ]
+        })()
 
     this.passes = [
       { pipeline: pUnwrap, target: atlas.createView(), verts: topo.count, mesh: true, load: false,
         bind: bind(pUnwrap, uPlain, [buf(0, frameB), buf(1, lmB), buf(2, boxB)]) },
-      { pipeline: pBlur, target: ping.createView(), verts: 3, mesh: false, load: false,
-        bind: bind(pBlur, uBlurH, [{ binding: 4, resource: sampler }, tex(5, atlas)]) },
-      { pipeline: pBlur, target: low.createView(), verts: 3, mesh: false, load: false,
-        bind: bind(pBlur, uBlurV, [{ binding: 4, resource: sampler }, tex(5, ping)]) },
-      { pipeline: pComb, target: smoothed.createView(), verts: 3, mesh: false, load: false,
-        bind: bind(pComb, uPlain, [{ binding: 4, resource: sampler }, tex(5, atlas), tex(6, low)]) },
+      ...smoothing,
       { pipeline: pPass, target: null, verts: 3, mesh: false, load: false,
         bind: bind(pPass, uPlain, [buf(0, frameB)]) },
       { pipeline: pComp, target: null, verts: topo.count, mesh: true, load: true,

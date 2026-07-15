@@ -112,6 +112,36 @@ void main() {
     fragColor = clamp(lo + (a - lo) * u_detail, 0.0, 1.0);
 }`
 
+// Single-pass edge-preserving bilateral (style 'bilateral'); range sigma 0.15.
+const BILATERAL_FRAG = `#version 300 es
+precision highp float;
+uniform sampler2D u_tex;
+uniform float u_sigma;
+out vec4 fragColor;
+void main() {
+    vec2 uv = gl_FragCoord.xy / ${ATLAS}.0;
+    vec2 texel = vec2(1.0 / ${ATLAS}.0);
+    float ss = max(u_sigma, 0.001);
+    int R = int(clamp(ceil(ss), 1.0, 12.0));
+    float sr = 0.15;
+    vec3 c = texture(u_tex, uv).rgb;
+    vec3 sum = vec3(0.0);
+    float wsum = 0.0;
+    for (int y = -12; y <= 12; y++) {
+        if (y < -R || y > R) continue;
+        for (int x = -12; x <= 12; x++) {
+            if (x < -R || x > R) continue;
+            vec3 sc = texture(u_tex, uv + texel * vec2(float(x), float(y))).rgb;
+            float ws = exp(-float(x * x + y * y) / (2.0 * ss * ss));
+            vec3 d = sc - c;
+            float wr = exp(-dot(d, d) / (2.0 * sr * sr));
+            sum += sc * ws * wr;
+            wsum += ws * wr;
+        }
+    }
+    fragColor = vec4(sum / wsum, 1.0);
+}`
+
 // Display blit (flips y — canvas is bottom-up, tensors top-down).
 const BLIT_FRAG = `#version 300 es
 precision highp float;
@@ -179,7 +209,7 @@ function compileProgram(gl: WebGL2RenderingContext, vertSrc: string, fragSrc: st
 // All per-frame data (frame, landmarks, box) comes from SDK tensor textures —
 // texelFetch in the vertex shaders, zero readback.
 export class FaceTouchupWebGL {
-  private readonly progs: Record<'unwrap' | 'blur' | 'combine' | 'blit' | 'comp', WebGLProgram>
+  private readonly progs: Record<'unwrap' | 'blur' | 'combine' | 'bilateral' | 'blit' | 'comp', WebGLProgram>
   private readonly meshVao: WebGLVertexArrayObject
   private readonly fbo: WebGLFramebuffer
   private readonly atlas: WebGLTexture
@@ -209,11 +239,12 @@ export class FaceTouchupWebGL {
     this.params = params
 
     this.progs = {
-      unwrap:  compileProgram(gl, UNWRAP_VERT, UNWRAP_FRAG, 'touchup unwrap'),
-      blur:    compileProgram(gl, QUAD_VERT, BLUR_FRAG, 'touchup blur'),
-      combine: compileProgram(gl, QUAD_VERT, COMBINE_FRAG, 'touchup combine'),
-      blit:    compileProgram(gl, QUAD_VERT, BLIT_FRAG, 'touchup blit'),
-      comp:    compileProgram(gl, COMP_VERT, COMP_FRAG, 'touchup comp'),
+      unwrap:    compileProgram(gl, UNWRAP_VERT, UNWRAP_FRAG, 'touchup unwrap'),
+      blur:      compileProgram(gl, QUAD_VERT, BLUR_FRAG, 'touchup blur'),
+      combine:   compileProgram(gl, QUAD_VERT, COMBINE_FRAG, 'touchup combine'),
+      bilateral: compileProgram(gl, QUAD_VERT, BILATERAL_FRAG, 'touchup bilateral'),
+      blit:      compileProgram(gl, QUAD_VERT, BLIT_FRAG, 'touchup blit'),
+      comp:      compileProgram(gl, COMP_VERT, COMP_FRAG, 'touchup comp'),
     }
 
     // Static mesh VAO (uv → loc 0, idx → loc 1).
@@ -297,26 +328,34 @@ export class FaceTouchupWebGL {
       gl.bindVertexArray(null)
     })
 
-    // 2–3. separable gaussian → low band
-    const blur = (src: WebGLTexture, dst: WebGLTexture, dx: number, dy: number) =>
-      this.atlasPass(dst, () => {
-        gl.useProgram(this.progs.blur)
-        this.bindTex(this.progs.blur, 0, 'u_tex', src)
-        gl.uniform2f(gl.getUniformLocation(this.progs.blur, 'u_dir'), dx, dy)
-        gl.uniform1f(gl.getUniformLocation(this.progs.blur, 'u_sigma'), this.params.amount)
+    // 2–4. smoothing → `smoothed` (style-dependent).
+    if ((this.params.style ?? 'freq-sep') === 'bilateral') {
+      this.atlasPass(this.smoothed, () => {
+        gl.useProgram(this.progs.bilateral)
+        this.bindTex(this.progs.bilateral, 0, 'u_tex', this.atlas)
+        gl.uniform1f(gl.getUniformLocation(this.progs.bilateral, 'u_sigma'), this.params.amount)
         gl.drawArrays(gl.TRIANGLES, 0, 6)
       })
-    blur(this.atlas, this.ping, 1 / ATLAS, 0)
-    blur(this.ping, this.low, 0, 1 / ATLAS)
+    } else {
+      const blur = (src: WebGLTexture, dst: WebGLTexture, dx: number, dy: number) =>
+        this.atlasPass(dst, () => {
+          gl.useProgram(this.progs.blur)
+          this.bindTex(this.progs.blur, 0, 'u_tex', src)
+          gl.uniform2f(gl.getUniformLocation(this.progs.blur, 'u_dir'), dx, dy)
+          gl.uniform1f(gl.getUniformLocation(this.progs.blur, 'u_sigma'), this.params.amount)
+          gl.drawArrays(gl.TRIANGLES, 0, 6)
+        })
+      blur(this.atlas, this.ping, 1 / ATLAS, 0)
+      blur(this.ping, this.low, 0, 1 / ATLAS)
 
-    // 4. freq-sep combine → smoothed
-    this.atlasPass(this.smoothed, () => {
-      gl.useProgram(this.progs.combine)
-      this.bindTex(this.progs.combine, 0, 'u_atlas', this.atlas)
-      this.bindTex(this.progs.combine, 1, 'u_low', this.low)
-      gl.uniform1f(gl.getUniformLocation(this.progs.combine, 'u_detail'), this.params.detail)
-      gl.drawArrays(gl.TRIANGLES, 0, 6)
-    })
+      this.atlasPass(this.smoothed, () => {
+        gl.useProgram(this.progs.combine)
+        this.bindTex(this.progs.combine, 0, 'u_atlas', this.atlas)
+        this.bindTex(this.progs.combine, 1, 'u_low', this.low)
+        gl.uniform1f(gl.getUniformLocation(this.progs.combine, 'u_detail'), this.params.detail)
+        gl.drawArrays(gl.TRIANGLES, 0, 6)
+      })
+    }
 
     // 5. composite to canvas: frame blit, then the mesh over the face.
     this.backend.bindDisplayFramebuffer()
