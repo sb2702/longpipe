@@ -12,6 +12,7 @@ import { WarpWebGPU } from "~/model/backends/webgpu/ops/warp.ts";
 import { FaceBoxWebGPU } from "~/model/backends/webgpu/ops/face_box.ts";
 import { CropResampleWebGPU } from "~/model/backends/webgpu/ops/crop_resample.ts";
 import { LandmarkOverlayWebGPU } from "~/model/backends/webgpu/ops/landmark_overlay.ts";
+import { FaceTouchupWebGPU } from "~/model/backends/webgpu/ops/face_touchup.ts";
 import { StabilizeWebGPU } from "~/model/backends/webgpu/ops/stabilize.ts";
 import { BilinearUpsampleWebGPU } from "~/model/backends/webgpu/ops/bilinear_upsample.ts";
 import { CropWebGPU } from "~/model/backends/webgpu/ops/crop.ts";
@@ -147,6 +148,15 @@ export class WebGPUBackend implements Backend {
       },
       LandmarkOverlay: (image, landmarks, box, params, target = "main") => {
         const op = new LandmarkOverlayWebGPU(this, image, landmarks, box, params);
+        return {
+          run: () => {
+            op.setOutput(this.getCurrentDisplayTexture(target));
+            op.run();
+          },
+        };
+      },
+      FaceTouchup: (frame, landmarks, box, topo, params, target = "main") => {
+        const op = new FaceTouchupWebGPU(this, frame, landmarks, box, topo, params);
         return {
           run: () => {
             op.setOutput(this.getCurrentDisplayTexture(target));

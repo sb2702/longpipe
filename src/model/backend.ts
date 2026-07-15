@@ -109,6 +109,27 @@ export interface LandmarkOverlayParams {
   color:     [number, number, number];
 }
 
+// Static face-mesh assets for the touch-up effect (ar-scope/build_web_assets.py):
+// the canonical 898-triangle mesh expanded to non-indexed vertices — per corner
+// a canonical UV (atlas orientation) and the landmark index it samples — plus
+// the 512² per-region skin-smoothing weight mask (protection + forehead falloff).
+export interface FaceTopology {
+  count:      number;         // vertices (898 × 3)
+  uv:         Float32Array;   // flat [u0,v0,u1,v1,…], length count·2
+  idx:        Float32Array;   // landmark index per vertex, length count
+  weightMask: ImageBitmap;    // 512² grayscale (weight in .r)
+}
+
+// UV-space skin smoothing (freq-sep): unwrap the face into a canonical UV
+// atlas via the landmark mesh, smooth there (pose-independent), composite the
+// smoothed skin back through the static weight mask.
+export interface FaceTouchupParams {
+  strength: number;   // 0..1 — blend of smoothed over original (× weight mask)
+  amount:   number;   // gaussian sigma in atlas px
+  detail:   number;   // 0..1 — high-frequency keep (freq-sep; pore texture)
+  thresh:   number;   // skip the effect when box score < thresh (passthrough)
+}
+
 export interface UpsampleConv1x1Params {
   outH:        number;
   outW:        number;
@@ -267,6 +288,11 @@ export interface Backend {
     // box score < thresh. The no-readback landmark visualization/consumption
     // pattern (the touch-up mesh warp consumes the same buffer the same way).
     LandmarkOverlay:         (image: Tensor, landmarks: Tensor, box: Tensor, params: LandmarkOverlayParams, target?: RenderTarget) => Presenter;
+    // UV-space face touch-up: unwrap (mesh draw, vertex-pulled landmarks) →
+    // separable gaussian + freq-sep recombine on the atlas → composite the
+    // smoothed skin over the frame through the static weight mask. Five GPU
+    // passes, zero readback; passthrough when box score < params.thresh.
+    FaceTouchup:             (frame: Tensor, landmarks: Tensor, box: Tensor, topo: FaceTopology, params: FaceTouchupParams, target?: RenderTarget) => Presenter;
   };
 
   // Register an additional output canvas under `name` so presenters can target

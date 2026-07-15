@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Longpipe — face touch-up (GPU-resident)</title>
+    <style>
+      body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+      a { color: #6cf; }
+      .topbar { padding: 8px 16px; }
+      h2 { padding: 0 16px; margin: 8px 0; }
+      .desc { padding: 0 16px 8px; color: #aaa; font-size: 13px; max-width: 860px; line-height: 1.5; }
+      .controls { padding: 8px 16px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+      .sliders  { padding: 4px 16px 8px; display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+      label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: #bbb; }
+      select, input { background: #222; color: #ddd; border: 1px solid #444; padding: 4px 6px; }
+      input[type=range] { width: 120px; padding: 0; }
+      .val { font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; min-width: 38px; }
+      button { background: #2a6; color: #fff; border: none; padding: 6px 16px; cursor: pointer; border-radius: 4px; }
+      #status { padding: 8px 16px; font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; }
+      .panels { display: flex; gap: 12px; flex-wrap: wrap; padding: 12px 16px; }
+      .panel { display: flex; flex-direction: column; gap: 4px; }
+      .panel span { font-size: 12px; color: #888; }
+      canvas { background: #000; width: 768px; height: auto; }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><a href="/">← demos</a></div>
+    <h2>Face touch-up — the full flow, GPU-resident</h2>
+    <p class="desc">
+      The complete chain with <b>zero per-frame readback</b>: TierModel matting pass →
+      <code>FaceHeatmapNet</code> → <code>FaceBoxFromHeatmaps</code> → <code>CropResample</code> →
+      <code>LandmarkNet</code> (478 pts) → <code>FaceTouchup</code>: unwrap the face into a canonical
+      UV atlas (mesh draw, vertex-pulled landmarks), freq-sep smooth there (pose-independent),
+      composite back through the static per-region weight mask (eyes/brows/lips protected,
+      forehead falloff). Port of <code>ar-scope/face-touchup-gpu.html</code> with the SDK landmark
+      model in MediaPipe's place. <b>compare</b> toggles the effect off; no face → clean passthrough.
+    </p>
+    <div class="controls">
+      <label>tier
+        <select id="tier"><option value="small">small</option><option value="xs">xs</option></select>
+      </label>
+      <label>backend
+        <select id="backend"><option value="webgpu">webgpu</option><option value="webgl">webgl</option></select>
+      </label>
+      <label>precision
+        <select id="dtype"><option value="f32">f32</option><option value="f16">f16</option></select>
+      </label>
+      <label>source
+        <select id="source">
+          <option value="webcam">webcam</option>
+          <option value="video">loop video</option>
+          <option value="image">test image</option>
+        </select>
+      </label>
+      <label>compare <input id="compare" type="checkbox" /></label>
+      <button id="run">Run</button>
+    </div>
+    <div class="sliders">
+      <label>strength <input id="strength" type="range" min="0"   max="1"   step="0.05" value="0.7" /><span id="strength-v" class="val"></span></label>
+      <label>amount   <input id="amount"   type="range" min="1"   max="30"  step="1"    value="8" /><span id="amount-v"   class="val"></span></label>
+      <label>detail   <input id="detail"   type="range" min="0"   max="1"   step="0.05" value="0.35" /><span id="detail-v"   class="val"></span></label>
+      <label>box scale<input id="boxscale" type="range" min="1.5" max="3.5" step="0.05" value="2.4" /><span id="boxscale-v" class="val"></span></label>
+    </div>
+    <div id="status">idle — pick a tier and press Run</div>
+    <div class="panels">
+      <div class="panel"><span>touch-up output (5 GPU passes, no readback)</span><canvas id="view"></canvas></div>
+    </div>
+    <script type="module" src="./touchup.ts"></script>
+  </body>
+</html>

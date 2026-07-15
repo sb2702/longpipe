@@ -12,6 +12,7 @@ import { WarpWebGL } from '~/model/backends/webgl/ops/warp.ts'
 import { FaceBoxWebGL } from '~/model/backends/webgl/ops/face_box.ts'
 import { CropResampleWebGL } from '~/model/backends/webgl/ops/crop_resample.ts'
 import { LandmarkOverlayWebGL } from '~/model/backends/webgl/ops/landmark_overlay.ts'
+import { FaceTouchupWebGL } from '~/model/backends/webgl/ops/face_touchup.ts'
 import { StabilizeWebGL } from '~/model/backends/webgl/ops/stabilize.ts'
 import { BilinearUpsampleWebGL } from '~/model/backends/webgl/ops/bilinear_upsample.ts'
 import { CropWebGL } from '~/model/backends/webgl/ops/crop.ts'
@@ -119,6 +120,8 @@ export class WebGLBackend implements Backend {
       // `target` ignored — single GL context, always the main canvas.
       LandmarkOverlay: (image, landmarks, box, params) =>
         new LandmarkOverlayWebGL(this, image, landmarks, box, params),
+      FaceTouchup: (frame, landmarks, box, topo, params) =>
+        new FaceTouchupWebGL(this, frame, landmarks, box, topo, params),
     }
   }
 
