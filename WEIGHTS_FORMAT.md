@@ -26,6 +26,7 @@ interface DecoderBlockWeights {
 }
 
 // Full model — explicit structure, variants differ as real code changes
+// The BASE matting network's weights — one field per architectural piece.
 interface ModelWeights {
   encoder: {
     stem: Conv2DWeights
@@ -44,6 +45,32 @@ interface ModelWeights {
     outputConv:    Conv2DWeights
   }
 }
+```
+
+### Tier `.bin` top-level shape
+
+A production tier `.bin` (`model_<tier>.bin`, exported by
+`training/deploy/export_sdk_weights.py`) is a composite:
+
+```ts
+{
+  base:    ModelWeights          // the base matting network above
+  wrapper: UNetWrapperWeights    // the hi-res U-Net wrapper (variant lives in tier_config, not here)
+  flow?:   FlowWeights           // optical-flow temporal head (rides the base encoder's taps)
+  face?:   FaceWeights           // 5-pt face-keypoint decoder (drives landmarks / touch-up)
+}
+```
+
+The `.bin` carries **only weights** — which base network, wrapper variant, and
+resolutions to build is decided by `sdk/src/model/tier_config.ts` (model-as-code).
+
+Two more weight files ship alongside the tiers:
+
+- `model_landmark_mesh.bin` — the 478-point face-landmark regressor
+  (`LandmarkWeights`: `{ stem, blocks[10], headConv, fc }`). One model shared by
+  all tiers; it consumes a 256² face crop, not tier features.
+- `face_topology.json` + `weight_mask.png` — static touch-up assets (canonical
+  face mesh + per-region skin-smoothing weight mask), not network weights.
 ```
 
 ## How ops and blocks use weights
@@ -101,7 +128,7 @@ Single `.bin` file fetched once. Format:
 - N bytes: JSON header — same nested structure as above, but `number[]` replaced by `{ offset: number, length: number }`
 - Remaining bytes: all float32 arrays packed contiguously
 
-Deserializer slices `Float32Array` views from the `ArrayBuffer` by offset and produces an object of the same `ModelWeights` shape.
+Deserializer slices `Float32Array` views from the `ArrayBuffer` by offset and produces an object of the same shape. An optional top-level `__dtype__: "f16"` header tag marks half-precision packs (`model_<tier>.f16.bin`, ~half the download); their leaves become `Uint16Array` views of raw binary16 bits, decoded by the backend on upload.
 
 ### Loader interface
 
@@ -114,4 +141,4 @@ function loadWeightsFromBinary(buf: ArrayBuffer): ModelWeights  // for productio
 
 ## Model variants
 
-Different variants (large, small, small2) differ in encoder depth and decoder width. These are real code changes — separate network classes, not config flags. `ModelWeights` reflects this with optional fields (`s5?`, `s6?`) and variable-length arrays (`decoder.blocks`). Adding a new variant means a new network file and a matching type extension, visible as a git diff.
+Different base networks (Small / Large / XL) differ in encoder depth and decoder width. These are real code changes — separate network classes, not config flags. `ModelWeights` reflects this with optional fields (`s5?`, `s6?`) and variable-length arrays (`decoder.blocks`). Adding a new variant means a new network file and a matching type extension, visible as a git diff. The five production tiers map onto three base networks via `tier_config.ts` (xs/small → Small, medium/large → Large, xl → XL).

@@ -99,7 +99,7 @@ new EffectsPipeline(stream, { preset: 'balanced' })   // medium model
 new EffectsPipeline(stream, { preset: 'quality' })    // xl model
 ```
 
-`'auto'` runs a microbenchmark at init and picks the largest preset that fits the per-frame budget on the current device. While `'auto'` is in effect an adaptive controller polls FPS / model time and swaps preset up or down as conditions change. Explicit preset choices (`'fast'`, `'balanced'`, `'quality'`, or a manual config) are always respected and never auto-overridden.
+`'auto'` runs a microbenchmark at init and picks the largest preset that fits the per-frame budget on the current device, **topping out at `large`** — `xl` is the explicit opt-in flagship (`'quality'` or a manual config). While `'auto'` is in effect an adaptive controller polls FPS / model time and swaps preset up or down as conditions change. Explicit preset choices (`'fast'`, `'balanced'`, `'quality'`, or a manual config) are always respected and never auto-overridden.
 
 You can also pass a manual config:
 
@@ -194,11 +194,40 @@ Works on Chromium (Chrome, Edge), Firefox, and Safari (desktop and iOS). WebGPU 
 
 
 
+## Face touch-up
+
+UV-space skin smoothing (the "beautify" filter). It runs **in parallel with any background effect** — both features share one encoder pass per frame, and the retouched frame feeds the background compositor.
+
+```ts
+new EffectsPipeline(stream, {
+  background: 'blur',
+  touchup: { strength: 0.6 },   // presence enables it
+})
+
+await pipeline.setTouchup({ strength: 0.8, style: 'bilateral' })   // live update
+await pipeline.setTouchup(null)                                    // disable
+```
+
+```ts
+interface TouchupOptions {
+  strength?: number   // 0..1 — blend of smoothed skin over original (default 0.6)
+  amount?:   number   // smoothing radius (default 8)
+  detail?:   number   // high-frequency (pore texture) keep — freq-sep only (default 0.35)
+  style?:    'freq-sep' | 'bilateral'   // default 'freq-sep'
+}
+```
+
+How it works: a 5-point face-keypoint head rides the matting encoder (no second encoder pass); its heatmaps are decoded on the GPU into a face box; a 478-point landmark model runs on the face crop; the face is unwrapped into a pose-independent UV atlas, smoothed there, and composited back through a per-region weight mask. Eyes, brows, and lips are protected and stay pixel-exact; `'freq-sep'` smooths while keeping pore-level texture, `'bilateral'` is a stronger edge-preserving filter. The whole chain is GPU-resident — no per-frame readback.
+
+On first enable the landmark weights (`model_landmark_mesh.bin`, ~2.6 MB) and two small static assets are fetched from `weightsBaseUrl`, then cached; parameter updates are instant. With no face in frame the effect passes through cleanly.
+
+Current limitation: single face — with multiple people in frame, detection can jump between faces. Multi-face support is on the roadmap.
+
 ## How it works
 
 Two layers:
 
-- **Model** (`src/model/`) — an EfficientNet-Lite encoder (lite0; lite3 on the `xl` tier) with a U-Net decoder, plus a lightweight U-Net *wrapper* that sharpens the matte at higher resolution and a temporal ConvGRU that smooths it across frames. Written as TypeScript op classes — each layer is a class; weights load as binary tensors at init; the backend (WebGPU or WebGL2) is injected at construction. BatchNorm is fused into conv weights at export — there is no BN op at inference.
+- **Model** (`src/model/`) — a shared EfficientNet-Lite encoder (lite0; lite3 on the `xl` tier) feeding multiple heads: a U-Net matting decoder (sharpened at higher resolution by a lightweight U-Net *wrapper*), a 5-point face-keypoint head (drives touch-up, and auto-reframe later), and a small optical-flow head that provides temporal stability — the renderer warps the previous outputs along the predicted flow and blends them through a flow-gated stabilizer, so the matte is steady without any recurrent state in the network. A separate 478-point landmark model runs on the detected face crop. Written as TypeScript op classes — each layer is a class; weights load as binary tensors at init; the backend (WebGPU or WebGL2) is injected at construction. BatchNorm is fused into conv weights at export — there is no BN op at inference.
 - **Pipeline** (`src/pipeline/`) — capability detection, per-browser frame transport selection, worker spawn, audio passthrough, autotune, and the adaptive controller. Designed to absorb the browser/codec/canvas plumbing complexity so consumers don't have to. 
 
 Five trained presets cover the hardware range. "Resolution" is the model's working (canvas) resolution; the encoder runs at a lower internal resolution and the U-Net wrapper refines back up to this.
@@ -222,7 +251,10 @@ Training scripts, fixture generation, and the weight export pipeline are not yet
 
 - [x] Background segmentation / virtual backgrounds
 - [x] Background noise removal (audio, separate pipeline)
-- [ ] Face Landmarks / Touchup / AR Effects
+- [x] Face landmarks + touch-up
+- [ ] Multi-face support
+- [ ] Auto-reframe
+- [ ] AR effects
 - [ ] Lighting correction
 
 

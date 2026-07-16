@@ -25,6 +25,11 @@ PATTERN = "model_*.bin"
 # no SDK header (wasm is wasm; the dfn pack is its own format) — indexed as
 # opaque binaries (size + sha256 only).
 AUDIO_FILES = ("dfn.wasm", "rnnoise.wasm", "dfn_weights.pack", "dfn_weights_int8.pack")
+# Touch-up static assets (the landmark weights already match model_*.bin;
+# these two are the canonical face mesh + skin-weight mask).
+TOUCHUP_FILES = ("face_topology.json", "weight_mask.png")
+# Touch-up static assets (landmark weights match model_*.bin; these two don't).
+TOUCHUP_FILES = ("face_topology.json", "weight_mask.png")
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_SRC = SCRIPT_DIR.parent / "weights"
 
@@ -73,7 +78,8 @@ def describe(path: Path) -> dict:
     metadata for the audio denoise assets (no header — size + sha256 only)."""
     if path.suffix == ".bin" and path.name.startswith("model_"):
         return read_header(path)
-    kind = {".wasm": "audio-wasm", ".pack": "audio-weights"}.get(path.suffix, "audio")
+    kind = {".wasm": "audio-wasm", ".pack": "audio-weights",
+            ".json": "touchup-asset", ".png": "touchup-asset"}.get(path.suffix, "audio")
     return {"dtype": "-", "kind": kind, "hasGru": False, "top": []}
 
 
@@ -144,7 +150,7 @@ def main():
         raise SystemExit(f"Source directory not found: {src}")
     out.mkdir(parents=True, exist_ok=True)
 
-    paths = sorted(src.glob(PATTERN)) + [src / n for n in AUDIO_FILES if (src / n).exists()]
+    paths = sorted(src.glob(PATTERN)) + [src / n for n in AUDIO_FILES + TOUCHUP_FILES if (src / n).exists()]
     if not paths:
         raise SystemExit(f"No files matching {PATTERN} (or audio assets) in {src}")
 
