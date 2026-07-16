@@ -57,6 +57,10 @@ export async function autotunePreset(
 
   let best: ManualPreset | null = null
   for (const preset of PRESETS) {
+    // 'auto' tops out at LARGE — the reference tier. xl is the explicit
+    // opt-in flagship ('quality' named preset or a manual preset); auto
+    // should not surprise callers with its cost.
+    if (preset.model === 'xl') continue
     if (!TIER_CONFIG[preset.model]) {
       log('skip', preset.model, '(no TIER_CONFIG entry)')
       continue

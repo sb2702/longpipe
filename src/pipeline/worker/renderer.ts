@@ -538,7 +538,13 @@ export class Renderer {
     this.renderOp.setEffectChain([])
     const cfg = this.faceCfg
     const w = this.lastTierWeights
-    if (!cfg || !w?.face || !this.tier || !this.tierInput || !this.preset) return
+    if (!cfg || !this.tier || !this.tierInput || !this.preset) return
+    if (!w?.face) {
+      // Loud, not silent: a missing face blob means the tier .bin predates the
+      // face-head export — touch-up cannot run. (Cost a debugging marathon once.)
+      console.warn(`[longpipe/renderer] touchup configured but the '${this.preset.model}' weights have no face blob — effect disabled. Re-export the tier with a face-trained checkpoint.`)
+      return
+    }
 
     const face = new FaceHeatmapNet(this.backend, this.tier.encoderTaps, w.face)
     const hm = face.output

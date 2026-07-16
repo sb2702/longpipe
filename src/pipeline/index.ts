@@ -55,6 +55,10 @@ export interface PipelineOptions {
   background?:     BackgroundInput
   preset?:         PresetName | ManualPreset    // default: 'auto' (worker microbenches, picks best fit)
   weightsBaseUrl?: string                       // default: DEFAULT_WEIGHTS_BASE_URL
+  // Numeric precision preference. Default 'f16' (halves bandwidth + weight
+  // downloads; falls back to f32 when the adapter lacks shader-f16). Force
+  // 'f32' for maximum fidelity or to A/B-test f16-specific issues.
+  dtype?:          Dtype
   // 'passthrough' | 'drop' | 'denoise' | { denoise: DenoiseOptions }.
   // 'denoise' runs input audio through the AudioWorklet denoiser (separate from
   // the video worker). Default: 'passthrough'.
@@ -338,7 +342,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
       preset:     opts.preset,
       enabled:    opts.enabled,
       backend:    'auto' as const,
-      dtype:      'f16'  as const,
+      dtype:      opts.dtype ?? ('f16' as const),
       canvasSize: outputSize,
       debug:      opts.debug,
       ...inputSetup.initFields,

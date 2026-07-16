@@ -102,6 +102,9 @@ export class AdaptiveController {
   }
 
   private tryUpgrade(modelMs: number, budgetMs: number): void {
+    // Adaptive follows the same policy as autotune: never upgrade INTO xl —
+    // it's the explicit opt-in tier ('quality' / manual preset only).
+    if (PRESETS[this.currentPresetIdx + 1]?.model === 'xl') return
     if (this.currentPresetIdx >= PRESETS.length - 1) return
     const next = this.currentPresetIdx + 1
     log(`upgrade ${PRESETS[this.currentPresetIdx].model} → ${PRESETS[next].model} (modelMs=${modelMs.toFixed(1)} < ${budgetMs.toFixed(1)})`)

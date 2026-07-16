@@ -646,6 +646,7 @@
         preset: currentPreset,
         audio: 'drop',
         weightsBaseUrl: '/',   // local demo assets (new tier bins + landmark/touch-up assets)
+        dtype: new URLSearchParams(location.search).get('dtype') || undefined,  // ?dtype=f32 to A/B f16 issues
         touchup: touchupEnabled ? touchupOpts() : undefined,
         onError: (err) => setStatus('error: ' + (err.message || err), false),
       })
