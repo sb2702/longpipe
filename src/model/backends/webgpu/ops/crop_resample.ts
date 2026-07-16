@@ -20,12 +20,17 @@ export class CropResampleWebGPU extends WebGPUOp {
     this.output = backend.tensor(params.outH, params.outW, 4);
     this.inputs = [frame, box];
 
+    const slot = params.slot ?? 0;
+    if (slot >= box.w * box.h)
+      throw new Error(`CropResample: slot ${slot} out of range for a ${box.h}×${box.w} box tensor`);
+
     this.createUniform("params", "Params");
-    const ab = new ArrayBuffer(48);   // 4×u32 + vec4 mean + vec4 std
-    const u = new Uint32Array(ab, 0, 4);
-    u[0] = frame.h; u[1] = frame.w; u[2] = params.outH; u[3] = params.outW;
-    new Float32Array(ab, 16, 4).set([...params.mean, 0]);
-    new Float32Array(ab, 32, 4).set([...params.std, 1]);
+    // 5×u32 (+3 pad — vec4 members need 16B alignment) + vec4 mean + vec4 std.
+    const ab = new ArrayBuffer(64);
+    const u = new Uint32Array(ab, 0, 5);
+    u[0] = frame.h; u[1] = frame.w; u[2] = params.outH; u[3] = params.outW; u[4] = slot;
+    new Float32Array(ab, 32, 4).set([...params.mean, 0]);
+    new Float32Array(ab, 48, 4).set([...params.std, 1]);
     this.setUniform("params", new Uint32Array(ab));
 
     this.defaultSetup();

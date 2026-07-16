@@ -25,15 +25,24 @@
   </head>
   <body>
     <div class="topbar"><a href="/">← demos</a></div>
-    <h2>Landmark probe — full GPU-resident chain</h2>
+    <h2>Landmark probe — full GPU-resident chain, up to 4 faces</h2>
     <p class="desc">
       The whole path runs on the GPU with <b>zero per-frame readback</b>:
-      TierModel matting pass → <code>FaceHeatmapNet</code> → <code>FaceBoxFromHeatmaps</code>
-      (soft-argmax box, compute shader) → <code>CropResample</code> (256² crop + ImageNet norm)
+      TierModel matting pass → <code>FaceHeatmapNet</code> → <code>FaceBoxesFromHeatmaps</code>
+      (multi-face decode, compute shader) → <code>CropResample</code> (256² crop + ImageNet norm)
       → <code>LandmarkNet</code> (478 pts) → <code>LandmarkOverlay</code>, whose <b>vertex shader
       reads the landmark tensor directly</b> (vertex pulling) and transforms crop → canvas via
-      the box tensor. The optional stats line reads the 16-byte box tensor every 30 frames —
-      untick to make the loop literally readback-free.
+      the box tensor. The optional stats line reads the box tensor every 30 frames — untick to
+      make the loop literally readback-free.
+    </p>
+    <p class="desc">
+      <b>multi-face</b>: one decode emits a <code>1×4×4</code> box tensor; each slot drives its own
+      crop + landmark net + overlay pass, differing <i>only</i> by a <code>slot</code> index — so
+      there is no CPU-side branch on face count anywhere, and cost is a fixed 4 landmark runs per
+      frame regardless of how many people are in shot. Empty slots carry score 0, which the overlay's
+      vertex shader clips away. Each face gets its own dot color. Off = the single-face
+      <code>FaceBoxFromHeatmaps</code> production path, for A/B. Toggling restarts the chain (K crops
+      and landmark nets are built at startup).
     </p>
     <div class="controls">
       <label>tier
@@ -52,6 +61,7 @@
           <option value="image">test image</option>
         </select>
       </label>
+      <label>multi-face <input id="multi" type="checkbox" checked /></label>
       <label>stats readback <input id="stats" type="checkbox" checked /></label>
       <button id="run">Run</button>
     </div>
@@ -59,10 +69,11 @@
       <label>box scale    <input id="boxscale" type="range" min="1.5" max="3.5" step="0.05" value="2.4" /><span id="boxscale-v" class="val"></span></label>
       <label>score thresh <input id="thresh"   type="range" min="0"   max="0.9" step="0.01" value="0.15" /><span id="thresh-v"   class="val"></span></label>
       <label>point size   <input id="ptsize"   type="range" min="1"   max="6"   step="0.5"  value="2" /><span id="ptsize-v"   class="val"></span></label>
+      <label>geom tol     <input id="tol"      type="range" min="0.2" max="1.2" step="0.05" value="0.6" /><span id="tol-v"      class="val"></span></label>
     </div>
     <div id="status">idle — pick a tier and press Run</div>
     <div class="panels">
-      <div class="panel"><span>GPU overlay (video + 478 vertex-pulled landmarks)</span><canvas id="view"></canvas></div>
+      <div class="panel"><span>GPU overlay (video + 478 vertex-pulled landmarks × up to 4 faces)</span><canvas id="view"></canvas></div>
     </div>
     <script type="module" src="./landmarks.ts"></script>
   </body>

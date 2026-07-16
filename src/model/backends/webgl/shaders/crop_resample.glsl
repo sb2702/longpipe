@@ -16,6 +16,7 @@ uniform int u_in_h;
 uniform int u_in_w;
 uniform int u_out_h;
 uniform int u_out_w;
+uniform int u_slot;   // box-tensor slot (multi-face); 0 for the single-face path
 uniform float u_mean_r;
 uniform float u_mean_g;
 uniform float u_mean_b;
@@ -33,7 +34,7 @@ void main() {
     int x = int(gl_FragCoord.x);
     int y = int(gl_FragCoord.y);
 
-    vec4 box = texelFetch(u_box, ivec2(0, 0), 0);
+    vec4 box = texelFetch(u_box, ivec2(u_slot, 0), 0);
     float cx   = box.x * float(u_in_w);
     float cy   = box.y * float(u_in_h);
     float side = 2.0 * box.z * float(u_in_w);

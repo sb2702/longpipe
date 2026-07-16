@@ -14,6 +14,10 @@ export class CropResampleWebGL extends WebGLOp {
   constructor(backend: WebGLBackend, frame: Tensor, box: Tensor, params: CropResampleParams) {
     super(backend)
 
+    const slot = params.slot ?? 0
+    if (slot >= box.w * box.h)
+      throw new Error(`CropResample: slot ${slot} out of range for a ${box.h}×${box.w} box tensor`)
+
     const outTexture = this.makeTexture(null, params.outW, params.outH)
     this.output = { h: params.outH, w: params.outW, c: 4, texture: outTexture, texW: params.outW, texH: params.outH }
     this.inputs = [frame, box]
@@ -22,7 +26,7 @@ export class CropResampleWebGL extends WebGLOp {
       { name: 'u_frame', texture: (frame as WebGLTensor).texture },
       { name: 'u_box',   texture: (box as WebGLTensor).texture },
     ]
-    this.uniformInts = { u_in_h: frame.h, u_in_w: frame.w, u_out_h: params.outH, u_out_w: params.outW }
+    this.uniformInts = { u_in_h: frame.h, u_in_w: frame.w, u_out_h: params.outH, u_out_w: params.outW, u_slot: slot }
     this.uniformFloats = {
       u_mean_r: params.mean[0], u_mean_g: params.mean[1], u_mean_b: params.mean[2],
       u_std_r:  params.std[0],  u_std_g:  params.std[1],  u_std_b:  params.std[2],

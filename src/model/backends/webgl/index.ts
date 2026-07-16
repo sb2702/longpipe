@@ -10,6 +10,7 @@ import { TanhWebGL } from '~/model/backends/webgl/ops/tanh.ts'
 import { ElementwiseMulWebGL } from '~/model/backends/webgl/ops/elementwise_mul.ts'
 import { WarpWebGL } from '~/model/backends/webgl/ops/warp.ts'
 import { FaceBoxWebGL } from '~/model/backends/webgl/ops/face_box.ts'
+import { FaceBoxesWebGL } from '~/model/backends/webgl/ops/face_boxes.ts'
 import { CropResampleWebGL } from '~/model/backends/webgl/ops/crop_resample.ts'
 import { LandmarkOverlayWebGL } from '~/model/backends/webgl/ops/landmark_overlay.ts'
 import { FaceTouchupWebGL, FaceTouchupStageWebGL } from '~/model/backends/webgl/ops/face_touchup.ts'
@@ -80,6 +81,7 @@ export class WebGLBackend implements Backend {
       ElementwiseMul:   (a, b)                          => new ElementwiseMulWebGL(this, a, b),
       Warp:             (source, flow, params)          => new WarpWebGL(this, source, flow, params),
       FaceBoxFromHeatmaps: (heatmaps, params)            => new FaceBoxWebGL(this, heatmaps, params),
+      FaceBoxesFromHeatmaps: (heatmaps, params)          => new FaceBoxesWebGL(this, heatmaps, params),
       CropResample:     (frame, box, params)             => new CropResampleWebGL(this, frame, box, params),
       FaceTouchupStage: (frame, landmarks, box, topo, params) => new FaceTouchupStageWebGL(this, frame, landmarks, box, topo, params),
       Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGL(this, flow, pred, ref, envPrev, params),

@@ -13,6 +13,10 @@ struct Params {
     in_w  : u32,
     out_h : u32,
     out_w : u32,
+    slot  : u32,        // box-tensor slot (multi-face); 0 for the single-face path
+    pad0  : u32,
+    pad1  : u32,
+    pad2  : u32,
     mean  : vec4<f32>,   // .xyz used
     stdev : vec4<f32>,   // .xyz used
 }
@@ -36,7 +40,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     let W = i32(params.in_w);
     let H = i32(params.in_h);
-    let box = vec4<f32>(box_buf[0]);
+    let box = vec4<f32>(box_buf[params.slot]);
     let cx   = box.x * f32(params.in_w);
     let cy   = box.y * f32(params.in_h);
     let side = 2.0 * box.z * f32(params.in_w);   // square in frame px

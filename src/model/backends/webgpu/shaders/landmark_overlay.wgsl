@@ -11,6 +11,7 @@ struct Params {
     count      : u32,
     thresh     : f32,   // hide all dots when box score < thresh
     point_size : f32,   // dot diameter in canvas px
+    slot       : u32,   // box-tensor slot to read (multi-face); 0 = single-face
     color      : vec4<f32>,
     canvas     : vec4<f32>,   // .xy = canvas w, h
 }
@@ -51,7 +52,7 @@ fn vs_pts(@builtin(vertex_index) vi: u32) -> VOut {
     let corner = vi % 6u;
     var out: VOut;
 
-    let box = box_buf[0];
+    let box = box_buf[params.slot];
     if (box.w < params.thresh || i >= params.count) {
         out.pos = vec4<f32>(2.0, 2.0, 2.0, 1.0);   // clipped away
         return out;

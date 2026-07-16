@@ -93,6 +93,18 @@ export interface FaceBoxParams {
   boxScale: number;   // crop side = boxScale × keypoint-hull long side (px-square)
 }
 
+// MULTI-FACE decode → a 1×K×4 box tensor (K = maxFaces), one (cx, cy, halfSide,
+// score) per slot; unfilled slots are zero (score 0 = no face). FaceBoxParams
+// above is the single-face decode: one global argmax per channel + hull, which
+// merges multiple faces into one box. This one takes local-max candidates per
+// channel and groups them into faces by eye-pair hypothesis + canonical-template
+// geometry. Consumers address a slot via the `slot` param on CropResample /
+// LandmarkOverlay. CPU reference: sdk/demo/face.ts.
+export interface FaceBoxesParams extends FaceBoxParams {
+  maxFaces: number;   // K — output slots, 1..6
+  tol:      number;   // keypoint match radius, × interocular distance (~0.6)
+}
+
 // Square crop + resample driven by a box tensor, with per-channel normalization
 // folded in ((rgb - mean) / std) — produces the landmark model's input directly.
 export interface CropResampleParams {
@@ -100,6 +112,7 @@ export interface CropResampleParams {
   outW: number;
   mean: [number, number, number];
   std:  [number, number, number];
+  slot?: number;   // box-tensor slot to crop (default 0) — multi-face
 }
 
 export interface LandmarkOverlayParams {
@@ -107,6 +120,11 @@ export interface LandmarkOverlayParams {
   thresh:    number;   // hide the overlay when box score < thresh
   pointSize: number;   // dot size in canvas px
   color:     [number, number, number];
+  slot?:     number;    // box-tensor slot to read (default 0) — multi-face
+  // Draw the image before the dots (default true). Set false to overlay a
+  // second/third face's dots onto what a previous overlay already drew — the
+  // pass then loads the target instead of clearing it.
+  drawImage?: boolean;
 }
 
 // Static face-mesh assets for the touch-up effect (ar-scope/build_web_assets.py):
@@ -226,6 +244,11 @@ export interface Backend {
     // peak, 0 if any peak < thresh. Everything stays GPU-resident: CropResample
     // and LandmarkOverlay consume this tensor without a readback.
     FaceBoxFromHeatmaps: (heatmaps: Tensor, params: FaceBoxParams) => Op;
+
+    // Multi-face decode: same heatmaps → 1×K×4 boxes (K = params.maxFaces), one
+    // face per slot, score-0 slots meaning "no face". Same units/conventions as
+    // FaceBoxFromHeatmaps, so consumers differ only by the `slot` param.
+    FaceBoxesFromHeatmaps: (heatmaps: Tensor, params: FaceBoxesParams) => Op;
 
     // UV-space face touch-up as a Tensor→Tensor EFFECT STAGE: renders the
     // retouched frame into an output tensor the (single, terminal) background

@@ -20,6 +20,7 @@ const POINTS_VERT = `#version 300 es
 precision highp float;
 uniform sampler2D u_lm;
 uniform sampler2D u_box;
+uniform int u_slot;
 uniform float u_thresh;
 uniform float u_point_size;
 uniform float u_canvas_w;
@@ -27,7 +28,7 @@ uniform float u_canvas_h;
 
 void main() {
     int i = gl_VertexID;
-    vec4 box = texelFetch(u_box, ivec2(0, 0), 0);
+    vec4 box = texelFetch(u_box, ivec2(u_slot, 0), 0);
     if (box.w < u_thresh) {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);   // clipped away
         gl_PointSize = 0.0;
@@ -83,6 +84,7 @@ export class LandmarkOverlayWebGL {
   private readonly params: LandmarkOverlayParams
   private readonly canvasW: number
   private readonly canvasH: number
+  private readonly slot: number
 
   constructor(
     private readonly backend: WebGLBackend,
@@ -93,6 +95,9 @@ export class LandmarkOverlayWebGL {
   ) {
     if (landmarks.c < params.count * 2)
       throw new Error(`LandmarkOverlay: landmarks tensor holds ${landmarks.c / 2} points < count ${params.count}`)
+    this.slot = params.slot ?? 0
+    if (this.slot >= box.w * box.h)
+      throw new Error(`LandmarkOverlay: slot ${this.slot} out of range for a ${box.h}×${box.w} box tensor`)
     this.imageTex = (image as WebGLTensor).texture
     this.lmTex = (landmarks as WebGLTensor).texture
     this.boxTex = (box as WebGLTensor).texture
@@ -110,11 +115,15 @@ export class LandmarkOverlayWebGL {
     this.backend.bindDisplayFramebuffer()
     gl.bindVertexArray(null)
 
-    gl.useProgram(this.imgProgram)
-    gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, this.imageTex)
-    gl.uniform1i(gl.getUniformLocation(this.imgProgram, 'u_image'), 0)
-    gl.drawArrays(gl.TRIANGLES, 0, 6)
+    // drawImage=false layers this face's dots onto what a previous overlay
+    // already blitted (multi-face) — the image blit is what would wipe them.
+    if (this.params.drawImage ?? true) {
+      gl.useProgram(this.imgProgram)
+      gl.activeTexture(gl.TEXTURE0)
+      gl.bindTexture(gl.TEXTURE_2D, this.imageTex)
+      gl.uniform1i(gl.getUniformLocation(this.imgProgram, 'u_image'), 0)
+      gl.drawArrays(gl.TRIANGLES, 0, 6)
+    }
 
     gl.useProgram(this.ptsProgram)
     gl.activeTexture(gl.TEXTURE0)
@@ -123,6 +132,7 @@ export class LandmarkOverlayWebGL {
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, this.boxTex)
     gl.uniform1i(gl.getUniformLocation(this.ptsProgram, 'u_box'), 1)
+    gl.uniform1i(gl.getUniformLocation(this.ptsProgram, 'u_slot'), this.slot)
     gl.uniform1f(gl.getUniformLocation(this.ptsProgram, 'u_thresh'), this.params.thresh)
     gl.uniform1f(gl.getUniformLocation(this.ptsProgram, 'u_point_size'), this.params.pointSize)
     gl.uniform1f(gl.getUniformLocation(this.ptsProgram, 'u_canvas_w'), this.canvasW)
