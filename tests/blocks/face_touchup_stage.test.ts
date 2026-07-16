@@ -113,6 +113,44 @@ describe.each(BACKENDS)('FaceTouchupStage multi-face ($name)', ({ create }) => {
     expect(outside).toBeLessThan(1e-5)
   })
 
+  it('setActiveSlots bounds the draw even when a later slot has a live box', async () => {
+    // The renderer gates landmark runs on a throttled occupancy probe, so between
+    // probes a slot can hold a LIVE box while its landmark tensor is stale. Drawing
+    // it would smear the previous face's mesh onto the new one — worse than not
+    // retouching. setActiveSlots is what makes the draw follow the landmark runs.
+    const backend = await create()
+    const topo = await makeTopo()
+    const img = gradient()
+    const frame = backend.tensor(H, W, 4, img)
+    const lm = backend.tensor(1, 1, 956 * 4, packed(topo, 4))
+    const box = backend.tensor(1, 4, 4, new Float32Array([
+      0.25, 0.5, 0.12, 0.9,
+      0.75, 0.5, 0.12, 0.9,   // live, but beyond activeSlots below
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+    ]))
+    const stage = backend.ops.FaceTouchupStage(frame, lm, box, topo, {
+      strength: 1, amount: 16, detail: 0, thresh: 0.15, slots: 4,
+    })
+    stage.setActiveSlots(1)
+    stage.run()
+    const got = await backend.readback(stage.output)
+    backend.destroy()
+
+    const maxDiffIn = (cx: number) => {
+      let m = 0
+      const x0 = cx * W - 0.12 * W, x1 = cx * W + 0.12 * W
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        if (x < x0 || x > x1) continue
+        const p = (y * W + x) * 4
+        m = Math.max(m, Math.abs(got[p] - img[p]) + Math.abs(got[p + 1] - img[p + 1]) + Math.abs(got[p + 2] - img[p + 2]))
+      }
+      return m
+    }
+    expect(maxDiffIn(0.25)).toBeGreaterThan(0.02)   // slot 0 drawn
+    expect(maxDiffIn(0.75)).toBeLessThan(1e-5)      // slot 1 gated off despite a live box
+  })
+
   it('slots:4 with one face ≈ slots:1 with that face (tiling is not a behavior change)', async () => {
     const topo = await makeTopo()
     const img = gradient()

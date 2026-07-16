@@ -14,7 +14,7 @@ import { OpticalFlowNet } from '~/model/networks/optical_flow_net.ts'
 import { FaceHeatmapNet } from '~/model/networks/face_heatmap_net.ts'
 import { LandmarkNet } from '~/model/networks/landmark_net.ts'
 import { TIER_CONFIG } from '~/model/tier_config.ts'
-import type { FaceTopology, FaceTouchupParams } from '~/model/backend.ts'
+import type { FaceTopology, FaceTouchupParams, FaceTouchupStageOp } from '~/model/backend.ts'
 
 const FLOW_DEC_W = 16   // shipping flow-head width
 // Flow-gated stabilizer params. tLo/tHi are flow magnitudes in BASE-res pixels
@@ -39,6 +39,14 @@ const MULTI_FACE_K = 4
 // Keypoint-match radius as a fraction of interocular distance, for the eye-pair
 // grouping. Prototyped in demo/face.ts; 0.6 is the default the probe settled on.
 const FACE_GROUP_TOL = 0.6
+// Occupancy probe cadence, in face-chain frames. The box tensor is 64 bytes, but
+// the two backends charge very differently for reading it: WebGPU's readback is a
+// genuine async buffer map (cheap, off the critical path), while WebGL's is a
+// blocking gl.readPixels that flushes the pipeline — `async` in signature only.
+// So WebGL probes rarely enough to amortize the stall; WebGPU can afford to be
+// responsive. The cost of a slow probe is only latency on a face ARRIVING
+// (it goes unretouched until the next probe), never a wrong-looking frame.
+const FACE_PROBE_INTERVAL = { webgpu: 6, webgl: 30 }
 import type { ManualPreset } from '../presets'
 import type { Background } from '../background'
 import type { RendererStats } from '../messages'
@@ -154,8 +162,18 @@ export class Renderer {
     crops: Op[]
     lms: LandmarkNet[]
     packLm: Op[]
+    stage: FaceTouchupStageOp
   } | null = null
   private faceCfg: FaceEffectsConfig | null = null
+  // Occupancy gating. FaceBoxesFromHeatmaps fills slots 0..n-1 and zeroes the
+  // rest, so live faces are always a PREFIX — one count is enough, no per-slot
+  // mask. faceLive is how many crops/landmark nets run AND how many mesh
+  // instances the touch-up draws; the two must not diverge (stale landmarks under
+  // a live box smear the old face's mesh onto the new one). Starts at K so the
+  // frames before the first probe are correct rather than cheap.
+  private faceLive:         number  = 0
+  private faceProbePending: boolean = false
+  private faceProbeCounter: number  = 0
   // Pieces held for face-chain (re)builds outside setPreset.
   private tier: TierModel | null = null
   private tierInput: InputOp | null = null
@@ -387,12 +405,35 @@ export class Renderer {
 
     fc.boxOp.run()
     this.backend.copyTensor(fc.boxOp.output, fc.boxStable)
-    // Every slot runs unconditionally — empty ones carry score 0, which the
-    // crop resolves to a degenerate box and the touch-up mesh clips away in the
-    // vertex shader. Branching here would need the face count on the CPU, i.e. a
-    // readback; the fixed cost buys a readback-free path.
-    for (let i = 0; i < fc.crops.length; i++) { fc.crops[i].run(); fc.lms[i].run() }
-    for (const p of fc.packLm) p.run()
+
+    // Occupancy gating: run a crop + landmark net only for slots that hold a
+    // face. LandmarkNet is 13 dispatches at 256², so running all K every frame
+    // cost ~4× for the common single-face case. The box op still decodes all K
+    // slots every frame (one dispatch) — only the per-face model runs are gated,
+    // so the probe below sees the true count regardless of what we skipped.
+    this.probeFaceOccupancy(fc)
+    const live = fc.crops.length === 1 ? 1 : this.faceLive
+    for (let i = 0; i < live; i++) { fc.crops[i].run(); fc.lms[i].run() }
+    if (live > 0) for (const p of fc.packLm) p.run()
+    fc.stage.setActiveSlots(live)
+  }
+
+  // Refresh faceLive from the box tensor, throttled and never overlapping. A
+  // face ARRIVING is unretouched until the next probe (≤100ms WebGPU, ≤500ms
+  // WebGL); a face LEAVING keeps its slot running until then, which costs a
+  // landmark run and looks identical (its box score is 0, so nothing draws).
+  private probeFaceOccupancy(fc: NonNullable<Renderer['faceChain']>): void {
+    const K = fc.crops.length
+    if (K === 1) return
+    const interval = FACE_PROBE_INTERVAL[this.backendKind]
+    if (this.faceProbePending || this.faceProbeCounter++ % interval !== 0) return
+    this.faceProbePending = true
+    this.backend.readback(fc.boxStable).then(b => {
+      let n = 0
+      while (n < K && b[n * 4 + 3] > 0) n++
+      this.faceLive = n
+      this.faceProbePending = false
+    }).catch(() => { this.faceProbePending = false })   // shutdown races are expected
   }
 
   // True when the preview should composite this frame: a canvas is attached, a
@@ -623,7 +664,11 @@ export class Renderer {
     const stage = this.backend.ops.FaceTouchupStage(
       this.renderOp.displayImage, lmPacked, boxStable, cfg.topology, { ...cfg.touchup, slots: K })
     this.renderOp.setEffectChain([stage])
-    this.faceChain = { face, hmBuf, hmHeld, hmFlowDown, hmWarp, boxOp, boxStable, crops, lms, packLm }
+    // Correct-before-cheap until the first probe lands: assume every slot holds
+    // a face, and let the probe settle it down within a few frames.
+    this.faceLive = K
+    this.faceProbeCounter = 0
+    this.faceChain = { face, hmBuf, hmHeld, hmFlowDown, hmWarp, boxOp, boxStable, crops, lms, packLm, stage }
   }
 
   // Release everything: close any open background ports (worker-side

@@ -27,6 +27,7 @@ export class FaceTouchupWebGPU {
   private readonly uvBuf: GPUBuffer
   private readonly idxBuf: GPUBuffer
   private readonly slots: number
+  private activeSlots: number
   private outputView: GPUTextureView | null = null
 
   constructor(
@@ -49,6 +50,7 @@ export class FaceTouchupWebGPU {
     if (landmarks.c < slots * 956)
       throw new Error(`FaceTouchup: landmarks tensor holds ${landmarks.c / 956} faces < slots ${slots}`)
     this.slots = slots
+    this.activeSlots = slots
 
     const device = backend.device
     this.device = device
@@ -180,7 +182,7 @@ export class FaceTouchupWebGPU {
         pass.setVertexBuffer(0, this.uvBuf)
         pass.setVertexBuffer(1, this.idxBuf)
       }
-      pass.draw(p.verts, p.mesh ? this.slots : 1)
+      pass.draw(p.verts, p.mesh ? this.activeSlots : 1)
       pass.end()
     }
     this.device.queue.submit([enc.finish()])
@@ -215,6 +217,7 @@ export class FaceTouchupStageWebGPU {
   private readonly idxBuf: GPUBuffer
   private readonly meshCount: number
   private readonly slots: number
+  private activeSlots: number
 
   constructor(
     backend: WebGPUBackend,
@@ -237,6 +240,7 @@ export class FaceTouchupStageWebGPU {
     if (landmarks.c < slots * 956)
       throw new Error(`FaceTouchup: landmarks tensor holds ${landmarks.c / 956} faces < slots ${slots}`)
     this.slots = slots
+    this.activeSlots = slots
 
     const device = backend.device
     this.device = device
@@ -356,6 +360,12 @@ export class FaceTouchupStageWebGPU {
     this.unpackDispatch = [Math.ceil(frame.w / 8), Math.ceil(frame.h / 8)]
   }
 
+  // Faces to draw this frame — kept in lockstep with the caller's landmark runs
+  // (a live box + stale landmarks smears the old mesh onto the new face).
+  setActiveSlots(n: number): void {
+    this.activeSlots = Math.max(0, Math.min(n, this.slots))
+  }
+
   run(): void {
     const enc = this.device.createCommandEncoder()
     for (const p of this.passes) {
@@ -371,7 +381,7 @@ export class FaceTouchupStageWebGPU {
         pass.setVertexBuffer(0, this.uvBuf)
         pass.setVertexBuffer(1, this.idxBuf)
       }
-      pass.draw(p.verts, p.mesh ? this.slots : 1)
+      pass.draw(p.verts, p.mesh ? this.activeSlots : 1)
       pass.end()
     }
     const c = enc.beginComputePass()

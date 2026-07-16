@@ -254,6 +254,7 @@ export class FaceTouchupWebGL {
   private readonly params: FaceTouchupParams
   private readonly slots: number
   private readonly grid: number
+  private activeSlots: number
 
   constructor(
     private readonly backend: WebGLBackend,
@@ -276,6 +277,7 @@ export class FaceTouchupWebGL {
     if (this.slots !== 1 && this.slots !== 4)
       throw new Error(`FaceTouchup: slots must be 1 or 4, got ${this.slots}`)
     this.grid = this.slots === 4 ? 2 : 1
+    this.activeSlots = this.slots
     if (box.w * box.h < this.slots)
       throw new Error(`FaceTouchup: slots ${this.slots} exceeds the ${box.h}×${box.w} box tensor`)
     if (landmarks.c < this.slots * 956)
@@ -368,7 +370,7 @@ export class FaceTouchupWebGL {
       this.frameUniforms(this.progs.unwrap)
       this.lmUniforms(this.progs.unwrap)
       gl.bindVertexArray(this.meshVao)
-      gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.slots)
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.activeSlots)
       gl.bindVertexArray(null)
     })
 
@@ -418,7 +420,7 @@ export class FaceTouchupWebGL {
     this.bindTex(this.progs.comp, 2, 'u_weight', this.weight)
     gl.uniform1f(gl.getUniformLocation(this.progs.comp, 'u_strength'), this.params.strength)
     gl.bindVertexArray(this.meshVao)
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.slots)
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.activeSlots)
     gl.bindVertexArray(null)
   }
 }
@@ -472,6 +474,7 @@ export class FaceTouchupStageWebGL {
   private readonly params: FaceTouchupParams
   private readonly slots: number
   private readonly grid: number
+  private activeSlots: number
 
   constructor(
     private readonly backend: WebGLBackend,
@@ -495,6 +498,7 @@ export class FaceTouchupStageWebGL {
     if (this.slots !== 1 && this.slots !== 4)
       throw new Error(`FaceTouchup: slots must be 1 or 4, got ${this.slots}`)
     this.grid = this.slots === 4 ? 2 : 1
+    this.activeSlots = this.slots
     if (box.w * box.h < this.slots)
       throw new Error(`FaceTouchup: slots ${this.slots} exceeds the ${box.h}×${box.w} box tensor`)
     if (landmarks.c < this.slots * 956)
@@ -575,6 +579,12 @@ export class FaceTouchupStageWebGL {
     draw()
   }
 
+  // Faces to draw this frame — kept in lockstep with the caller's landmark runs
+  // (a live box + stale landmarks smears the old mesh onto the new face).
+  setActiveSlots(n: number): void {
+    this.activeSlots = Math.max(0, Math.min(n, this.slots))
+  }
+
   run(): void {
     const gl = this.backend.gl
 
@@ -585,7 +595,7 @@ export class FaceTouchupStageWebGL {
       this.frameUniforms(this.progs.unwrap)
       this.lmUniforms(this.progs.unwrap)
       gl.bindVertexArray(this.meshVao)
-      gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.slots)
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.activeSlots)
       gl.bindVertexArray(null)
     })
 
@@ -632,7 +642,7 @@ export class FaceTouchupStageWebGL {
       this.bindTex(this.progs.compT, 2, 'u_weight', this.weightTex)
       gl.uniform1f(gl.getUniformLocation(this.progs.compT, 'u_strength'), this.params.strength)
       gl.bindVertexArray(this.meshVao)
-      gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.slots)
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.activeSlots)
       gl.bindVertexArray(null)
     })
   }

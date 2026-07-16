@@ -127,6 +127,17 @@ export interface LandmarkOverlayParams {
   drawImage?: boolean;
 }
 
+export interface FaceTouchupStageOp extends Op {
+  // Faces to DRAW this frame, ≤ params.slots (clamped). Defaults to params.slots.
+  //
+  // This MUST stay in lockstep with how many faces the caller actually refreshed
+  // landmarks for. Drawing a slot whose box score is live but whose landmark
+  // tensor is stale smears the previous face's mesh over the new one — visibly
+  // worse than not retouching it. The renderer gates landmark runs on an
+  // occupancy probe and passes the same count here.
+  setActiveSlots(n: number): void;
+}
+
 // Static face-mesh assets for the touch-up effect (ar-scope/build_web_assets.py):
 // the canonical 898-triangle mesh expanded to non-indexed vertices — per corner
 // a canonical UV (atlas orientation) and the landmark index it samples — plus
@@ -154,7 +165,9 @@ export interface FaceTouchupParams {
   detail:   number;   // 0..1 — high-frequency keep (freq-sep only)
   thresh:   number;   // skip the effect when box score < thresh (passthrough)
   style?:   FaceTouchupStyle;   // default 'freq-sep'
-  // Faces to retouch in one pass — 1 (default) or 4. The K faces share a single
+  // MAX faces to retouch in one pass — 1 (default) or 4; sizes the atlas grid and
+  // the expected landmark/box tensors. The faces actually DRAWN each frame is
+  // set separately via setActiveSlots (see FaceTouchupStageOp). The K faces share a single
   // atlas as a grid of tiles (1×1 at K=1, 2×2 at K=4), so the blur, the frame
   // copy and the unpack all run ONCE regardless of K; only the two mesh draws
   // scale, via instancing. K=1 is the single-face layout unchanged.
@@ -265,7 +278,7 @@ export interface Backend {
     // compositor consumes as its foreground image — effects compose upstream
     // of the one compositor instead of competing for the canvas. Same passes
     // as presenters.FaceTouchup (which remains for standalone/probe use).
-    FaceTouchupStage: (frame: Tensor, landmarks: Tensor, box: Tensor, topo: FaceTopology, params: FaceTouchupParams) => Op;
+    FaceTouchupStage: (frame: Tensor, landmarks: Tensor, box: Tensor, topo: FaceTopology, params: FaceTouchupParams) => FaceTouchupStageOp;
 
     // Square crop from `frame` at the box tensor's location, bilinearly
     // resampled to (outH, outW) and normalized ((rgb - mean)/std) — feeds
