@@ -3,7 +3,7 @@
 // 'longpipe'`). Internal code keeps the shorter `Pipeline` name.
 export { Pipeline as EffectsPipeline } from '~/pipeline/index.ts'
 export type {
-  PipelineOptions,
+  PipelineOptions, TouchupOptions,
   BackgroundInput, Background, BlurInput, ColorInput, ImageInput, VideoInput,
   PresetName, ManualPreset, ModelName,
   AudioMode, AudioInput, DenoiseOptions, DenoiseModel, DenoiseTier, DenoiseModelOption, AudioStats,
@@ -11,5 +11,5 @@ export type {
 } from '~/pipeline/index.ts'
 
 // Lower-level types for callers building on top of the backend directly.
-export type { Backend, Tensor, Op, Activation, Conv2dParams, DepthwiseParams } from '~/model/backend.ts'
+export type { Backend, Tensor, Op, Activation, Conv2dParams, DepthwiseParams, FaceTouchupStyle } from '~/model/backend.ts'
 export { WebGPUBackend } from '~/model/backends/webgpu/index.ts'

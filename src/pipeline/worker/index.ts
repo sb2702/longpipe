@@ -79,6 +79,7 @@ async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
     case 'attachPreview': return handleAttachPreview(data as CmdDataMap['attachPreview'])
     case 'setPreview':    return handleSetPreview(data as CmdDataMap['setPreview'])
     case 'clearPreview':  return handleClearPreview()
+    case 'setTouchup':    return handleSetTouchup(data as CmdDataMap['setTouchup'])
     default: throw new Error(`unknown cmd: ${cmd}`)
   }
 }
@@ -242,4 +243,16 @@ function emit<E extends EventName>(name: E, res: EventMap[E]): void {
 // handleInit when we add periodic stats reporting).
 export function emitStats(stats: RendererStats): void {
   emit('stats', stats)
+}
+
+// Face touch-up: rebuild the renderer's face-effect chain from the payload
+// (or clear it). The renderer defers until a preset is attached, so this is
+// safe at any point after init.
+function handleSetTouchup(p: import('../messages').TouchupPayload | null): void {
+  if (!renderer) throw new Error('setTouchup before init')
+  renderer.setFaceEffects(p === null ? null : {
+    landmarkWeights: p.landmarkWeights,
+    topology: { count: p.topoCount, uv: p.topoUv, idx: p.topoIdx, weightMask: p.weightMask },
+    touchup: p.params,
+  })
 }

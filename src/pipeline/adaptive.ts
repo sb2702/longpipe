@@ -8,7 +8,7 @@
 // module doesn't depend on WorkerController or Pipeline internals.
 
 import type { ModelName, PresetName } from './presets'
-import { PRESETS } from './presets'
+import { PRESETS, ManualPreset } from './presets'
 import type { RendererStats, PipelineError } from './messages'
 import { createLogger } from './debug'
 
@@ -32,7 +32,7 @@ export interface AdaptiveOptions {
   getStats:        () => Promise<RendererStats>
   // Caller is responsible for the actual setPreset wire-up; adaptive
   // just hands over fresh weights and the new preset name.
-  swapPreset:      (preset: PresetName, weights: ArrayBuffer) => Promise<void>
+  swapPreset:      (preset: PresetName | ManualPreset, weights: ArrayBuffer) => Promise<void>
   // Surfaced when a swap attempt fails (weights fetch 404, etc.).
   // Adaptive keeps running on the previous preset; cooldown still
   // applies so we don't immediately retry. Recoverable.
@@ -117,7 +117,11 @@ export class AdaptiveController {
     this.headroomStart  = 0
     try {
       const weights = await this.opts.fetchWeights(preset.model)
-      await this.opts.swapPreset(preset.model as PresetName, weights)
+      // Pass the full ManualPreset: bare model names ('large') are NOT
+      // PresetNames (those are fast/balanced/quality) and the worker's
+      // resolveNamedPreset rejects them — the old `preset.model as PresetName`
+      // cast made every adaptive swap fail with "unknown preset".
+      await this.opts.swapPreset(preset, weights)
       this.currentPresetIdx = idx
       log(`swap to ${preset.model} done`)
     } catch (err) {

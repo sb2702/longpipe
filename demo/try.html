@@ -393,6 +393,25 @@
           <span class="val" id="bgColorVal">#00b050</span>
         </div>
       </div>
+
+      <div class="card">
+        <p class="card-label">Touch-up <span style="text-transform:none;font-weight:400;opacity:0.7">(runs in parallel with the background)</span></p>
+        <div class="segmented" id="touchupSeg">
+          <button data-tu="off" class="active">Off</button>
+          <button data-tu="freq-sep">Smooth</button>
+          <button data-tu="bilateral">Bilateral</button>
+        </div>
+        <div class="bg-extra show" id="tuStrengthRow">
+          <label for="tuStrength">Strength</label>
+          <input type="range" id="tuStrength" min="0" max="1" step="0.05" value="0.6" />
+          <span class="val" id="tuStrengthVal">0.6</span>
+        </div>
+        <div class="bg-extra show" id="tuAmountRow">
+          <label for="tuAmount">Amount</label>
+          <input type="range" id="tuAmount" min="1" max="24" step="1" value="8" />
+          <span class="val" id="tuAmountVal">8</span>
+        </div>
+      </div>
     </div>
 
     <div class="card preview-card" id="previewCard">
@@ -626,6 +645,8 @@
         background: bg,
         preset: currentPreset,
         audio: 'drop',
+        weightsBaseUrl: '/',   // local demo assets (new tier bins + landmark/touch-up assets)
+        touchup: touchupEnabled ? touchupOpts() : undefined,
         onError: (err) => setStatus('error: ' + (err.message || err), false),
       })
       $output.srcObject = pipeline.stream
@@ -977,6 +998,44 @@
       if (pipeline && currentBg === 'color') {
         pipeline.setBackground({ color: $bgColor.value })
       }
+    })
+
+    // ── Touch-up (parallel with backgrounds — one shared encoder pass) ──────
+    const $touchupSeg  = document.getElementById('touchupSeg')
+    const $tuStrength  = document.getElementById('tuStrength')
+    const $tuStrengthVal = document.getElementById('tuStrengthVal')
+    const $tuAmount    = document.getElementById('tuAmount')
+    const $tuAmountVal = document.getElementById('tuAmountVal')
+    let touchupEnabled = false
+    let touchupStyle   = 'freq-sep'
+
+    function touchupOpts() {
+      return {
+        style: touchupStyle,
+        strength: parseFloat($tuStrength.value),
+        amount: parseFloat($tuAmount.value),
+      }
+    }
+    function applyTouchup() {
+      if (!pipeline || engine !== 'longpipe') return
+      pipeline.setTouchup(touchupEnabled ? touchupOpts() : null)
+        .catch(err => setStatus('touch-up failed: ' + (err.message || err), false))
+    }
+    $touchupSeg.addEventListener('click', (e) => {
+      const btn = e.target.closest('button')
+      if (!btn) return
+      for (const b of $touchupSeg.querySelectorAll('button')) b.classList.toggle('active', b === btn)
+      touchupEnabled = btn.dataset.tu !== 'off'
+      if (touchupEnabled) touchupStyle = btn.dataset.tu
+      applyTouchup()
+    })
+    $tuStrength.addEventListener('input', () => {
+      $tuStrengthVal.textContent = $tuStrength.value
+      if (touchupEnabled) applyTouchup()
+    })
+    $tuAmount.addEventListener('input', () => {
+      $tuAmountVal.textContent = $tuAmount.value
+      if (touchupEnabled) applyTouchup()
     })
 
     buildPipeline().catch(err => setStatus('startup failed: ' + (err.message || err), false))

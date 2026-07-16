@@ -4,7 +4,7 @@
 // dedicated MessagePorts and is NOT modeled here — that bypass is
 // intentional, to avoid UUID/Promise overhead per frame.
 
-import type { Dtype } from '~/model/backend.ts'
+import type { Dtype, FaceTouchupParams } from '~/model/backend.ts'
 import type { ManualPreset, PresetName } from './presets'
 import type { Background } from './background'
 import type { Topology } from './topology'
@@ -26,6 +26,10 @@ export interface CmdDataMap {
   attachPreview: { canvas: OffscreenCanvas }
   setPreview:    { background: Background; fps?: number }
   clearPreview:  Record<string, never>
+  // Face touch-up: full payload enables/updates (assets are cached main-side
+  // and structured-cloned — no transfer, so param updates can resend them);
+  // null disables. The worker assembles a FaceEffectsConfig for the renderer.
+  setTouchup:    TouchupPayload | null
 }
 
 export interface CmdResponseMap {
@@ -39,6 +43,18 @@ export interface CmdResponseMap {
   attachPreview: void
   setPreview:    void
   clearPreview:  void
+  setTouchup:    void
+}
+
+// Touch-up wire payload — the flattened FaceTopology (typed arrays and
+// ImageBitmap structured-clone across postMessage) + landmark weights + params.
+export interface TouchupPayload {
+  landmarkWeights: ArrayBuffer
+  topoCount:       number
+  topoUv:          Float32Array
+  topoIdx:         Float32Array
+  weightMask:      ImageBitmap
+  params:          FaceTouchupParams
 }
 
 export type CmdName = keyof CmdDataMap

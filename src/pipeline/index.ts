@@ -8,7 +8,7 @@
 // delegates to a submodule (topology selection, transport setup, audio
 // passthrough, worker spawn). See docs/PIPELINE.md.
 
-import type { Dtype } from '~/model/backend'
+import type { Dtype, FaceTouchupParams, FaceTouchupStyle } from '~/model/backend'
 import type { ManualPreset, PresetName } from './presets'
 import { AdaptiveController } from './adaptive'
 import type { BackgroundInput, Background } from './background'
@@ -69,6 +69,12 @@ export interface PipelineOptions {
   // Only takes effect when `preset: 'auto'` — explicit preset choices
   // are always respected. Default: true.
   adaptive?:       boolean
+  // Face touch-up (UV-space skin smoothing). Presence enables it; runs in
+  // PARALLEL with any background effect (one shared encoder pass; the
+  // retouched frame feeds the background compositor). Requires tier weights
+  // with a face blob + the landmark assets at weightsBaseUrl
+  // (model_landmark_mesh.bin, face_topology.json, weight_mask.png).
+  touchup?:        TouchupOptions
   onReady?:        () => void
   // Fires for ALL async / runtime errors after the constructor returns:
   //   - Init failures (weights 404, normalizeBackground URL fail, worker
@@ -90,6 +96,17 @@ export interface PipelineOptions {
   // consumers see nothing in console unless they opt in.
   debug?:          boolean
 }
+
+// Developer-facing touch-up options; thresholds/decode internals stay SDK-owned.
+export interface TouchupOptions {
+  strength?: number             // 0..1 blend, default 0.6
+  amount?:   number             // smoothing sigma in atlas px, default 8
+  detail?:   number             // freq-sep high-band keep, default 0.35
+  style?:    FaceTouchupStyle   // 'freq-sep' (default) | 'bilateral'
+}
+
+const TOUCHUP_DEFAULTS = { strength: 0.6, amount: 8, detail: 0.35, style: 'freq-sep' as FaceTouchupStyle }
+const TOUCHUP_THRESH = 0.15
 
 // Public CDN where Longpipe hosts its own model weights. Versioned in the
 // path so SDK upgrades that change weight shapes can move to a new prefix
@@ -155,6 +172,47 @@ async function fetchModelWeights(baseUrl: string, model: string, dtype: Dtype): 
   return r.arrayBuffer()
 }
 
+// Touch-up static assets: the landmark regressor weights (separate .bin — one
+// model shared by all tiers) + the canonical face topology + weight mask.
+// Fetched once per pipeline and cached (see setTouchup).
+interface TouchupAssets {
+  landmarkWeights: ArrayBuffer
+  topoCount: number
+  topoUv: Float32Array
+  topoIdx: Float32Array
+  weightMask: ImageBitmap
+}
+
+async function fetchTouchupAssets(baseUrl: string, dtype: Dtype): Promise<TouchupAssets> {
+  const base = baseUrl.replace(/\/$/, '')
+  const lmPromise = (async () => {
+    if (dtype === 'f16') {
+      const r = await fetch(`${base}/model_landmark_mesh.f16.bin`)
+      if (r.ok) return r.arrayBuffer()
+    }
+    const url = `${base}/model_landmark_mesh.bin`
+    const r = await fetch(url)
+    if (!r.ok) throw new Error(`touchup: landmark weights fetch failed: ${r.status} ${url}`)
+    return r.arrayBuffer()
+  })()
+  const topoPromise = fetch(`${base}/face_topology.json`).then(r => {
+    if (!r.ok) throw new Error(`touchup: face_topology.json fetch failed: ${r.status}`)
+    return r.json()
+  })
+  const maskPromise = fetch(`${base}/weight_mask.png`).then(async r => {
+    if (!r.ok) throw new Error(`touchup: weight_mask.png fetch failed: ${r.status}`)
+    return createImageBitmap(await r.blob())
+  })
+  const [landmarkWeights, topo, weightMask] = await Promise.all([lmPromise, topoPromise, maskPromise])
+  return {
+    landmarkWeights,
+    topoCount: topo.count,
+    topoUv: new Float32Array(topo.uv),
+    topoIdx: new Float32Array(topo.idx),
+    weightMask,
+  }
+}
+
 export class Pipeline implements PromiseLike<Pipeline> {
   readonly stream: MediaStream
   // Promise<void> rather than Promise<this> on purpose: resolving a Promise
@@ -179,6 +237,11 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // Audio denoiser — only set when audio: 'denoise' (or {denoise}) was passed
   // AND the input stream has an audio track. Independent of the video worker.
   private denoiser: AudioDenoiser | null = null
+
+  // Touch-up asset cache + resolved fetch context (set during bootstrap).
+  private touchupAssets:  TouchupAssets | null = null
+  private weightsBaseUrl: string = DEFAULT_WEIGHTS_BASE_URL
+  private resolvedDtype:  Dtype = 'f32'
 
   // Cleanup callback for the current background. Set by normalizeBackground
   // for kinds that own resources (currently: video, which holds a hidden
@@ -286,7 +349,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
       ...outputSetup.transferList,
     ]
 
-    void this.bootstrap(partialInit, opts.background, transferList, opts.weightsBaseUrl, opts.adaptive, opts.onError)
+    this.weightsBaseUrl = opts.weightsBaseUrl
+    void this.bootstrap(partialInit, opts.background, transferList, opts.weightsBaseUrl, opts.adaptive, opts.onError, opts.touchup)
   }
 
   // Async second half of construction: normalize background → init handshake
@@ -299,6 +363,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     weightsBaseUrl: string,
     adaptive:       boolean,
     onError?:       (err: PipelineError) => void,
+    touchup?:       TouchupOptions,
   ): Promise<void> {
     try {
       log('normalizing background…')
@@ -315,9 +380,18 @@ export class Pipeline implements PromiseLike<Pipeline> {
       const weights = await fetchModelWeights(weightsBaseUrl, initRes.resolvedPreset.model, initRes.resolvedDtype)
       log('weights bytes:', weights.byteLength)
 
+      this.resolvedDtype = initRes.resolvedDtype
+
       log('sending startRender…')
       await this.controller.sendMessage('startRender', { weights }, [weights])
       log('startRender resolved; awaiting first frame')
+
+      // Initial touch-up (non-blocking — ready never waits on touch-up assets).
+      if (touchup) {
+        void this.setTouchup(touchup).catch(err => {
+          onError?.({ message: `touchup init failed: ${(err as Error).message ?? err}`, source: 'unknown', recoverable: true, cause: err })
+        })
+      }
 
       // Adaptive controller — only when caller used 'auto' AND didn't
       // disable it. Explicit preset choices are respected and never
@@ -377,6 +451,30 @@ export class Pipeline implements PromiseLike<Pipeline> {
     this.bgCleanup = norm.cleanup ?? null
     await this.controller.sendMessage('setBackground', norm.background, norm.transferList)
     previousCleanup?.()
+  }
+
+  // Enable / update / disable the face touch-up at runtime. First call fetches
+  // the landmark assets from weightsBaseUrl (cached for later param updates);
+  // pass null to disable. Runs in parallel with the background effect. Requires
+  // the loaded tier weights to carry a face blob (all current tiers do) — if
+  // they don't, the worker silently leaves the effect off.
+  async setTouchup(opts: TouchupOptions | null): Promise<void> {
+    await this.ready
+    if (opts === null) {
+      await this.controller.sendMessage('setTouchup', null)
+      return
+    }
+    if (!this.touchupAssets)
+      this.touchupAssets = await fetchTouchupAssets(this.weightsBaseUrl, this.resolvedDtype)
+    const params: FaceTouchupParams = {
+      strength: opts.strength ?? TOUCHUP_DEFAULTS.strength,
+      amount:   opts.amount   ?? TOUCHUP_DEFAULTS.amount,
+      detail:   opts.detail   ?? TOUCHUP_DEFAULTS.detail,
+      style:    opts.style    ?? TOUCHUP_DEFAULTS.style,
+      thresh:   TOUCHUP_THRESH,
+    }
+    // Structured-clone (no transfer) — the cached assets stay reusable.
+    await this.controller.sendMessage('setTouchup', { ...this.touchupAssets, params })
   }
 
   setPreset(p: PresetName | ManualPreset, weights?: ArrayBuffer): void {
