@@ -21,7 +21,43 @@ const WIN = 3
 const N_KP = 5
 const KP_NAMES = ['L-eye', 'R-eye', 'nose', 'L-mouth', 'R-mouth']
 const KP_COLORS = ['#ff5f5f', '#54e08c', '#ffd23f', '#5fb8ff', '#e05fd8']
+const FACE_COLORS = ['#ffffff', '#ffd23f', '#54e08c', '#5fb8ff', '#e05fd8', '#ff8a3d']
 const JITTER_N = 30   // frames of keypoint history for the jitter (std) meter
+const MIN_SEP = 1.0   // cells — two refined centroids closer than this are one blob
+const LAMBDA  = 0.5   // geometric-residual weight in the hypothesis score
+
+// ArcFace / RetinaFace canonical 5-point template (112² reference frame), in the
+// head's channel order: L-eye, R-eye, nose, L-mouth, R-mouth.
+const CANON: [number, number][] = [
+  [38.2946, 51.6963], [73.5318, 51.5014], [56.0252, 71.7366],
+  [41.5493, 92.3655], [70.7299, 92.2041],
+]
+
+// The template re-expressed in the EYE FRAME: origin = L-eye, +u along the
+// L-eye→R-eye vector, +w perpendicular to it (image-down for an upright face),
+// both normalized by interocular distance. An eye-pair hypothesis fixes origin,
+// scale and roll, so predicting the other three points is just (u, w) × that
+// frame. It's a similarity with no reflection term — which is why a FLIPPED eye
+// convention (if the head's channel 0 is actually the image-right eye) shows up
+// as "no faces detected" rather than as silently mirrored boxes: the predicted
+// nose/mouth land above the eyes and match nothing.
+const TEMPLATE = (() => {
+  const [e0, e1] = [CANON[0], CANON[1]]
+  const ev = [e1[0] - e0[0], e1[1] - e0[1]]
+  const elen = Math.hypot(ev[0], ev[1])
+  const ex = [ev[0] / elen, ev[1] / elen]
+  const ey = [-ex[1], ex[0]]
+  return CANON.map(p => {
+    const v = [p[0] - e0[0], p[1] - e0[1]]
+    return {
+      u: (v[0] * ex[0] + v[1] * ex[1]) / elen,
+      w: (v[0] * ey[0] + v[1] * ey[1]) / elen,
+    }
+  })
+})()
+
+interface Cand { x: number; y: number; score: number }
+interface Face { kp: (Cand | null)[]; keys: string[]; score: number }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const status = (s: string) => { $('status').textContent = s }
@@ -75,16 +111,11 @@ async function loadSource(kind: string): Promise<Source> {
   }
 }
 
-// Windowed soft-argmax centroid over channel k of the 8-ch NHWC heatmap buffer.
-// win=0 degrades to hard argmax (the jitter-demo toggle). Returns continuous
-// CELL coords + the peak score.
-function decodeKp(hm: Float32Array, h: number, w: number, k: number, win: number) {
-  let peak = -Infinity, pr = 0, pc = 0
-  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
-    const v = hm[(r * w + c) * 8 + k]
-    if (v > peak) { peak = v; pr = r; pc = c }
-  }
-  if (win === 0) return { x: pc, y: pr, score: peak }
+// Windowed soft-argmax centroid around (pr, pc) on channel k. Returns continuous
+// CELL coords. NOTE for multi-face: the ±win window is blind to face identity —
+// two faces closer than `win` cells drag each other's centroids. That's a real
+// limit of this decode on coarse grids, not a bug to patch here.
+function centroid(hm: Float32Array, h: number, w: number, k: number, pr: number, pc: number, win: number) {
   const r0 = Math.max(0, pr - win), r1 = Math.min(h, pr + win + 1)
   const c0 = Math.max(0, pc - win), c1 = Math.min(w, pc + win + 1)
   let wsum = 0, ry = 0, cx = 0
@@ -93,7 +124,117 @@ function decodeKp(hm: Float32Array, h: number, w: number, k: number, win: number
     wsum += v; ry += v * r; cx += v * c
   }
   wsum = Math.max(wsum, 1e-6)
-  return { x: cx / wsum, y: ry / wsum, score: peak }
+  return { x: cx / wsum, y: ry / wsum }
+}
+
+// SINGLE-FACE decode — the current production contract (face_box.wgsl): global
+// argmax per channel + windowed centroid. win=0 degrades to hard argmax (the
+// jitter-demo toggle). Kept so the 'multi-face' toggle is a live A/B.
+function decodeKp(hm: Float32Array, h: number, w: number, k: number, win: number): Cand {
+  let peak = -Infinity, pr = 0, pc = 0
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
+    const v = hm[(r * w + c) * 8 + k]
+    if (v > peak) { peak = v; pr = r; pc = c }
+  }
+  if (win === 0) return { x: pc, y: pr, score: peak }
+  return { ...centroid(hm, h, w, k, pr, pc, win), score: peak }
+}
+
+// STAGE 1 — local-maximum candidates for channel k. A cell qualifies if it's the
+// max of its 3×3 neighborhood (index tiebreak so f16 plateaus don't drop every
+// member of a tie) and above thresh. Sorted by peak score, capped at maxK, then
+// deduped by refined position — two local maxima on one noisy blob converge to
+// nearly the same centroid.
+function findCandidates(hm: Float32Array, h: number, w: number, k: number,
+                        win: number, thresh: number, maxK: number): Cand[] {
+  const at = (r: number, c: number) => hm[(r * w + c) * 8 + k]
+  const peaks: { r: number; c: number; score: number }[] = []
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
+    const v = at(r, c)
+    if (v < thresh) continue
+    let isMax = true
+    for (let dr = -1; dr <= 1 && isMax; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc) continue
+      const rr = r + dr, cc = c + dc
+      if (rr < 0 || rr >= h || cc < 0 || cc >= w) continue
+      const u = at(rr, cc)
+      if (u > v || (u === v && rr * w + cc < r * w + c)) { isMax = false; break }
+    }
+    if (isMax) peaks.push({ r, c, score: v })
+  }
+  peaks.sort((a, b) => b.score - a.score)
+
+  const out: Cand[] = []
+  for (const p of peaks) {
+    if (out.length >= maxK) break
+    const cand: Cand = win === 0
+      ? { x: p.c, y: p.r, score: p.score }
+      : { ...centroid(hm, h, w, k, p.r, p.c, win), score: p.score }
+    if (out.some(o => Math.hypot(o.x - cand.x, o.y - cand.y) < MIN_SEP)) continue
+    out.push(cand)
+  }
+  return out
+}
+
+// STAGE 2/3/4 — eye-pair hypotheses → geometric scoring → face-level NMS.
+//
+// Every (L-eye, R-eye) candidate pair is a face hypothesis. The pair fixes the
+// face's center, scale (interocular distance — the classic normalizer) and roll,
+// so nose + mouth corners get PREDICTED from the canonical template and matched
+// against nearby candidates within tol × interocular. Cross-pairing (face A's
+// left eye with face B's right eye) survives stage 1 but dies here: the implied
+// scale is wrong and there's no nose/mouth support where the template says.
+//
+// Scoring = mean matched peak score − λ · mean normalized residual. Then greedy
+// NMS: accept hypotheses by score, rejecting any that reuse a consumed candidate.
+function groupFaces(cands: Cand[][], opts: { tol: number; maxFaces: number; gridW: number }): Face[] {
+  const MIN_EYE = 1.0                  // cells — below this the grid can't resolve a pair
+  const MAX_EYE = opts.gridW * 0.45    // a face wider than ~half the frame
+  const hyps: Face[] = []
+
+  for (let i = 0; i < cands[0].length; i++) for (let j = 0; j < cands[1].length; j++) {
+    const a = cands[0][i], b = cands[1][j]
+    const evx = b.x - a.x, evy = b.y - a.y
+    const len = Math.hypot(evx, evy)
+    if (len < MIN_EYE || len > MAX_EYE) continue
+    const exv = [evx / len, evy / len]
+    const eyv = [-exv[1], exv[0]]
+
+    const kp: (Cand | null)[] = [a, b, null, null, null]
+    const keys = [`0:${i}`, `1:${j}`]
+    let sc = a.score + b.score, resid = 0, nMatch = 2, mouths = 0
+
+    for (let k = 2; k < N_KP; k++) {
+      const t = TEMPLATE[k]
+      const px = a.x + len * (t.u * exv[0] + t.w * eyv[0])
+      const py = a.y + len * (t.u * exv[1] + t.w * eyv[1])
+      let best = -1, bestD = opts.tol * len
+      for (let m = 0; m < cands[k].length; m++) {
+        const d = Math.hypot(cands[k][m].x - px, cands[k][m].y - py)
+        if (d < bestD) { bestD = d; best = m }
+      }
+      if (best < 0) continue
+      kp[k] = cands[k][best]
+      keys.push(`${k}:${best}`)
+      sc += cands[k][best].score
+      resid += bestD / len
+      nMatch++
+      if (k >= 3) mouths++
+    }
+    if (!kp[2] || mouths < 1) continue   // support floor: nose + ≥1 mouth corner
+    hyps.push({ kp, keys, score: sc / nMatch - LAMBDA * (resid / (nMatch - 2)) })
+  }
+
+  hyps.sort((x, y) => y.score - x.score)
+  const used = new Set<string>()
+  const out: Face[] = []
+  for (const hy of hyps) {
+    if (out.length >= opts.maxFaces) break
+    if (hy.keys.some(k => used.has(k))) continue
+    for (const k of hy.keys) used.add(k)
+    out.push(hy)
+  }
+  return out
 }
 
 let session = 0
@@ -153,7 +294,25 @@ async function run() {
 
       const win = on('soft') ? WIN : 0
       const thresh = numv('thresh')
-      const kps = Array.from({ length: N_KP }, (_, k) => decodeKp(hm, fh, fw, k, win))
+      const multi = on('multi')
+      const maxFaces = Math.round(numv('maxfaces'))
+
+      // Decode. multi: local-max candidates → eye-pair grouping → K faces.
+      // single: the production global-argmax path, wrapped as one face.
+      let faces: Face[] = []
+      let candsAll: Cand[][] = []
+      if (multi) {
+        // maxFaces+1 candidates/channel — headroom so cross-pairs exist to reject.
+        candsAll = Array.from({ length: N_KP },
+          (_, k) => findCandidates(hm, fh, fw, k, win, thresh, maxFaces + 1))
+        faces = groupFaces(candsAll, { tol: numv('tol'), maxFaces, gridW: fw })
+      } else {
+        const kps = Array.from({ length: N_KP }, (_, k) => decodeKp(hm, fh, fw, k, win))
+        const kp = kps.map(p => (p.score >= thresh ? p : null))
+        if (kp.filter(Boolean).length >= 2) {
+          faces = [{ kp, keys: [], score: Math.min(...kps.map(p => p.score)) }]
+        }
+      }
 
       // ── main view: frame + heatmap tint + keypoints + crop box ────────────
       vctx.drawImage(bm, 0, 0, view.width, view.height)
@@ -185,34 +344,61 @@ async function run() {
         vctx.restore()
       }
 
-      // Keypoints (frame-fraction coords: (cell + 0.5) / grid) + jitter history.
-      const frameKps: Array<{ x: number; y: number } | null> = []
-      const found: number[] = []
-      for (let k = 0; k < N_KP; k++) {
-        const { x, y, score } = kps[k]
-        if (score < thresh) { frameKps.push(null); continue }
-        const px = ((x + 0.5) / fw) * view.width
-        const py = ((y + 0.5) / fh) * view.height
-        frameKps.push({ x: px, y: py })
-        found.push(k)
-        vctx.strokeStyle = KP_COLORS[k]; vctx.lineWidth = 2
-        vctx.beginPath(); vctx.arc(px, py, 5, 0, Math.PI * 2); vctx.stroke()
-        vctx.fillStyle = KP_COLORS[k]; vctx.font = '11px ui-monospace'
-        vctx.fillText(`${KP_NAMES[k]} ${kps[k].score.toFixed(2)}`, px + 8, py - 6)
-      }
-      history.push(frameKps)
-      if (history.length > JITTER_N) history.shift()
+      // Cell coords → view px. (cell + 0.5) / grid = frame fraction.
+      const toView = (c: Cand) => ({
+        x: ((c.x + 0.5) / fw) * view.width,
+        y: ((c.y + 0.5) / fh) * view.height,
+      })
 
-      // Landmark-stage crop preview: square, boxScale × hull long side.
-      if (on('showbox') && found.length >= 2) {
-        const xs = found.map(k => frameKps[k]!.x), ys = found.map(k => frameKps[k]!.y)
-        const cx = (Math.min(...xs) + Math.max(...xs)) / 2
-        const cy = (Math.min(...ys) + Math.max(...ys)) / 2
-        const side = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * numv('boxscale')
-        vctx.strokeStyle = '#fff'; vctx.lineWidth = 1.5; vctx.setLineDash([6, 4])
-        vctx.strokeRect(cx - side, cy - side, side * 2, side * 2)
-        vctx.setLineDash([])
+      // Raw candidates (dim) — shows what stage 1 found before grouping, so a
+      // dropped face reads as "no candidate" vs "grouping rejected it".
+      if (multi && on('cands')) {
+        vctx.globalAlpha = 0.35
+        for (let k = 0; k < N_KP; k++) for (const c of candsAll[k]) {
+          const p = toView(c)
+          vctx.fillStyle = KP_COLORS[k]
+          vctx.beginPath(); vctx.arc(p.x, p.y, 3, 0, Math.PI * 2); vctx.fill()
+        }
+        vctx.globalAlpha = 1
       }
+
+      // Per-face: keypoints in CHANNEL colors, box + label in FACE color.
+      faces.forEach((f, fi) => {
+        const col = FACE_COLORS[fi % FACE_COLORS.length]
+        const pts: Array<{ x: number; y: number }> = []
+        for (let k = 0; k < N_KP; k++) {
+          const c = f.kp[k]
+          if (!c) continue
+          const p = toView(c)
+          pts.push(p)
+          vctx.strokeStyle = KP_COLORS[k]; vctx.lineWidth = 2
+          vctx.beginPath(); vctx.arc(p.x, p.y, 5, 0, Math.PI * 2); vctx.stroke()
+          if (!multi) {   // single-face mode keeps the per-keypoint labels
+            vctx.fillStyle = KP_COLORS[k]; vctx.font = '11px ui-monospace'
+            vctx.fillText(`${KP_NAMES[k]} ${c.score.toFixed(2)}`, p.x + 8, p.y - 6)
+          }
+        }
+        // Landmark-stage crop preview: square, boxScale × hull long side.
+        if (on('showbox') && pts.length >= 2) {
+          const xs = pts.map(p => p.x), ys = pts.map(p => p.y)
+          const cx = (Math.min(...xs) + Math.max(...xs)) / 2
+          const cy = (Math.min(...ys) + Math.max(...ys)) / 2
+          const side = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * numv('boxscale')
+          vctx.strokeStyle = col; vctx.lineWidth = 1.5; vctx.setLineDash([6, 4])
+          vctx.strokeRect(cx - side, cy - side, side * 2, side * 2)
+          vctx.setLineDash([])
+          if (multi) {
+            vctx.fillStyle = col; vctx.font = '12px ui-monospace'
+            vctx.fillText(`#${fi} ${f.score.toFixed(2)}`, cx - side + 4, cy - side - 5)
+          }
+        }
+      })
+
+      // Jitter history tracks the TOP-SCORING face only. With two faces of
+      // similar score the identity can swap between frames — read the meter as
+      // primary-subject stability, not a per-face guarantee.
+      history.push(faces[0] ? faces[0].kp.map(c => (c ? toView(c) : null)) : new Array(N_KP).fill(null))
+      if (history.length > JITTER_N) history.shift()
 
       // Jitter meter: mean per-keypoint std over the history window (canvas px).
       let jitter = NaN
@@ -231,9 +417,17 @@ async function run() {
       const now = performance.now()
       emaFps = emaFps ? emaFps * 0.9 + (1000 / (now - last)) * 0.1 : 1000 / (now - last)
       last = now
-      const scores = kps.map((p, k) => `${KP_NAMES[k]} ${p.score.toFixed(2)}`).join('  ')
+      const detail = multi
+        ? `cands ${candsAll.map(c => c.length).join('/')} (${KP_NAMES.join('/')})\n`
+          + (faces.length
+            ? faces.map((f, i) => `#${i} score ${f.score.toFixed(2)} · ${f.kp.filter(Boolean).length}/5 kp`).join('\n')
+            : 'no faces grouped')
+        : faces[0]
+          ? KP_NAMES.map((n, k) => `${n} ${faces[0].kp[k]?.score.toFixed(2) ?? '—'}`).join('  ')
+          : 'no face'
       status(`${tier} ${backendName}/${dtype} · ${emaFps.toFixed(0)} fps · ${on('soft') ? 'soft' : 'HARD'}-argmax · `
-        + `jitter ${Number.isNaN(jitter) ? '—' : jitter.toFixed(2) + 'px'}\n${scores}`)
+        + `${multi ? `multi: ${faces.length} face(s)` : 'single'} · `
+        + `jitter ${Number.isNaN(jitter) ? '—' : jitter.toFixed(2) + 'px'}\n${detail}`)
       requestAnimationFrame(() => tick())
     }
     requestAnimationFrame(() => tick())
@@ -244,7 +438,7 @@ async function run() {
   }
 }
 
-const SLIDERS = ['thresh', 'overlay', 'boxscale']
+const SLIDERS = ['thresh', 'overlay', 'boxscale', 'maxfaces', 'tol']
 const syncVals = () => { for (const id of SLIDERS) $(`${id}-v`).textContent = $<HTMLInputElement>(id).value }
 for (const id of SLIDERS) $(id).addEventListener('input', syncVals)
 syncVals()

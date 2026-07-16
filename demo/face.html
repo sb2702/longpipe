@@ -27,15 +27,24 @@
   </head>
   <body>
     <div class="topbar"><a href="/">← demos</a></div>
-    <h2>Face-heatmap probe (small / xs)</h2>
+    <h2>Face-heatmap probe — multi-face decode</h2>
     <p class="desc">
       Runs the tier's <b>production .bin</b> end-to-end: TierModel matting pass →
       <code>encoderTaps</code> → <code>FaceHeatmapNet</code> → 5 keypoint heatmaps at base/4
       (L-eye, R-eye, nose, L-mouth, R-mouth). Keypoints are decoded with the
       <b>windowed soft-argmax centroid</b> (the required decode — toggle it off to see
-      hard-argmax cell snapping). The dashed square is the crop the landmark stage
-      would take. <b>jitter</b> = per-keypoint position std over the last 30 frames,
-      in canvas px — the number soft-argmax exists to keep small.
+      hard-argmax cell snapping). Dashed squares are the crops the landmark stage
+      would take.
+    </p>
+    <p class="desc">
+      <b>multi-face</b> (CPU prototype for the <code>face_box.wgsl</code> rewrite): local-max
+      candidates per channel → every (L-eye, R-eye) pair becomes a hypothesis fixing
+      center/scale/roll → nose + mouth corners predicted from the canonical template and
+      matched within <b>tol</b> × interocular → scored (peak scores − geometric residual) →
+      greedy NMS on consumed candidates. Off = the current single-face production path
+      (global argmax + hull), for A/B. <b>candidates</b> shows stage 1 before grouping, so a
+      missing face reads as "never detected" vs "grouping rejected it". <b>jitter</b> =
+      per-keypoint position std over 30 frames for the top-scoring face, in canvas px.
     </p>
     <div class="controls">
       <label>tier
@@ -54,6 +63,8 @@
           <option value="image">test image</option>
         </select>
       </label>
+      <label>multi-face <input id="multi" type="checkbox" checked /></label>
+      <label>candidates <input id="cands" type="checkbox" /></label>
       <label>soft-argmax <input id="soft" type="checkbox" checked /></label>
       <label>heatmap <input id="showhm" type="checkbox" checked /></label>
       <label>crop box <input id="showbox" type="checkbox" checked /></label>
@@ -63,6 +74,8 @@
       <label>score thresh <input id="thresh"  type="range" min="0"   max="0.9" step="0.01" value="0.15" /><span id="thresh-v"  class="val"></span></label>
       <label>overlay      <input id="overlay" type="range" min="0"   max="1"   step="0.05" value="0.55" /><span id="overlay-v" class="val"></span></label>
       <label>box scale    <input id="boxscale" type="range" min="1.0" max="2.2" step="0.05" value="1.4" /><span id="boxscale-v" class="val"></span></label>
+      <label>max faces    <input id="maxfaces" type="range" min="1"   max="6"   step="1"    value="3" /><span id="maxfaces-v" class="val"></span></label>
+      <label>geom tol     <input id="tol"      type="range" min="0.2" max="1.2" step="0.05" value="0.6" /><span id="tol-v"      class="val"></span></label>
     </div>
     <div id="status">idle — pick a tier and press Run</div>
     <div class="panels">
