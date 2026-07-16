@@ -12,7 +12,7 @@ import { WarpWebGPU } from "~/model/backends/webgpu/ops/warp.ts";
 import { FaceBoxWebGPU } from "~/model/backends/webgpu/ops/face_box.ts";
 import { CropResampleWebGPU } from "~/model/backends/webgpu/ops/crop_resample.ts";
 import { LandmarkOverlayWebGPU } from "~/model/backends/webgpu/ops/landmark_overlay.ts";
-import { FaceTouchupWebGPU } from "~/model/backends/webgpu/ops/face_touchup.ts";
+import { FaceTouchupWebGPU, FaceTouchupStageWebGPU } from "~/model/backends/webgpu/ops/face_touchup.ts";
 import { StabilizeWebGPU } from "~/model/backends/webgpu/ops/stabilize.ts";
 import { BilinearUpsampleWebGPU } from "~/model/backends/webgpu/ops/bilinear_upsample.ts";
 import { CropWebGPU } from "~/model/backends/webgpu/ops/crop.ts";
@@ -85,6 +85,7 @@ export class WebGPUBackend implements Backend {
       Warp:             (source, flow, params)          => new WarpWebGPU(this, source, flow, params),
       FaceBoxFromHeatmaps: (heatmaps, params)            => new FaceBoxWebGPU(this, heatmaps, params),
       CropResample:     (frame, box, params)             => new CropResampleWebGPU(this, frame, box, params),
+      FaceTouchupStage: (frame, landmarks, box, topo, params) => new FaceTouchupStageWebGPU(this, frame, landmarks, box, topo, params),
       Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGPU(this, flow, pred, ref, envPrev, params),
       BilinearUpsample: (input, params)                 => new BilinearUpsampleWebGPU(this, input, params),
       Crop:             (input, params)                 => new CropWebGPU(this, input, params),

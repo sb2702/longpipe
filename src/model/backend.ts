@@ -227,6 +227,13 @@ export interface Backend {
     // and LandmarkOverlay consume this tensor without a readback.
     FaceBoxFromHeatmaps: (heatmaps: Tensor, params: FaceBoxParams) => Op;
 
+    // UV-space face touch-up as a Tensor→Tensor EFFECT STAGE: renders the
+    // retouched frame into an output tensor the (single, terminal) background
+    // compositor consumes as its foreground image — effects compose upstream
+    // of the one compositor instead of competing for the canvas. Same passes
+    // as presenters.FaceTouchup (which remains for standalone/probe use).
+    FaceTouchupStage: (frame: Tensor, landmarks: Tensor, box: Tensor, topo: FaceTopology, params: FaceTouchupParams) => Op;
+
     // Square crop from `frame` at the box tensor's location, bilinearly
     // resampled to (outH, outW) and normalized ((rgb - mean)/std) — feeds
     // LandmarkNet (ImageNet stats). Mirrors landmark training's warpAffine

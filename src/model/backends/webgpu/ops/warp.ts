@@ -21,13 +21,14 @@ export class WarpWebGPU extends WebGPUOp {
     this.inputs = [source, flow];
 
     this.createUniform("params", "Params");
-    const u = new Uint32Array(3);              // { h: u32, w: u32, flow_scale: f32 }
+    const u = new Uint32Array(4);              // { h, w: u32, flow_scale: f32, groups: u32 }
     u[0] = source.h;
     u[1] = source.w;
     new Float32Array(u.buffer)[2] = params.flowScale;
+    u[3] = source.c / 4;
     this.setUniform("params", u);
 
     this.defaultSetup();
-    this.dispatch = [Math.ceil(source.w / 8), Math.ceil(source.h / 8), 1];
+    this.dispatch = [Math.ceil(source.w / 8), Math.ceil(source.h / 8), source.c / 4];
   }
 }

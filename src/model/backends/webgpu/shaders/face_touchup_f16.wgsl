@@ -203,3 +203,17 @@ fn fs_comp(in: CompOut) -> @location(0) vec4<f32> {
     let w    = textureSample(tex1, samp, in.uv).r * uni.strength; // weight mask
     return vec4<f32>(mix(orig, sm, w), 1.0);
 }
+
+// ── stage mode: unpack the composited float texture into the output tensor ──
+// (WebGPU tensors are storage buffers; the mesh passes need a raster target.
+// copyTextureToBuffer has a 256-byte bytesPerRow constraint that arbitrary
+// widths violate, so a tiny compute blit does the copy instead.)
+
+@group(0) @binding(7) var<storage, read_write> unpack_out : array<vec4<f16>>;
+
+@compute @workgroup_size(8, 8, 1)
+fn cs_unpack(@builtin(global_invocation_id) gid: vec3<u32>) {
+    if (gid.x >= uni.frame_w || gid.y >= uni.frame_h) { return; }
+    let v = textureLoad(tex0, vec2<i32>(i32(gid.x), i32(gid.y)), 0);
+    unpack_out[gid.y * uni.frame_w + gid.x] = vec4<f16>(v);
+}

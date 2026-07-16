@@ -12,13 +12,24 @@ export type BackgroundConfig =
   | { mode: 'image'; image: Tensor }
   | { mode: 'blur';  sigma: number }
 
-// What compositeTo() can render: an effect (BackgroundConfig) or raw
-// passthrough (input image straight to the target, no alpha/bg). The renderer
-// picks passthrough for a surface whose background is 'none' — see the 2×2
-// main/preview effect matrix.
-export type CompositeSpec = BackgroundConfig | { mode: 'passthrough' }
+// What compositeTo() can render: an effect (BackgroundConfig), raw passthrough
+// (input image straight to the target — disabled/boot), or fg-passthrough (the
+// EFFECT-CHAIN tail straight to the target — background 'none' with an active
+// effect chain, e.g. touch-up without a virtual background). Effect specs also
+// read the chain tail as their foreground: the chain composes UPSTREAM of the
+// one terminal compositor per target.
+export type CompositeSpec = BackgroundConfig | { mode: 'passthrough' } | { mode: 'fg-passthrough' }
 
 export interface NetworkLike {
+  readonly output: Tensor
+  run(): void
+}
+
+// A Tensor→Tensor effect stage (e.g. FaceTouchupStage): consumes the previous
+// foreground image tensor (bound at construction) and produces the next. The
+// chain runs once per frame (runEffects) before any composite; the terminal
+// compositor(s) bind the chain tail as their foreground.
+export interface EffectStage {
   readonly output: Tensor
   run(): void
 }
@@ -63,6 +74,18 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
   // Preview config is passed explicitly by the renderer to compositeTo().
   private bgConfig:     BackgroundConfig  = { mode: 'solid', color: [0, 0, 0] }
 
+  // Ordered Tensor→Tensor effect chain (empty = foreground is the raw display
+  // image). Stages bind their input tensor at construction; the renderer
+  // rebuilds the chain when effects change (setEffectChain clears the
+  // compositor cache — every effect compositor binds the chain tail).
+  private effectChain: EffectStage[] = []
+
+  // Deduplicates the per-frame display-image upload: setSource marks dirty,
+  // refreshDisplayInput uploads once, later calls are no-ops until the next
+  // setSource. Lets the renderer refresh early (effect stages read the image
+  // before compositing) without double uploads.
+  private displayDirty = false
+
   // Per-target compositor cache, keyed by RenderTarget. compositeTo() builds a
   // compositor on first use of a (target, spec) and reuses it until the spec
   // changes (config swap) or attachNetwork/setUpscaler invalidates the alpha
@@ -99,6 +122,7 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
   setSource(src: ImageSource): void {
     this.networkInput?.setSource(src)
     this.displayInput.setSource(src)
+    this.displayDirty = true
   }
 
   setUpscaler(mode: UpscalerMode): void {
@@ -116,42 +140,80 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
     this.bgConfig = config
   }
 
+  // The raw display image tensor (output-canvas res). Effect stages bind this
+  // (or an earlier stage's output) as their input.
+  get displayImage(): Tensor {
+    return this.image
+  }
+
+  // Current foreground: the effect-chain tail, or the raw image when no chain.
+  private fgImage(): Tensor {
+    return this.effectChain.length ? this.effectChain[this.effectChain.length - 1].output : this.image
+  }
+
+  // Replace the effect chain. Invalidates all cached compositors — effect and
+  // fg-passthrough compositors bind the (possibly new) chain tail.
+  setEffectChain(stages: EffectStage[]): void {
+    this.effectChain = stages
+    this.compositors.clear()
+  }
+
+  // Run the chain once per frame, after refreshDisplayInput and before any
+  // composite. No-op when the chain is empty.
+  runEffects(): void {
+    for (const s of this.effectChain) s.run()
+  }
+
   run(): void {
     this.runModel()
     this.runDisplay()
   }
 
-  // Cheap, runs every frame: refresh display tensor at canvas resolution,
+  // Cheap, runs every frame: refresh display tensor, run the effect chain,
   // composite the 'main' target with whatever's currently in the alpha tensor
   // (which persists between model runs).
   runDisplay(): void {
     this.refreshDisplayInput()
-    this.compositeMain(false)
+    this.runEffects()
+    this.compositeMain('effect')
   }
 
-  // True passthrough: writes the input image directly to the canvas. Used
+  // Effect-chain output straight to the canvas — background 'none' with an
+  // active chain (e.g. touch-up on, no virtual background).
+  runFgPassthrough(): void {
+    this.refreshDisplayInput()
+    this.runEffects()
+    this.compositeMain('fg')
+  }
+
+  // True passthrough: writes the raw input image directly to the canvas. Used
   // by the renderer when disabled OR while booting (no network attached
   // yet). setSource() is still required (display input needs a fresh
-  // frame); model + alpha pipeline is skipped entirely.
+  // frame); model + alpha + effect pipeline is skipped entirely.
   runPassthrough(): void {
     this.refreshDisplayInput()
-    this.compositeMain(true)
+    this.compositeMain('raw')
   }
 
-  // Composite the 'main' target with its stored config (passthrough=false) or
-  // raw passthrough (passthrough=true). Does NOT refresh the display input —
+  // Composite the 'main' target: the stored effect config, the effect-chain
+  // tail (fg), or the raw image (raw). Does NOT refresh the display input —
   // used by the renderer's multi-target frame where refreshDisplayInput() is
   // called once and the WebGL preview path needs main composited LAST (after
   // the preview snapshot) so the output adapter captures main content.
-  compositeMain(passthrough: boolean): void {
-    this.compositeTo('main', passthrough ? { mode: 'passthrough' } : this.bgConfig)
+  compositeMain(mode: 'effect' | 'fg' | 'raw'): void {
+    const spec: CompositeSpec = mode === 'effect' ? this.bgConfig
+      : mode === 'fg' ? { mode: 'fg-passthrough' }
+      : { mode: 'passthrough' }
+    this.compositeTo('main', spec)
   }
 
   // Refresh the full-resolution display image from the staged source. Run ONCE
   // per frame before any compositeTo() — the image tensor is shared across all
   // targets (main + preview), so re-running it per target would be wasted work.
   refreshDisplayInput(): void {
+    if (!this.displayDirty) return
     this.displayInput.run()
+    this.displayDirty = false
   }
 
   // Composite the (already-computed, current) alpha over `spec`'s background to
@@ -206,12 +268,18 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
     if (spec.mode === 'passthrough') {
       return backend.presenters.CompositePassthrough(image, target)
     }
+    // Everything below composites the CHAIN TAIL as its foreground — the one
+    // terminal compositor per target; effects composed upstream.
+    const fg = this.fgImage()
+    if (spec.mode === 'fg-passthrough') {
+      return backend.presenters.CompositePassthrough(fg, target)
+    }
     if (!this.upscaler) throw new Error('RenderOp.compositeTo (effect spec) called before attachNetwork')
     const alpha = this.upscaler.output
     switch (spec.mode) {
-      case 'solid': return new CompositorSolid(backend, image, alpha, spec.color, target)
-      case 'image': return new CompositorImage(backend, image, alpha, spec.image, target)
-      case 'blur':  return new CompositorBlur(backend,  image, alpha, spec.sigma, target)
+      case 'solid': return new CompositorSolid(backend, fg, alpha, spec.color, target)
+      case 'image': return new CompositorImage(backend, fg, alpha, spec.image, target)
+      case 'blur':  return new CompositorBlur(backend,  fg, alpha, spec.sigma, target)
     }
   }
 }
@@ -224,6 +292,7 @@ function sameSpec(a: CompositeSpec, b: CompositeSpec): boolean {
   if (a.mode !== b.mode) return false
   switch (b.mode) {
     case 'passthrough': return true
+    case 'fg-passthrough': return true
     case 'solid': {
       const ac = (a as { color: [number, number, number] }).color
       return ac[0] === b.color[0] && ac[1] === b.color[1] && ac[2] === b.color[2]

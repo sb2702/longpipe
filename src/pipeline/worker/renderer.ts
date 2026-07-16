@@ -11,7 +11,10 @@ import { RenderOp, type BackgroundConfig as RenderOpBackgroundConfig, type Compo
 import { loadWeightsFromBinary } from '~/utils/loadWeights.ts'
 import { TierModel } from '~/model/tier_model.ts'
 import { OpticalFlowNet } from '~/model/networks/optical_flow_net.ts'
+import { FaceHeatmapNet } from '~/model/networks/face_heatmap_net.ts'
+import { LandmarkNet } from '~/model/networks/landmark_net.ts'
 import { TIER_CONFIG } from '~/model/tier_config.ts'
+import type { FaceTopology, FaceTouchupParams } from '~/model/backend.ts'
 
 const FLOW_DEC_W = 16   // shipping flow-head width
 // Flow-gated stabilizer params. tLo/tHi are flow magnitudes in BASE-res pixels
@@ -22,6 +25,11 @@ const FLOW_DEC_W = 16   // shipping flow-head width
 // background is static). stepX/stepY are added per-tier in setPreset (≈ canvas/flow
 // resolution ratio so the finite-difference spans one base/4 pixel). Tunable.
 const FLOW_STAB = { tLo: 0.15, tHi: 2.5, leak: 0.15, release: 0.9, tDiv:1.0, divScale: 2.0 }
+// Landmark crop config — mirrors landmark training (256² crop, ImageNet norm).
+const LM_CROP = 256
+const IMAGENET_MEAN: [number, number, number] = [0.485, 0.456, 0.406]
+const IMAGENET_STD:  [number, number, number] = [0.229, 0.224, 0.225]
+const FACE_BOX_DEFAULTS = { win: 3, thresh: 0.15, boxScale: 2.4 }
 import type { ManualPreset } from '../presets'
 import type { Background } from '../background'
 import type { RendererStats } from '../messages'
@@ -36,6 +44,16 @@ export interface PreviewOptions {
 }
 
 const DEFAULT_PREVIEW_FPS = 15
+
+// Face-effect configuration (touch-up today; AR later). The landmark model is
+// SEPARATE weights (one model, all tiers); topology/weight-mask are static
+// assets. box tunes the heatmap→crop decode (defaults from the probe pages).
+export interface FaceEffectsConfig {
+  landmarkWeights: ArrayBuffer
+  topology:        FaceTopology
+  touchup:         FaceTouchupParams
+  box?:            { win?: number; thresh?: number; boxScale?: number }
+}
 
 export interface RendererOptions {
   backend:     Backend
@@ -102,6 +120,33 @@ export class Renderer {
     predBuf: Tensor; stabPrev: Tensor; refWarp: Op; stab: Op
     alphaHeld: Tensor | null; predWarp: Op | null
   } | null = null
+  // Face-effect chain — null unless setFaceEffects() configured it AND the
+  // loaded .bin carries a `face` blob. The heatmaps are a temporal citizen
+  // exactly like alpha: FaceHeatmapNet runs on matting-inference frames (its
+  // taps are only fresh then); on skip frames the HELD heatmaps are warped
+  // forward with the same flow field (rescaled to heatmap res). Landmarks run
+  // EVERY frame from the current (live or warped) heatmaps — the regressor is
+  // tiny and crop-jitter training tolerates the box.
+  //   hmBuf     : current heatmaps (live or warped) — the box op's input
+  //   hmHeld    : warp source, copied on inference frames (flow skip tiers only)
+  //   boxStable : box carrier — crop + effect stage bind this stable tensor
+  private faceChain: {
+    face: FaceHeatmapNet
+    hmBuf: Tensor
+    hmHeld: Tensor | null
+    hmFlowDown: Op | null
+    hmWarp: Op | null
+    boxOp: Op
+    boxStable: Tensor
+    crop: Op
+    lm: LandmarkNet
+  } | null = null
+  private faceCfg: FaceEffectsConfig | null = null
+  // Pieces held for face-chain (re)builds outside setPreset.
+  private tier: TierModel | null = null
+  private tierInput: InputOp | null = null
+  private lastTierWeights: any = null
+
   // Per-target Input ops + ports for 'image'/'video' background modes. Keyed by
   // RenderTarget so main and preview can each show a different image/video bg
   // without colliding on one input op. Each video port receives a fresh
@@ -165,7 +210,9 @@ export class Renderer {
     const now = performance.now()
 
     const hasNet        = this.renderOp.hasNetwork()
+    const faceActive    = this.enabled && hasNet && this.faceChain !== null
     const mainEffect    = this.enabled && hasNet && this.currentBackground.kind !== 'none'
+    const needsModel    = mainEffect || faceActive   // face rides the encoder → needs the matting pass
     const previewTick   = this.isPreviewTick(now)
     const previewEffect = previewTick && hasNet && this.previewBg !== null && this.previewBg.kind !== 'none'
 
@@ -174,13 +221,18 @@ export class Renderer {
     // non-flow tiers follow the plain skip cadence. A preview tick that needs alpha
     // forces a run when main didn't already produce one this frame.
     let ranModel = false
-    if (mainEffect && this.flow) {
+    if (needsModel && this.flow) {
       ranModel = this.stepFlow()
-    } else if (mainEffect) {
+    } else if (needsModel) {
       if (this.shouldRunModel()) { this.runModelOnce(); ranModel = true }
       else this.skippedCount++
     }
     if (!ranModel && previewEffect) { this.runModelOnce(); ranModel = true }
+
+    // Face chain: heatmaps (live on inference frames / warped on skips) → box →
+    // crop → landmarks. Runs every frame while active; the touch-up stage itself
+    // runs inside the RenderOp effect chain during the composite below.
+    if (faceActive) this.stepFace(ranModel)
 
     // Composite. The display input (full-res image, shared by both surfaces) is
     // refreshed once inside whichever composite path runs first.
@@ -189,15 +241,15 @@ export class Renderer {
       if (this.backendKind === 'webgl') {
         // WebGL: one canvas — preview composited + snapshotted, then main last
         // so the output adapter captures main. All synchronous (no race).
-        this.compositePreviewWebGL(mainEffect, previewEffect)
+        this.compositePreviewWebGL(mainEffect, previewEffect, faceActive)
       } else {
         // WebGPU: main + preview render to independent swapchains; order free.
-        this.compositeMain(mainEffect)
+        this.compositeMain(mainEffect, faceActive)
         this.renderOp.compositeTo('preview', this.previewSpec(previewEffect))
       }
       this.lastPreviewAt = now
     } else {
-      this.compositeMain(mainEffect)
+      this.compositeMain(mainEffect, faceActive)
     }
     this.displayRunSamples.push({ ts: performance.now(), ms: performance.now() - td })
     this.trimSamples(this.displayRunSamples)
@@ -206,11 +258,13 @@ export class Renderer {
     this.trim(this.framesRenderedAt)
   }
 
-  // Main surface: effect (runDisplay) or passthrough. Both refresh the shared
-  // display input as their first step.
-  private compositeMain(effect: boolean): void {
-    if (effect) this.renderOp.runDisplay()
-    else        this.renderOp.runPassthrough()
+  // Main surface: background effect (runDisplay), effect-chain-only output
+  // (fg-passthrough — touch-up on, background 'none'), or raw passthrough.
+  // All refresh the shared display input as their first step.
+  private compositeMain(effect: boolean, faceActive: boolean): void {
+    if (effect)          this.renderOp.runDisplay()
+    else if (faceActive) this.renderOp.runFgPassthrough()
+    else                 this.renderOp.runPassthrough()
   }
 
   // WebGL preview present: render preview to the single canvas, snapshot it to
@@ -219,12 +273,14 @@ export class Renderer {
   // backing (left blank), but main is recomposited before this synchronous
   // block ends, so neither the output adapter nor a continuous captureStream
   // ever observes preview/blank content.
-  private compositePreviewWebGL(mainEffect: boolean, previewEffect: boolean): void {
+  private compositePreviewWebGL(mainEffect: boolean, previewEffect: boolean, faceActive: boolean): void {
     this.renderOp.refreshDisplayInput()
+    this.renderOp.runEffects()   // chain feeds both surfaces' compositors
     this.renderOp.compositeTo('preview', this.previewSpec(previewEffect))
     const bmp = this.canvas.transferToImageBitmap()   // this.canvas === backend.canvas, typed OffscreenCanvas
     this.previewCtx!.transferFromImageBitmap(bmp)
-    this.renderOp.compositeMain(!mainEffect)   // main last; passthrough when no main effect
+    // main last; effect / chain-only / raw per the main-surface state
+    this.renderOp.compositeMain(mainEffect ? 'effect' : faceActive ? 'fg' : 'raw')
   }
 
   // Preview compositor spec: the precomputed effect config, or passthrough when
@@ -296,6 +352,29 @@ export class Renderer {
     this.backend.copyTensor(f.stab.output, f.stabPrev)         // threads stab (.x) + env (.y)
     this.renderOp.applyAlpha(f.stab.output)
     return ranModel
+  }
+
+  // One face-chain frame. On matting-inference frames the heatmaps are fresh
+  // (taps just updated); on skip frames the held heatmaps are warped forward
+  // with this frame's flow (stepFlow already ran the flow net on skip frames).
+  // Without a flow blob the heatmaps simply hold between inference frames.
+  private stepFace(ranModel: boolean): void {
+    const fc = this.faceChain!
+    if (ranModel) {
+      fc.face.run()
+      this.backend.copyTensor(fc.face.output, fc.hmBuf)
+      if (fc.hmHeld) this.backend.copyTensor(fc.face.output, fc.hmHeld)
+    } else if (fc.hmWarp && this.flow) {
+      fc.hmFlowDown!.run()   // flow → heatmap res (values rescaled via flowScale)
+      fc.hmWarp.run()
+      this.backend.copyTensor(fc.hmWarp.output, fc.hmBuf)
+    }
+    // else: hold the last heatmaps (non-flow tier skip frame)
+
+    fc.boxOp.run()
+    this.backend.copyTensor(fc.boxOp.output, fc.boxStable)
+    fc.crop.run()
+    fc.lm.run()
   }
 
   // True when the preview should composite this frame: a canvas is attached, a
@@ -434,8 +513,64 @@ export class Renderer {
                     predBuf, stabPrev, refWarp, stab, alphaHeld, predWarp }
     }
 
-    this.preset      = preset
-    this.skipCounter = 0
+    this.preset          = preset
+    this.skipCounter     = 0
+    this.tier            = tier
+    this.tierInput       = networkInput
+    this.lastTierWeights = w
+    this.buildFaceChain()
+  }
+
+  // Configure (or clear) the face-effect chain. Takes effect immediately when a
+  // preset is attached; otherwise applied by the next setPreset. Passing a new
+  // config rebuilds the chain in place (adaptive tier swaps do the same via
+  // setPreset — the chain rides the current tier's encoder taps).
+  setFaceEffects(cfg: FaceEffectsConfig | null): void {
+    this.faceCfg = cfg
+    if (this.preset) this.buildFaceChain()
+  }
+
+  // (Re)build the face chain + RenderOp effect chain from faceCfg and the
+  // current tier. No-ops (clearing both) when unconfigured or the .bin has no
+  // face blob.
+  private buildFaceChain(): void {
+    this.faceChain = null
+    this.renderOp.setEffectChain([])
+    const cfg = this.faceCfg
+    const w = this.lastTierWeights
+    if (!cfg || !w?.face || !this.tier || !this.tierInput || !this.preset) return
+
+    const face = new FaceHeatmapNet(this.backend, this.tier.encoderTaps, w.face)
+    const hm = face.output
+    const zerosT = (h: number, wd: number, c: number) =>
+      this.backend.tensor(h, wd, c, new Float32Array(h * wd * c))
+    const hmBuf = zerosT(hm.h, hm.w, hm.c)
+
+    // Heatmap warp carriers — only meaningful on flow tiers that skip frames
+    // (every-frame tiers refresh the heatmaps each frame; non-flow tiers hold).
+    let hmHeld: Tensor | null = null
+    let hmFlowDown: Op | null = null
+    let hmWarp: Op | null = null
+    if (this.flow && (this.preset.skipFrames ?? 0) > 0) {
+      const baseW = TIER_CONFIG[this.preset.model].baseRes.w
+      hmHeld = zerosT(hm.h, hm.w, hm.c)
+      hmFlowDown = this.backend.ops.BilinearUpsample(this.flow.net.output, { outH: hm.h, outW: hm.w })
+      // flow values are base-res px → heatmap-res px
+      hmWarp = this.backend.ops.Warp(hmHeld, hmFlowDown.output, { flowScale: hm.w / baseW })
+    }
+
+    const boxCfg = { ...FACE_BOX_DEFAULTS, ...(cfg.box ?? {}) }
+    const boxOp = this.backend.ops.FaceBoxFromHeatmaps(hmBuf, boxCfg)
+    const boxStable = zerosT(1, 1, 4)
+    const crop = this.backend.ops.CropResample(this.tierInput.output, boxStable, {
+      outH: LM_CROP, outW: LM_CROP, mean: IMAGENET_MEAN, std: IMAGENET_STD,
+    })
+    const lm = new LandmarkNet(this.backend, crop.output, loadWeightsFromBinary(cfg.landmarkWeights) as any)
+
+    const stage = this.backend.ops.FaceTouchupStage(
+      this.renderOp.displayImage, lm.output, boxStable, cfg.topology, cfg.touchup)
+    this.renderOp.setEffectChain([stage])
+    this.faceChain = { face, hmBuf, hmHeld, hmFlowDown, hmWarp, boxOp, boxStable, crop, lm }
   }
 
   // Release everything: close any open background ports (worker-side

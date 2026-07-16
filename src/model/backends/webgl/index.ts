@@ -12,7 +12,7 @@ import { WarpWebGL } from '~/model/backends/webgl/ops/warp.ts'
 import { FaceBoxWebGL } from '~/model/backends/webgl/ops/face_box.ts'
 import { CropResampleWebGL } from '~/model/backends/webgl/ops/crop_resample.ts'
 import { LandmarkOverlayWebGL } from '~/model/backends/webgl/ops/landmark_overlay.ts'
-import { FaceTouchupWebGL } from '~/model/backends/webgl/ops/face_touchup.ts'
+import { FaceTouchupWebGL, FaceTouchupStageWebGL } from '~/model/backends/webgl/ops/face_touchup.ts'
 import { StabilizeWebGL } from '~/model/backends/webgl/ops/stabilize.ts'
 import { BilinearUpsampleWebGL } from '~/model/backends/webgl/ops/bilinear_upsample.ts'
 import { CropWebGL } from '~/model/backends/webgl/ops/crop.ts'
@@ -81,6 +81,7 @@ export class WebGLBackend implements Backend {
       Warp:             (source, flow, params)          => new WarpWebGL(this, source, flow, params),
       FaceBoxFromHeatmaps: (heatmaps, params)            => new FaceBoxWebGL(this, heatmaps, params),
       CropResample:     (frame, box, params)             => new CropResampleWebGL(this, frame, box, params),
+      FaceTouchupStage: (frame, landmarks, box, topo, params) => new FaceTouchupStageWebGL(this, frame, landmarks, box, topo, params),
       Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGL(this, flow, pred, ref, envPrev, params),
       BilinearUpsample: (input, params)                => new BilinearUpsampleWebGL(this, input, params),
       Crop:             (input, params)                => new CropWebGL(this, input, params),

@@ -376,3 +376,202 @@ export class FaceTouchupWebGL {
     gl.bindVertexArray(null)
   }
 }
+
+// ── Tensor→Tensor stage form ─────────────────────────────────────────────────
+// Renders the retouched frame INTO an output tensor's texture (WebGL tensors
+// are textures, so this is direct — no unpack needed). Tensor-space targets
+// don't y-flip: the display blit flips because the canvas is bottom-up; a
+// tensor row 0 is just index 0, so blit copies rows straight through and the
+// mesh positions map py → NDC py*2-1.
+const BLIT_TENSOR_FRAG = `#version 300 es
+precision highp float;
+uniform sampler2D u_image;
+out vec4 fragColor;
+void main() {
+    ivec2 px = ivec2(gl_FragCoord.xy);
+    fragColor = vec4(texelFetch(u_image, px, 0).rgb, 1.0);
+}`
+
+const COMP_TENSOR_VERT = `#version 300 es
+precision highp float;
+layout(location = 0) in vec2 a_uv;
+layout(location = 1) in float a_idx;
+${LM_COMMON}
+out vec2 v_uv;
+out vec2 v_src;
+void main() {
+    vec3 l = lmFrame(int(a_idx));
+    if (l.z < u_thresh) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+    v_uv = a_uv;
+    v_src = l.xy;
+    gl_Position = vec4(l.x * 2.0 - 1.0, l.y * 2.0 - 1.0, 0.0, 1.0);
+}`
+
+export class FaceTouchupStageWebGL {
+  readonly inputs: Tensor[]
+  readonly weights: never[] = []
+  readonly output: WebGLTensor
+  private readonly progs: Record<'unwrap' | 'blur' | 'combine' | 'bilateral' | 'blitT' | 'compT', WebGLProgram>
+  private readonly meshVao: WebGLVertexArrayObject
+  private readonly fbo: WebGLFramebuffer
+  private readonly atlas: WebGLTexture
+  private readonly ping: WebGLTexture
+  private readonly low: WebGLTexture
+  private readonly smoothed: WebGLTexture
+  private readonly weightTex: WebGLTexture
+  private readonly frame: WebGLTensor
+  private readonly lm: WebGLTensor
+  private readonly box: WebGLTensor
+  private readonly count: number
+  private readonly params: FaceTouchupParams
+
+  constructor(
+    private readonly backend: WebGLBackend,
+    frame: Tensor,
+    landmarks: Tensor,
+    box: Tensor,
+    topo: FaceTopology,
+    params: FaceTouchupParams,
+  ) {
+    const gl = backend.gl
+    this.inputs = [frame, landmarks, box]
+    this.frame = frame as WebGLTensor
+    this.lm = landmarks as WebGLTensor
+    this.box = box as WebGLTensor
+    this.count = topo.count
+    this.params = params
+    this.output = backend.tensor(frame.h, frame.w, 4) as WebGLTensor
+
+    this.progs = {
+      unwrap:    compileProgram(gl, UNWRAP_VERT, UNWRAP_FRAG, 'touchup-stage unwrap'),
+      blur:      compileProgram(gl, QUAD_VERT, BLUR_FRAG, 'touchup-stage blur'),
+      combine:   compileProgram(gl, QUAD_VERT, COMBINE_FRAG, 'touchup-stage combine'),
+      bilateral: compileProgram(gl, QUAD_VERT, BILATERAL_FRAG, 'touchup-stage bilateral'),
+      blitT:     compileProgram(gl, QUAD_VERT, BLIT_TENSOR_FRAG, 'touchup-stage blitT'),
+      compT:     compileProgram(gl, COMP_TENSOR_VERT, COMP_FRAG, 'touchup-stage compT'),
+    }
+
+    this.meshVao = gl.createVertexArray()!
+    gl.bindVertexArray(this.meshVao)
+    const uvBuf = gl.createBuffer()!
+    gl.bindBuffer(gl.ARRAY_BUFFER, uvBuf)
+    gl.bufferData(gl.ARRAY_BUFFER, topo.uv, gl.STATIC_DRAW)
+    gl.enableVertexAttribArray(0)
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    const idxBuf = gl.createBuffer()!
+    gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf)
+    gl.bufferData(gl.ARRAY_BUFFER, topo.idx, gl.STATIC_DRAW)
+    gl.enableVertexAttribArray(1)
+    gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(null)
+
+    const mkTex = (data: ImageBitmap | null) => {
+      const t = gl.createTexture()!
+      gl.bindTexture(gl.TEXTURE_2D, t)
+      if (data) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, data)
+      else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, ATLAS, ATLAS, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      return t
+    }
+    this.atlas = mkTex(null)
+    this.ping = mkTex(null)
+    this.low = mkTex(null)
+    this.smoothed = mkTex(null)
+    this.weightTex = mkTex(topo.weightMask)
+    this.fbo = gl.createFramebuffer()!
+  }
+
+  private bindTex(prog: WebGLProgram, unit: number, name: string, tex: WebGLTexture): void {
+    const gl = this.backend.gl
+    gl.activeTexture(gl.TEXTURE0 + unit)
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.uniform1i(gl.getUniformLocation(prog, name), unit)
+  }
+
+  private lmUniforms(prog: WebGLProgram): void {
+    const gl = this.backend.gl
+    this.bindTex(prog, 4, 'u_lm', this.lm.texture)
+    this.bindTex(prog, 5, 'u_box', this.box.texture)
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_thresh'), this.params.thresh)
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_canvas_w'), this.frame.w)
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_canvas_h'), this.frame.h)
+  }
+
+  private frameUniforms(prog: WebGLProgram): void {
+    const gl = this.backend.gl
+    this.bindTex(prog, 0, 'u_frame', this.frame.texture)
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_frame_w'), this.frame.w)
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_frame_h'), this.frame.h)
+  }
+
+  private pass(target: WebGLTexture, w: number, h: number, draw: () => void): void {
+    const gl = this.backend.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target, 0)
+    gl.viewport(0, 0, w, h)
+    draw()
+  }
+
+  run(): void {
+    const gl = this.backend.gl
+
+    this.pass(this.atlas, ATLAS, ATLAS, () => {
+      gl.clearColor(0, 0, 0, 0)
+      gl.clear(gl.COLOR_BUFFER_BIT)
+      gl.useProgram(this.progs.unwrap)
+      this.frameUniforms(this.progs.unwrap)
+      this.lmUniforms(this.progs.unwrap)
+      gl.bindVertexArray(this.meshVao)
+      gl.drawArrays(gl.TRIANGLES, 0, this.count)
+      gl.bindVertexArray(null)
+    })
+
+    if ((this.params.style ?? 'freq-sep') === 'bilateral') {
+      this.pass(this.smoothed, ATLAS, ATLAS, () => {
+        gl.useProgram(this.progs.bilateral)
+        this.bindTex(this.progs.bilateral, 0, 'u_tex', this.atlas)
+        gl.uniform1f(gl.getUniformLocation(this.progs.bilateral, 'u_sigma'), this.params.amount)
+        gl.drawArrays(gl.TRIANGLES, 0, 6)
+      })
+    } else {
+      const blur = (src: WebGLTexture, dst: WebGLTexture, dx: number, dy: number) =>
+        this.pass(dst, ATLAS, ATLAS, () => {
+          gl.useProgram(this.progs.blur)
+          this.bindTex(this.progs.blur, 0, 'u_tex', src)
+          gl.uniform2f(gl.getUniformLocation(this.progs.blur, 'u_dir'), dx, dy)
+          gl.uniform1f(gl.getUniformLocation(this.progs.blur, 'u_sigma'), this.params.amount)
+          gl.drawArrays(gl.TRIANGLES, 0, 6)
+        })
+      blur(this.atlas, this.ping, 1 / ATLAS, 0)
+      blur(this.ping, this.low, 0, 1 / ATLAS)
+      this.pass(this.smoothed, ATLAS, ATLAS, () => {
+        gl.useProgram(this.progs.combine)
+        this.bindTex(this.progs.combine, 0, 'u_atlas', this.atlas)
+        this.bindTex(this.progs.combine, 1, 'u_low', this.low)
+        gl.uniform1f(gl.getUniformLocation(this.progs.combine, 'u_detail'), this.params.detail)
+        gl.drawArrays(gl.TRIANGLES, 0, 6)
+      })
+    }
+
+    // Composite into the output tensor: straight blit, then the mesh.
+    this.pass(this.output.texture, this.frame.w, this.frame.h, () => {
+      gl.useProgram(this.progs.blitT)
+      this.bindTex(this.progs.blitT, 0, 'u_image', this.frame.texture)
+      gl.bindVertexArray(null)
+      gl.drawArrays(gl.TRIANGLES, 0, 6)
+
+      gl.useProgram(this.progs.compT)
+      this.frameUniforms(this.progs.compT)
+      this.lmUniforms(this.progs.compT)
+      this.bindTex(this.progs.compT, 1, 'u_smoothed', this.smoothed)
+      this.bindTex(this.progs.compT, 2, 'u_weight', this.weightTex)
+      gl.uniform1f(gl.getUniformLocation(this.progs.compT, 'u_strength'), this.params.strength)
+      gl.bindVertexArray(this.meshVao)
+      gl.drawArrays(gl.TRIANGLES, 0, this.count)
+      gl.bindVertexArray(null)
+    })
+  }
+}
