@@ -80,6 +80,21 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
   // compositor cache — every effect compositor binds the chain tail).
   private effectChain: EffectStage[] = []
 
+  // The GEOMETRIC slot: auto-reframe. `viewRect` is a 1×1×4 (cx, cy, size,
+  // moving) tensor owned by the renderer (it holds the camera state across
+  // frames); RenderOp only APPLIES it. Two sample ops, rebuilt whenever the
+  // chain tail or the alpha source changes:
+  //   viewFg    — samples the effect-chain tail (or the raw image)
+  //   viewAlpha — samples the upscaled alpha
+  // Deliberately NOT applied to the background: solid/image backgrounds stay put
+  // while the subject zooms (a virtual backdrop shouldn't move), and blur is
+  // derived from the foreground so it follows for free. The reframe sits AFTER
+  // the effect chain because touch-up draws its mesh at full-frame landmark
+  // coords — reframing upstream would put every face effect in the wrong place.
+  private viewRect:  Tensor | null = null
+  private viewFg:    { readonly output: Tensor; run(): void } | null = null
+  private viewAlpha: { readonly output: Tensor; run(): void } | null = null
+
   // Deduplicates the per-frame display-image upload: setSource marks dirty,
   // refreshDisplayInput uploads once, later calls are no-ops until the next
   // setSource. Lets the renderer refresh early (effect stages read the image
@@ -108,6 +123,7 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
     this.upscalerMode = options.upscaler
     this.bgConfig     = options.background
     this.upscaler     = this.makeUpscaler()
+    this.rebuildView()          // viewAlpha binds upscaler.output
     this.compositors.clear()
   }
 
@@ -130,6 +146,7 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
     this.upscalerMode = mode
     if (this.network) {
       this.upscaler = this.makeUpscaler()
+      this.rebuildView()
       this.compositors.clear()   // every effect compositor binds upscaler.output
     }
   }
@@ -146,15 +163,43 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
     return this.image
   }
 
-  // Current foreground: the effect-chain tail, or the raw image when no chain.
+  // Current foreground: the effect-chain tail (or raw image), reframed if a view
+  // is active.
   private fgImage(): Tensor {
+    return this.viewFg ? this.viewFg.output : this.chainTail()
+  }
+
+  private chainTail(): Tensor {
     return this.effectChain.length ? this.effectChain[this.effectChain.length - 1].output : this.image
+  }
+
+  // Current alpha: the upscaler output, reframed if a view is active.
+  private alphaImage(): Tensor {
+    if (!this.upscaler) throw new Error('RenderOp.alphaImage called before attachNetwork')
+    return this.viewAlpha ? this.viewAlpha.output : this.upscaler.output
+  }
+
+  // Attach (or clear) the reframe view. `rect` is the renderer-owned camera-state
+  // tensor; passing null removes the reframe entirely.
+  setViewTransform(rect: Tensor | null): void {
+    this.viewRect = rect
+    this.rebuildView()
+    this.compositors.clear()
+  }
+
+  private rebuildView(): void {
+    this.viewFg = null
+    this.viewAlpha = null
+    if (!this.viewRect) return
+    this.viewFg = this.backend.ops.Reframe(this.chainTail(), this.viewRect)
+    if (this.upscaler) this.viewAlpha = this.backend.ops.Reframe(this.upscaler.output, this.viewRect)
   }
 
   // Replace the effect chain. Invalidates all cached compositors — effect and
   // fg-passthrough compositors bind the (possibly new) chain tail.
   setEffectChain(stages: EffectStage[]): void {
     this.effectChain = stages
+    this.rebuildView()          // viewFg binds the chain tail
     this.compositors.clear()
   }
 
@@ -162,6 +207,10 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
   // composite. No-op when the chain is empty.
   runEffects(): void {
     for (const s of this.effectChain) s.run()
+    // Every frame, not just inference frames: the rect eases continuously, so the
+    // sample must be re-applied even when the alpha tensor didn't change.
+    this.viewFg?.run()
+    this.viewAlpha?.run()
   }
 
   run(): void {
@@ -275,7 +324,7 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
       return backend.presenters.CompositePassthrough(fg, target)
     }
     if (!this.upscaler) throw new Error('RenderOp.compositeTo (effect spec) called before attachNetwork')
-    const alpha = this.upscaler.output
+    const alpha = this.alphaImage()
     switch (spec.mode) {
       case 'solid': return new CompositorSolid(backend, fg, alpha, spec.color, target)
       case 'image': return new CompositorImage(backend, fg, alpha, spec.image, target)

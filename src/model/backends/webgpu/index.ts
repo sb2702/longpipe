@@ -11,6 +11,8 @@ import { ElementwiseMulWebGPU } from "~/model/backends/webgpu/ops/elementwise_mu
 import { WarpWebGPU } from "~/model/backends/webgpu/ops/warp.ts";
 import { FaceBoxWebGPU } from "~/model/backends/webgpu/ops/face_box.ts";
 import { FaceBoxesWebGPU } from "~/model/backends/webgpu/ops/face_boxes.ts";
+import { ReframeStateWebGPU } from "~/model/backends/webgpu/ops/reframe_state.ts";
+import { ReframeWebGPU } from "~/model/backends/webgpu/ops/reframe.ts";
 import { CropResampleWebGPU } from "~/model/backends/webgpu/ops/crop_resample.ts";
 import { LandmarkOverlayWebGPU } from "~/model/backends/webgpu/ops/landmark_overlay.ts";
 import { FaceTouchupWebGPU, FaceTouchupStageWebGPU } from "~/model/backends/webgpu/ops/face_touchup.ts";
@@ -86,6 +88,8 @@ export class WebGPUBackend implements Backend {
       Warp:             (source, flow, params)          => new WarpWebGPU(this, source, flow, params),
       FaceBoxFromHeatmaps: (heatmaps, params)            => new FaceBoxWebGPU(this, heatmaps, params),
       FaceBoxesFromHeatmaps: (heatmaps, params)          => new FaceBoxesWebGPU(this, heatmaps, params),
+      ReframeState: (boxes, prev, cmd, params)           => new ReframeStateWebGPU(this, boxes, prev, cmd, params),
+      Reframe: (src, rect)                               => new ReframeWebGPU(this, src, rect),
       CropResample:     (frame, box, params)             => new CropResampleWebGPU(this, frame, box, params),
       FaceTouchupStage: (frame, landmarks, box, topo, params) => new FaceTouchupStageWebGPU(this, frame, landmarks, box, topo, params),
       Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGPU(this, flow, pred, ref, envPrev, params),

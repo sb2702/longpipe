@@ -395,6 +395,29 @@
       </div>
 
       <div class="card">
+        <p class="card-label">Auto-reframe <span style="text-transform:none;font-weight:400;opacity:0.7">(rides the same face heatmaps — no extra model)</span></p>
+        <div class="segmented" id="reframeSeg">
+          <button data-rf="off" class="active">Off</button>
+          <button data-rf="auto">Auto</button>
+          <button data-rf="manual">Manual</button>
+        </div>
+        <div class="bg-extra" id="rfNowRow">
+          <label>Reframe</label>
+          <button id="rfNow" style="cursor:pointer">Reframe now</button>
+        </div>
+        <div class="bg-extra" id="rfZoomRow">
+          <label for="rfZoom">Zoom</label>
+          <input type="range" id="rfZoom" min="1" max="2.5" step="0.05" value="1.35" />
+          <span class="val" id="rfZoomVal">1.35</span>
+        </div>
+        <div class="bg-extra" id="rfGravityRow">
+          <label for="rfGravity">Gravity</label>
+          <input type="range" id="rfGravity" min="0" max="1" step="0.05" value="0.5" />
+          <span class="val" id="rfGravityVal">0.5</span>
+        </div>
+      </div>
+
+      <div class="card">
         <p class="card-label">Touch-up <span style="text-transform:none;font-weight:400;opacity:0.7">(runs in parallel with the background)</span></p>
         <div class="segmented" id="touchupSeg">
           <button data-tu="off" class="active">Off</button>
@@ -648,6 +671,7 @@
         weightsBaseUrl: '/',   // local demo assets (new tier bins + landmark/touch-up assets)
         dtype: new URLSearchParams(location.search).get('dtype') || undefined,  // ?dtype=f32 to A/B f16 issues
         touchup: touchupEnabled ? touchupOpts() : undefined,
+        reframe: reframeMode !== 'off' ? reframeOpts() : undefined,
         onError: (err) => setStatus('error: ' + (err.message || err), false),
       })
       $output.srcObject = pipeline.stream
@@ -1037,6 +1061,58 @@
     $tuAmount.addEventListener('input', () => {
       $tuAmountVal.textContent = $tuAmount.value
       if (touchupEnabled) applyTouchup()
+    })
+
+    // ── Auto-reframe ────────────────────────────────────────────────────────
+    // auto   = the camera follows the subject with a deadband (hold, deliberate
+    //          move, hold). manual = solve once and freeze; "Reframe now" is the
+    //          method a Meet-style button would call.
+    const $reframeSeg = document.getElementById('reframeSeg')
+    const $rfNowRow   = document.getElementById('rfNowRow')
+    const $rfZoomRow  = document.getElementById('rfZoomRow')
+    const $rfGravityRow = document.getElementById('rfGravityRow')
+    const $rfNow      = document.getElementById('rfNow')
+    const $rfZoom     = document.getElementById('rfZoom')
+    const $rfZoomVal  = document.getElementById('rfZoomVal')
+    const $rfGravity  = document.getElementById('rfGravity')
+    const $rfGravityVal = document.getElementById('rfGravityVal')
+    let reframeMode = 'off'
+
+    function reframeOpts() {
+      // Unspecified params fall back to SDK defaults; deadband/ease are left
+      // alone here (they only exist under `auto`).
+      return {
+        zoom: parseFloat($rfZoom.value),
+        gravity: parseFloat($rfGravity.value),
+        auto: reframeMode === 'auto',
+      }
+    }
+    function applyReframe() {
+      if (!pipeline || engine !== 'longpipe') return
+      pipeline.setReframe(reframeMode === 'off' ? null : reframeOpts())
+        .catch(err => setStatus('reframe failed: ' + (err.message || err), false))
+    }
+    $reframeSeg.addEventListener('click', (e) => {
+      const btn = e.target.closest('button')
+      if (!btn) return
+      for (const b of $reframeSeg.querySelectorAll('button')) b.classList.toggle('active', b === btn)
+      reframeMode = btn.dataset.rf
+      const on = reframeMode !== 'off'
+      $rfZoomRow.classList.toggle('show', on)
+      $rfGravityRow.classList.toggle('show', on)
+      $rfNowRow.classList.toggle('show', reframeMode === 'manual')
+      applyReframe()
+    })
+    $rfNow.addEventListener('click', () => {
+      if (pipeline && engine === 'longpipe') pipeline.reframe()
+    })
+    $rfZoom.addEventListener('input', () => {
+      $rfZoomVal.textContent = $rfZoom.value
+      if (reframeMode !== 'off') applyReframe()
+    })
+    $rfGravity.addEventListener('input', () => {
+      $rfGravityVal.textContent = $rfGravity.value
+      if (reframeMode !== 'off') applyReframe()
     })
 
     buildPipeline().catch(err => setStatus('startup failed: ' + (err.message || err), false))

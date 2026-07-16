@@ -79,6 +79,7 @@ export interface PipelineOptions {
   // with a face blob + the landmark assets at weightsBaseUrl
   // (model_landmark_mesh.bin, face_topology.json, weight_mask.png).
   touchup?:        TouchupOptions
+  reframe?:        ReframeConfig
   onReady?:        () => void
   // Fires for ALL async / runtime errors after the constructor returns:
   //   - Init failures (weights 404, normalizeBackground URL fail, worker
@@ -107,6 +108,28 @@ export interface TouchupOptions {
   amount?:   number             // smoothing sigma in atlas px, default 8
   detail?:   number             // freq-sep high-band keep, default 0.35
   style?:    FaceTouchupStyle   // 'freq-sep' (default) | 'bilateral'
+}
+
+// Auto-reframe. `true` = every default, tracking. The smoothing pair lives under
+// `auto` because that's literally its scope: deadband/ease describe how the frame
+// MOVES, and in manual it never moves — it's solved once and frozen.
+//   reframe: true                            → track, all defaults
+//   reframe: { zoom: 1.6 }                   → track, tighter crop
+//   reframe: { auto: { deadband: 0.12 } }    → track, lazier
+//   reframe: { auto: false }                 → solve once, then freeze; call
+//                                              pipeline.reframe() to re-solve
+export type ReframeConfig = boolean | ReframeOptions
+
+export interface ReframeOptions {
+  zoom?:    number   // crop = frame / zoom, default 1.35 (relaxed toward 1 as needed)
+  gravity?: number   // pull toward the subject, default 0.5 — 1 would centre it exactly
+  margin?:  number   // keep-out band around the subject, default 0.04
+  auto?:    boolean | ReframeAutoOptions   // default true
+}
+
+export interface ReframeAutoOptions {
+  deadband?: number   // hold until the target moves this far, default 0.09
+  ease?:     number   // per-frame lerp toward the target while moving, default 0.07
 }
 
 const TOUCHUP_DEFAULTS = { strength: 0.6, amount: 8, detail: 0.35, style: 'freq-sep' as FaceTouchupStyle }
@@ -354,7 +377,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     ]
 
     this.weightsBaseUrl = opts.weightsBaseUrl
-    void this.bootstrap(partialInit, opts.background, transferList, opts.weightsBaseUrl, opts.adaptive, opts.onError, opts.touchup)
+    void this.bootstrap(partialInit, opts.background, transferList, opts.weightsBaseUrl, opts.adaptive, opts.onError, opts.touchup, opts.reframe)
   }
 
   // Async second half of construction: normalize background → init handshake
@@ -368,6 +391,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     adaptive:       boolean,
     onError?:       (err: PipelineError) => void,
     touchup?:       TouchupOptions,
+    reframe?:       ReframeConfig,
   ): Promise<void> {
     try {
       log('normalizing background…')
@@ -391,6 +415,11 @@ export class Pipeline implements PromiseLike<Pipeline> {
       log('startRender resolved; awaiting first frame')
 
       // Initial touch-up (non-blocking — ready never waits on touch-up assets).
+      if (reframe) {
+        void this.setReframe(reframe).catch(err => {
+          onError?.({ message: `reframe init failed: ${(err as Error).message ?? err}`, source: 'unknown', recoverable: true, cause: err })
+        })
+      }
       if (touchup) {
         void this.setTouchup(touchup).catch(err => {
           onError?.({ message: `touchup init failed: ${(err as Error).message ?? err}`, source: 'unknown', recoverable: true, cause: err })
@@ -479,6 +508,23 @@ export class Pipeline implements PromiseLike<Pipeline> {
     }
     // Structured-clone (no transfer) — the cached assets stay reusable.
     await this.controller.sendMessage('setTouchup', { ...this.touchupAssets, params })
+  }
+
+  // Enable / update / disable auto-reframe at runtime. `true` takes every
+  // default; `false` (or null) turns it off. Needs no assets — it rides the face
+  // heatmaps the tier already carries — so unlike setTouchup this never fetches.
+  async setReframe(cfg: ReframeConfig | null): Promise<void> {
+    await this.ready
+    const normalized = cfg === true ? {} : (cfg === false || cfg === null ? null : cfg)
+    await this.controller.sendMessage('setReframe', normalized)
+  }
+
+  // Re-solve the frame now. This is the manual-mode entry point — the method to
+  // wire to a "reframe" button. In auto mode the camera already tracks, so this
+  // is a no-op there.
+  async reframe(): Promise<void> {
+    await this.ready
+    await this.controller.sendMessage('reframeNow', undefined)
   }
 
   setPreset(p: PresetName | ManualPreset, weights?: ArrayBuffer): void {

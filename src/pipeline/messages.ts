@@ -1,3 +1,5 @@
+import type { ReframeConfig } from './worker/renderer'
+export type { ReframeConfig }
 // Message taxonomy for the main↔worker control plane.
 //
 // Data plane (frames, bitmaps) flows through transferred streams or
@@ -30,6 +32,8 @@ export interface CmdDataMap {
   // and structured-cloned — no transfer, so param updates can resend them);
   // null disables. The worker assembles a FaceEffectsConfig for the renderer.
   setTouchup:    TouchupPayload | null
+  setReframe:    ReframeConfig | null
+  reframeNow:    void
 }
 
 export interface CmdResponseMap {
@@ -44,6 +48,8 @@ export interface CmdResponseMap {
   setPreview:    void
   clearPreview:  void
   setTouchup:    void
+  setReframe:    void
+  reframeNow:    void
 }
 
 // Touch-up wire payload — the flattened FaceTopology (typed arrays and

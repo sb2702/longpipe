@@ -80,6 +80,8 @@ async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
     case 'setPreview':    return handleSetPreview(data as CmdDataMap['setPreview'])
     case 'clearPreview':  return handleClearPreview()
     case 'setTouchup':    return handleSetTouchup(data as CmdDataMap['setTouchup'])
+    case 'setReframe':    return handleSetReframe(data as CmdDataMap['setReframe'])
+    case 'reframeNow':    return handleReframeNow()
     default: throw new Error(`unknown cmd: ${cmd}`)
   }
 }
@@ -248,6 +250,16 @@ export function emitStats(stats: RendererStats): void {
 // Face touch-up: rebuild the renderer's face-effect chain from the payload
 // (or clear it). The renderer defers until a preset is attached, so this is
 // safe at any point after init.
+function handleSetReframe(cfg: import('../messages').ReframeConfig | null): void {
+  if (!renderer) throw new Error('setReframe before init')
+  renderer.setReframe(cfg)
+}
+
+function handleReframeNow(): void {
+  if (!renderer) throw new Error('reframeNow before init')
+  renderer.reframeNow()
+}
+
 function handleSetTouchup(p: import('../messages').TouchupPayload | null): void {
   if (!renderer) throw new Error('setTouchup before init')
   renderer.setFaceEffects(p === null ? null : {

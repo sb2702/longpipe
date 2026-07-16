@@ -11,6 +11,8 @@ import { ElementwiseMulWebGL } from '~/model/backends/webgl/ops/elementwise_mul.
 import { WarpWebGL } from '~/model/backends/webgl/ops/warp.ts'
 import { FaceBoxWebGL } from '~/model/backends/webgl/ops/face_box.ts'
 import { FaceBoxesWebGL } from '~/model/backends/webgl/ops/face_boxes.ts'
+import { ReframeStateWebGL } from '~/model/backends/webgl/ops/reframe_state.ts'
+import { ReframeWebGL } from '~/model/backends/webgl/ops/reframe.ts'
 import { CropResampleWebGL } from '~/model/backends/webgl/ops/crop_resample.ts'
 import { LandmarkOverlayWebGL } from '~/model/backends/webgl/ops/landmark_overlay.ts'
 import { FaceTouchupWebGL, FaceTouchupStageWebGL } from '~/model/backends/webgl/ops/face_touchup.ts'
@@ -82,6 +84,8 @@ export class WebGLBackend implements Backend {
       Warp:             (source, flow, params)          => new WarpWebGL(this, source, flow, params),
       FaceBoxFromHeatmaps: (heatmaps, params)            => new FaceBoxWebGL(this, heatmaps, params),
       FaceBoxesFromHeatmaps: (heatmaps, params)          => new FaceBoxesWebGL(this, heatmaps, params),
+      ReframeState: (boxes, prev, cmd, params)           => new ReframeStateWebGL(this, boxes, prev, cmd, params),
+      Reframe: (src, rect)                               => new ReframeWebGL(this, src, rect),
       CropResample:     (frame, box, params)             => new CropResampleWebGL(this, frame, box, params),
       FaceTouchupStage: (frame, landmarks, box, topo, params) => new FaceTouchupStageWebGL(this, frame, landmarks, box, topo, params),
       Stabilize:        (flow, pred, ref, envPrev, params) => new StabilizeWebGL(this, flow, pred, ref, envPrev, params),

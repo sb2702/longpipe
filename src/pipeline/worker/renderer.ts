@@ -16,6 +16,21 @@ import { LandmarkNet } from '~/model/networks/landmark_net.ts'
 import { TIER_CONFIG } from '~/model/tier_config.ts'
 import type { FaceTopology, FaceTouchupParams, FaceTouchupStageOp } from '~/model/backend.ts'
 
+// Auto-reframe defaults — tuned by eye in demo/reframe.html. `auto` adds the
+// deadband/ease pair, which only exist while tracking (in manual the frame never
+// moves, so they'd be meaningless).
+export const REFRAME_DEFAULTS = { zoom: 1.35, gravity: 0.5, margin: 0.04 }
+export const REFRAME_AUTO_DEFAULTS = { deadband: 0.09, ease: 0.07 }
+// cmd.x, mirroring reframe_state.wgsl.
+const RF_AUTO = 0, RF_HOLD = 1, RF_SOLVE = 2
+
+export interface ReframeConfig {
+  zoom?:    number
+  gravity?: number
+  margin?:  number
+  auto?:    boolean | { deadband?: number; ease?: number }
+}
+
 const FLOW_DEC_W = 16   // shipping flow-head width
 // Flow-gated stabilizer params. tLo/tHi are flow magnitudes in BASE-res pixels
 // (the flow predicts base-res-unit displacements); envelope peak-hold mirrors the
@@ -162,9 +177,21 @@ export class Renderer {
     crops: Op[]
     lms: LandmarkNet[]
     packLm: Op[]
-    stage: FaceTouchupStageOp
+    stage: FaceTouchupStageOp | null   // null = detection only (reframe without touch-up)
   } | null = null
   private faceCfg: FaceEffectsConfig | null = null
+  // Auto-reframe. The camera lives entirely on the GPU: `state` carries
+  // (cx, cy, size, moving) across frames via copyTensor exactly like the flow
+  // stabilizer's stabPrev, and `cmd` is a 1×1×4 the CPU writes the mode into —
+  // uniforms are baked at op construction here, so a mode change would otherwise
+  // mean rebuilding the pipeline on every reframe() call.
+  private reframe: {
+    stateOp: Op; state: Tensor; cmd: Tensor
+    cmdAuto: Tensor; cmdHold: Tensor; cmdSolve: Tensor
+    auto: boolean
+  } | null = null
+  private reframeCfg: ReframeConfig | null = null
+  private reframeSolveOnce = false
   // Occupancy gating. FaceBoxesFromHeatmaps fills slots 0..n-1 and zeroes the
   // rest, so live faces are always a PREFIX — one count is enough, no per-slot
   // mask. faceLive is how many crops/landmark nets run AND how many mesh
@@ -411,11 +438,63 @@ export class Renderer {
     // cost ~4× for the common single-face case. The box op still decodes all K
     // slots every frame (one dispatch) — only the per-face model runs are gated,
     // so the probe below sees the true count regardless of what we skipped.
-    this.probeFaceOccupancy(fc)
-    const live = fc.crops.length === 1 ? 1 : this.faceLive
-    for (let i = 0; i < live; i++) { fc.crops[i].run(); fc.lms[i].run() }
-    if (live > 0) for (const p of fc.packLm) p.run()
-    fc.stage.setActiveSlots(live)
+    if (fc.stage) {
+      this.probeFaceOccupancy(fc)
+      const live = fc.crops.length === 1 ? 1 : this.faceLive
+      for (let i = 0; i < live; i++) { fc.crops[i].run(); fc.lms[i].run() }
+      if (live > 0) for (const p of fc.packLm) p.run()
+      fc.stage.setActiveSlots(live)
+    }
+
+    // Camera: pick the subject and ease the view rect, all GPU-side. The rect
+    // tensor is threaded across frames like the flow stabilizer's carrier.
+    if (this.reframe) {
+      const rf = this.reframe
+      const cmd = rf.auto ? rf.cmdAuto : (this.reframeSolveOnce ? rf.cmdSolve : rf.cmdHold)
+      this.backend.copyTensor(cmd, rf.cmd)
+      this.reframeSolveOnce = false
+      rf.stateOp.run()
+      this.backend.copyTensor(rf.stateOp.output, rf.state)
+    }
+  }
+
+  // Build the reframe camera from the current face chain's box tensor. Requires
+  // detection; costs one 1-thread op per frame plus two sample passes.
+  private buildReframe(): void {
+    this.reframe = null
+    this.renderOp.setViewTransform(null)
+    const fc = this.faceChain
+    const cfg = this.reframeCfg
+    if (!cfg || !fc || !this.preset) return
+
+    const c = TIER_CONFIG[this.preset.model].canvasRes
+    const autoCfg = cfg.auto ?? true
+    const auto = autoCfg !== false
+    const sm = { ...REFRAME_AUTO_DEFAULTS, ...(typeof autoCfg === 'object' ? autoCfg : {}) }
+
+    const t4 = (v: number[]) => this.backend.tensor(1, 1, 4, new Float32Array(v))
+    // size 0 = uninitialised → the state op snaps on its first solve rather than
+    // easing in from nothing, and Reframe is a bit-exact identity until then.
+    const state = t4([0, 0, 0, 0])
+    const cmd   = t4([auto ? RF_AUTO : RF_HOLD, 0, 0, 0])
+    const stateOp = this.backend.ops.ReframeState(fc.boxStable, state, cmd, {
+      zoom:     cfg.zoom     ?? REFRAME_DEFAULTS.zoom,
+      gravity:  cfg.gravity  ?? REFRAME_DEFAULTS.gravity,
+      margin:   cfg.margin   ?? REFRAME_DEFAULTS.margin,
+      deadband: sm.deadband,
+      ease:     sm.ease,
+      aspect:   c.w / c.h,
+    })
+
+    this.reframe = {
+      stateOp, state, cmd, auto,
+      cmdAuto:  t4([RF_AUTO,  0, 0, 0]),
+      cmdHold:  t4([RF_HOLD,  0, 0, 0]),
+      cmdSolve: t4([RF_SOLVE, 0, 0, 0]),
+    }
+    // Manual mode reframes once when enabled, then freezes — that first solve is
+    // the `size 0 → snap` branch in the state shader, so no explicit trigger.
+    this.renderOp.setViewTransform(state)
   }
 
   // Refresh faceLive from the box tensor, throttled and never overlapping. A
@@ -589,19 +668,37 @@ export class Renderer {
     if (this.preset) this.buildFaceChain()
   }
 
-  // (Re)build the face chain + RenderOp effect chain from faceCfg and the
-  // current tier. No-ops (clearing both) when unconfigured or the .bin has no
+  // Configure (or clear) auto-reframe. Independent of touch-up: either consumer
+  // pulls up the shared face DETECTION half of the chain.
+  setReframe(cfg: ReframeConfig | null): void {
+    this.reframeCfg = cfg
+    if (this.preset) this.buildFaceChain()
+  }
+
+  // Recompute the frame once, now. Only meaningful in manual mode — in auto the
+  // camera is already following.
+  reframeNow(): void {
+    this.reframeSolveOnce = true
+  }
+
+  // (Re)build the face chain + RenderOp effect chain. The chain has two halves:
+  // DETECTION (heatmaps → boxes), needed by touch-up AND reframe, and EFFECTS
+  // (crops → landmarks → touch-up stage), needed only by touch-up. Reframe alone
+  // therefore costs the heatmap head and one box decode — no landmark runs.
+  // No-ops (clearing everything) when neither is configured or the .bin has no
   // face blob.
   private buildFaceChain(): void {
     this.faceChain = null
+    this.reframe = null
     this.renderOp.setEffectChain([])
+    this.renderOp.setViewTransform(null)
     const cfg = this.faceCfg
     const w = this.lastTierWeights
-    if (!cfg || !this.tier || !this.tierInput || !this.preset) return
+    if ((!cfg && !this.reframeCfg) || !this.tier || !this.tierInput || !this.preset) return
     if (!w?.face) {
       // Loud, not silent: a missing face blob means the tier .bin predates the
-      // face-head export — touch-up cannot run. (Cost a debugging marathon once.)
-      console.warn(`[longpipe/renderer] touchup configured but the '${this.preset.model}' weights have no face blob — effect disabled. Re-export the tier with a face-trained checkpoint.`)
+      // face-head export — nothing face-driven can run. (Cost a debugging marathon once.)
+      console.warn(`[longpipe/renderer] face effects configured but the '${this.preset.model}' weights have no face blob — disabled. Re-export the tier with a face-trained checkpoint.`)
       return
     }
 
@@ -626,11 +723,19 @@ export class Renderer {
 
     // K faces on medium+, 1 on xs/small (grid too coarse — see MULTI_FACE_TIERS).
     const K = MULTI_FACE_TIERS.has(this.preset.model) ? MULTI_FACE_K : 1
-    const boxCfg = { ...FACE_BOX_DEFAULTS, ...(cfg.box ?? {}) }
+    const boxCfg = { ...FACE_BOX_DEFAULTS, ...(cfg?.box ?? {}) }
     const boxOp = K > 1
       ? this.backend.ops.FaceBoxesFromHeatmaps(hmBuf, { ...boxCfg, maxFaces: K, tol: FACE_GROUP_TOL })
       : this.backend.ops.FaceBoxFromHeatmaps(hmBuf, boxCfg)
     const boxStable = zerosT(1, K, 4)
+
+    // ── effects half: only when touch-up is configured ────────────────────
+    if (!cfg) {
+      this.faceChain = { face, hmBuf, hmHeld, hmFlowDown, hmWarp, boxOp, boxStable,
+                         crops: [], lms: [], packLm: [], stage: null }
+      this.buildReframe()
+      return
+    }
 
     // One crop + landmark net per slot; only the box slot differs.
     const lmWeights = loadWeightsFromBinary(cfg.landmarkWeights) as any
@@ -669,6 +774,7 @@ export class Renderer {
     this.faceLive = K
     this.faceProbeCounter = 0
     this.faceChain = { face, hmBuf, hmHeld, hmFlowDown, hmWarp, boxOp, boxStable, crops, lms, packLm, stage }
+    this.buildReframe()
   }
 
   // Release everything: close any open background ports (worker-side

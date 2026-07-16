@@ -127,6 +127,21 @@ export interface LandmarkOverlayParams {
   drawImage?: boolean;
 }
 
+// Auto-reframe camera state. The rule, tuned in demo/reframe.ts:
+//   centre = frameCentre + gravity·(subject − frameCentre)  — pull, never centre
+//   crop   = frame / zoom, kept inside the frame AND containing the subject+margin
+// Relaxing zoom toward 1 until both constraints hold is what makes a subject near
+// the frame edge widen out to the full frame, i.e. a head in the corner reframes
+// to nothing. That behaviour falls out of the constraints; there's no special case.
+export interface ReframeStateParams {
+  zoom:     number;   // requested crop = frame / zoom (relaxed toward 1 as needed)
+  gravity:  number;   // 0 = never move, 1 = centre the subject exactly
+  margin:   number;   // keep-out band around the subject, frame fractions
+  deadband: number;   // hold until the target moves this far (auto only)
+  ease:     number;   // per-frame lerp toward the target while moving (auto only)
+  aspect:   number;   // frame w/h — the box's halfSide is a fraction of WIDTH
+}
+
 export interface FaceTouchupStageOp extends Op {
   // Faces to DRAW this frame, ≤ params.slots (clamped). Defaults to params.slots.
   //
@@ -272,6 +287,18 @@ export interface Backend {
     // face per slot, score-0 slots meaning "no face". Same units/conventions as
     // FaceBoxFromHeatmaps, so consumers differ only by the `slot` param.
     FaceBoxesFromHeatmaps: (heatmaps: Tensor, params: FaceBoxesParams) => Op;
+
+    // Auto-reframe camera state: (boxes, prev state, cmd) → 1×1×4
+    // (cx, cy, size, moving) in frame fractions — `size` is a fraction of BOTH
+    // dims, which is what preserves the frame's aspect. cmd.x selects the mode:
+    // 0 auto (track with deadband), 1 manual-hold (frozen), 2 manual-solve (snap
+    // once). Held across frames by the caller with copyTensor, like the flow
+    // stabilizer — the whole camera stays GPU-resident.
+    ReframeState: (boxes: Tensor, prev: Tensor, cmd: Tensor, params: ReframeStateParams) => Op;
+
+    // Apply a view rect to a tensor (same shape in/out). Identity while the rect
+    // is uninitialised (size ≤ 0), so it can be wired in before any face exists.
+    Reframe: (src: Tensor, rect: Tensor) => Op;
 
     // UV-space face touch-up as a Tensor→Tensor EFFECT STAGE: renders the
     // retouched frame into an output tensor the (single, terminal) background
