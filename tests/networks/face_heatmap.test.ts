@@ -3,6 +3,9 @@ import { BACKENDS } from '../helpers/backends'
 import { FaceHeatmapNet } from '~/model/networks/face_heatmap_net'
 import face_small from '../fixtures/face_small.json'
 import face_xs from '../fixtures/face_xs.json'
+import face_medium from '../fixtures/face_medium.json'
+import face_large from '../fixtures/face_large.json'
+import face_xl from '../fixtures/face_xl.json'
 
 // Fidelity: the SDK FaceHeatmapNet vs the real trained face head on the same
 // packed weights + encoder taps (training/deploy/gen_face_fixture.py — input is
@@ -10,8 +13,11 @@ import face_xs from '../fixtures/face_xs.json'
 // Taps ship in the fixture: this isolates the face decoder; the encoder is
 // validated elsewhere.
 const FIXTURES = [
-  { name: 'small', fx: face_small as any },   // small encoder → base/4 (48×28)
-  { name: 'xs',    fx: face_xs    as any },   // small encoder → base/4 (32×20)
+  { name: 'small',  fx: face_small  as any },   // small encoder → base/4 (48×28)
+  { name: 'xs',     fx: face_xs     as any },   // small encoder → base/4 (32×20)
+  { name: 'medium', fx: face_medium as any },   // full lite0 → base/8 (32×20)
+  { name: 'large',  fx: face_large  as any },   // full lite0 → base/8 (32×20)
+  { name: 'xl',     fx: face_xl     as any },   // full lite3 → base/8 (40×24)
 ]
 const N_KP = 5
 const WIN = 3   // soft-argmax window, ±cells around the peak (matches training PoC)

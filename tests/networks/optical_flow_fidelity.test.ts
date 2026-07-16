@@ -16,10 +16,7 @@ const FIXTURES = [
   { name: 'small',  fx: flow_small  as any },   // small encoder (3 taps), variant A
   { name: 'large',  fx: flow_large  as any },   // full encoder (lite0), variant D
   { name: 'xs',     fx: flow_xs     as any },   // small encoder, tap-half (base/2)
-  // xl fixture predates the lite3 encoder switch (taps/weights are the lite4-era
-  // checkpoint, self-contained in the fixture) — still a valid op-graph fidelity
-  // test; regenerate via export_all.sh once a lite3 xl matting+flow ckpt exists.
-  { name: 'xl',     fx: flow_xl     as any },   // variant E (lite4-era fixture)
+  { name: 'xl',     fx: flow_xl     as any },   // full encoder (lite3), variant E
 ]
 
 describe.each(BACKENDS)('OpticalFlowNet fidelity ($name)', ({ name: backendName, create }) => {
