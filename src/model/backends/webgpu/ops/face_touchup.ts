@@ -26,6 +26,7 @@ export class FaceTouchupWebGPU {
   }>
   private readonly uvBuf: GPUBuffer
   private readonly idxBuf: GPUBuffer
+  private readonly slots: number
   private outputView: GPUTextureView | null = null
 
   constructor(
@@ -36,6 +37,19 @@ export class FaceTouchupWebGPU {
     topo: FaceTopology,
     params: FaceTouchupParams,
   ) {
+    // K faces share one atlas: grid×grid tiles, so the blur/combine/copy passes
+    // run ONCE regardless of K — only the two mesh draws scale (instanced).
+    // K=1 → grid 1 → the whole atlas, byte-identical to the single-face layout.
+    const slots = params.slots ?? 1
+    if (slots !== 1 && slots !== 4)
+      throw new Error(`FaceTouchup: slots must be 1 or 4, got ${slots}`)
+    const grid = slots === 4 ? 2 : 1
+    if (box.w * box.h < slots)
+      throw new Error(`FaceTouchup: slots ${slots} exceeds the ${box.h}×${box.w} box tensor`)
+    if (landmarks.c < slots * 956)
+      throw new Error(`FaceTouchup: landmarks tensor holds ${landmarks.c / 956} faces < slots ${slots}`)
+    this.slots = slots
+
     const device = backend.device
     this.device = device
 
@@ -66,10 +80,11 @@ export class FaceTouchupWebGPU {
       const ab = new ArrayBuffer(48)
       const u = new Uint32Array(ab, 0, 2)
       u[0] = frame.w; u[1] = frame.h
-      const f = new Float32Array(ab, 8, 10)
+      const f = new Float32Array(ab, 8, 8)
       f[0] = o.sigma ?? 0; f[1] = params.detail; f[2] = params.strength; f[3] = params.thresh
       f[4] = o.dirX ?? 0; f[5] = o.dirY ?? 0
       f[6] = frame.w; f[7] = frame.h
+      new Uint32Array(ab, 40, 2).set([slots, grid])
       device.queue.writeBuffer(buf, 0, ab)
       return buf
     }
@@ -165,7 +180,7 @@ export class FaceTouchupWebGPU {
         pass.setVertexBuffer(0, this.uvBuf)
         pass.setVertexBuffer(1, this.idxBuf)
       }
-      pass.draw(p.verts)
+      pass.draw(p.verts, p.mesh ? this.slots : 1)
       pass.end()
     }
     this.device.queue.submit([enc.finish()])
@@ -199,6 +214,7 @@ export class FaceTouchupStageWebGPU {
   private readonly uvBuf: GPUBuffer
   private readonly idxBuf: GPUBuffer
   private readonly meshCount: number
+  private readonly slots: number
 
   constructor(
     backend: WebGPUBackend,
@@ -209,6 +225,19 @@ export class FaceTouchupStageWebGPU {
     params: FaceTouchupParams,
   ) {
     const ATLAS = 512
+    // K faces share one atlas: grid×grid tiles, so the blur/combine/copy passes
+    // run ONCE regardless of K — only the two mesh draws scale (instanced).
+    // K=1 → grid 1 → the whole atlas, byte-identical to the single-face layout.
+    const slots = params.slots ?? 1
+    if (slots !== 1 && slots !== 4)
+      throw new Error(`FaceTouchup: slots must be 1 or 4, got ${slots}`)
+    const grid = slots === 4 ? 2 : 1
+    if (box.w * box.h < slots)
+      throw new Error(`FaceTouchup: slots ${slots} exceeds the ${box.h}×${box.w} box tensor`)
+    if (landmarks.c < slots * 956)
+      throw new Error(`FaceTouchup: landmarks tensor holds ${landmarks.c / 956} faces < slots ${slots}`)
+    this.slots = slots
+
     const device = backend.device
     this.device = device
     this.inputs = [frame, landmarks, box]
@@ -246,10 +275,11 @@ export class FaceTouchupStageWebGPU {
       const ab = new ArrayBuffer(48)
       const u = new Uint32Array(ab, 0, 2)
       u[0] = frame.w; u[1] = frame.h
-      const f = new Float32Array(ab, 8, 10)
+      const f = new Float32Array(ab, 8, 8)
       f[0] = o.sigma ?? 0; f[1] = params.detail; f[2] = params.strength; f[3] = params.thresh
       f[4] = o.dirX ?? 0; f[5] = o.dirY ?? 0
       f[6] = frame.w; f[7] = frame.h
+      new Uint32Array(ab, 40, 2).set([slots, grid])
       device.queue.writeBuffer(buf, 0, ab)
       return buf
     }
@@ -341,7 +371,7 @@ export class FaceTouchupStageWebGPU {
         pass.setVertexBuffer(0, this.uvBuf)
         pass.setVertexBuffer(1, this.idxBuf)
       }
-      pass.draw(p.verts)
+      pass.draw(p.verts, p.mesh ? this.slots : 1)
       pass.end()
     }
     const c = enc.beginComputePass()

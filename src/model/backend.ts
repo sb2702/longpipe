@@ -154,6 +154,16 @@ export interface FaceTouchupParams {
   detail:   number;   // 0..1 — high-frequency keep (freq-sep only)
   thresh:   number;   // skip the effect when box score < thresh (passthrough)
   style?:   FaceTouchupStyle;   // default 'freq-sep'
+  // Faces to retouch in one pass — 1 (default) or 4. The K faces share a single
+  // atlas as a grid of tiles (1×1 at K=1, 2×2 at K=4), so the blur, the frame
+  // copy and the unpack all run ONCE regardless of K; only the two mesh draws
+  // scale, via instancing. K=1 is the single-face layout unchanged.
+  //
+  // Requires `landmarks` to pack K faces' LandmarkNet outputs (ChannelConcat —
+  // 478 landmarks each, face f at channel f·956) and `box` to be a 1×K×4 tensor
+  // from FaceBoxesFromHeatmaps. Slots with score < thresh are clipped away in
+  // the vertex shader, so the cost is flat in the number of faces PRESENT.
+  slots?:   number;
 }
 
 export interface UpsampleConv1x1Params {

@@ -30,6 +30,15 @@ const LM_CROP = 256
 const IMAGENET_MEAN: [number, number, number] = [0.485, 0.456, 0.406]
 const IMAGENET_STD:  [number, number, number] = [0.229, 0.224, 0.225]
 const FACE_BOX_DEFAULTS = { win: 3, thresh: 0.15, boxScale: 2.4 }
+// Multi-face decode + retouch. Gated to medium and above: xs/small decode at a
+// 32×20 / 48×28 grid, too coarse to resolve a second face reliably, so they keep
+// the single-face path (FaceBoxFromHeatmaps + 1 slot) — which the K=1 atlas
+// layout leaves byte-identical to the pre-multi-face behavior.
+const MULTI_FACE_TIERS = new Set(['medium', 'large', 'xl'])
+const MULTI_FACE_K = 4
+// Keypoint-match radius as a fraction of interocular distance, for the eye-pair
+// grouping. Prototyped in demo/face.ts; 0.6 is the default the probe settled on.
+const FACE_GROUP_TOL = 0.6
 import type { ManualPreset } from '../presets'
 import type { Background } from '../background'
 import type { RendererStats } from '../messages'
@@ -129,7 +138,11 @@ export class Renderer {
   // tiny and crop-jitter training tolerates the box.
   //   hmBuf     : current heatmaps (live or warped) — the box op's input
   //   hmHeld    : warp source, copied on inference frames (flow skip tiers only)
-  //   boxStable : box carrier — crop + effect stage bind this stable tensor
+  //   boxStable : box carrier (1×K×4) — crops + effect stage bind this tensor
+  //   crops/lms : one per face slot, differing ONLY by the box slot they read
+  //   packLm    : ChannelConcat tree → one buffer holding all K faces' landmarks,
+  //               which the touch-up mesh vertex shader indexes per instance
+  //               (null at K=1 — lms[0].output is already that buffer)
   private faceChain: {
     face: FaceHeatmapNet
     hmBuf: Tensor
@@ -138,8 +151,9 @@ export class Renderer {
     hmWarp: Op | null
     boxOp: Op
     boxStable: Tensor
-    crop: Op
-    lm: LandmarkNet
+    crops: Op[]
+    lms: LandmarkNet[]
+    packLm: Op[]
   } | null = null
   private faceCfg: FaceEffectsConfig | null = null
   // Pieces held for face-chain (re)builds outside setPreset.
@@ -373,8 +387,12 @@ export class Renderer {
 
     fc.boxOp.run()
     this.backend.copyTensor(fc.boxOp.output, fc.boxStable)
-    fc.crop.run()
-    fc.lm.run()
+    // Every slot runs unconditionally — empty ones carry score 0, which the
+    // crop resolves to a degenerate box and the touch-up mesh clips away in the
+    // vertex shader. Branching here would need the face count on the CPU, i.e. a
+    // readback; the fixed cost buys a readback-free path.
+    for (let i = 0; i < fc.crops.length; i++) { fc.crops[i].run(); fc.lms[i].run() }
+    for (const p of fc.packLm) p.run()
   }
 
   // True when the preview should composite this frame: a canvas is attached, a
@@ -565,18 +583,47 @@ export class Renderer {
       hmWarp = this.backend.ops.Warp(hmHeld, hmFlowDown.output, { flowScale: hm.w / baseW })
     }
 
+    // K faces on medium+, 1 on xs/small (grid too coarse — see MULTI_FACE_TIERS).
+    const K = MULTI_FACE_TIERS.has(this.preset.model) ? MULTI_FACE_K : 1
     const boxCfg = { ...FACE_BOX_DEFAULTS, ...(cfg.box ?? {}) }
-    const boxOp = this.backend.ops.FaceBoxFromHeatmaps(hmBuf, boxCfg)
-    const boxStable = zerosT(1, 1, 4)
-    const crop = this.backend.ops.CropResample(this.tierInput.output, boxStable, {
-      outH: LM_CROP, outW: LM_CROP, mean: IMAGENET_MEAN, std: IMAGENET_STD,
-    })
-    const lm = new LandmarkNet(this.backend, crop.output, loadWeightsFromBinary(cfg.landmarkWeights) as any)
+    const boxOp = K > 1
+      ? this.backend.ops.FaceBoxesFromHeatmaps(hmBuf, { ...boxCfg, maxFaces: K, tol: FACE_GROUP_TOL })
+      : this.backend.ops.FaceBoxFromHeatmaps(hmBuf, boxCfg)
+    const boxStable = zerosT(1, K, 4)
+
+    // One crop + landmark net per slot; only the box slot differs.
+    const lmWeights = loadWeightsFromBinary(cfg.landmarkWeights) as any
+    const cropSrc = this.tierInput.output   // narrowing is lost inside the closure
+    const crops = Array.from({ length: K }, (_, i) =>
+      this.backend.ops.CropResample(cropSrc, boxStable, {
+        outH: LM_CROP, outW: LM_CROP, mean: IMAGENET_MEAN, std: IMAGENET_STD, slot: i,
+      }))
+    const lms = crops.map(c => new LandmarkNet(this.backend, c.output, lmWeights))
+
+    // The touch-up mesh vertex shader indexes ONE landmark buffer by instance, so
+    // the K outputs are concatenated into one (each is 1×1×956; ChannelConcat is
+    // channel-generic and its 1×1 output layout is exactly face·239 + i/2).
+    // Balanced tree so K=4 is two concats deep rather than three.
+    const packLm: Op[] = []
+    let lmPacked: Tensor = lms[0].output
+    if (K > 1) {
+      let level: Tensor[] = lms.map(l => l.output)
+      while (level.length > 1) {
+        const next: Tensor[] = []
+        for (let i = 0; i < level.length; i += 2) {
+          const op = this.backend.ops.ChannelConcat(level[i], level[i + 1])
+          packLm.push(op)
+          next.push(op.output)
+        }
+        level = next
+      }
+      lmPacked = level[0]
+    }
 
     const stage = this.backend.ops.FaceTouchupStage(
-      this.renderOp.displayImage, lm.output, boxStable, cfg.topology, cfg.touchup)
+      this.renderOp.displayImage, lmPacked, boxStable, cfg.topology, { ...cfg.touchup, slots: K })
     this.renderOp.setEffectChain([stage])
-    this.faceChain = { face, hmBuf, hmHeld, hmFlowDown, hmWarp, boxOp, boxStable, crop, lm }
+    this.faceChain = { face, hmBuf, hmHeld, hmFlowDown, hmWarp, boxOp, boxStable, crops, lms, packLm }
   }
 
   // Release everything: close any open background ports (worker-side

@@ -12,23 +12,34 @@ const vec2 VERTS[6] = vec2[6](
 void main() { gl_Position = vec4(VERTS[gl_VertexID], 0.0, 1.0); }`
 
 // Landmark fetch + crop→frame transform, shared by the mesh vertex shaders.
-// Landmarks: tensor texture (count/2, 1), two (x,y) pairs per texel. Box:
-// 1×1 (cx, cy, halfSide/W, score) frame fractions.
+// Landmarks: tensor texture (slots·count/2, 1), two (x,y) pairs per texel, K
+// faces packed end to end (ChannelConcat of the K LandmarkNet outputs; 478 is
+// even so face f starts on a texel boundary). Box: 1×K, slot f =
+// (cx, cy, halfSide/W, score) frame fractions.
 const LM_COMMON = `
 uniform sampler2D u_lm;
 uniform sampler2D u_box;
 uniform float u_thresh;
 uniform float u_canvas_w;
 uniform float u_canvas_h;
+uniform int u_grid;
 
-vec3 lmFrame(int i) {
-    vec4 box = texelFetch(u_box, ivec2(0, 0), 0);
-    vec4 g = texelFetch(u_lm, ivec2(i / 2, 0), 0);
-    float lx = g[(i % 2) * 2];
-    float ly = g[(i % 2) * 2 + 1];
+vec3 lmFrame(int i, int face) {
+    vec4 box = texelFetch(u_box, ivec2(face, 0), 0);
+    int gi = face * 478 + i;
+    vec4 g = texelFetch(u_lm, ivec2(gi / 2, 0), 0);
+    float lx = g[(gi % 2) * 2];
+    float ly = g[(gi % 2) * 2 + 1];
     float hsx = box.z;
     float hsy = box.z * u_canvas_w / u_canvas_h;
     return vec3((box.x - hsx) + lx * 2.0 * hsx, (box.y - hsy) + ly * 2.0 * hsy, box.w);
+}
+
+// Face 'face' owns tile (face % grid, face / grid). grid=1 (K=1) -> the whole
+// atlas, i.e. the single-face layout unchanged.
+vec2 tileUv(vec2 uv, int face) {
+    float g = float(u_grid);
+    return (uv + vec2(float(face % u_grid), float(face / u_grid))) / g;
 }`
 
 // Unwrap: vertex at canonical UV (atlas clip space), textured by the frame at
@@ -40,10 +51,10 @@ layout(location = 1) in float a_idx;
 ${LM_COMMON}
 out vec2 v_src;
 void main() {
-    vec3 l = lmFrame(int(a_idx));
+    vec3 l = lmFrame(int(a_idx), gl_InstanceID);
     if (l.z < u_thresh) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
     v_src = l.xy;
-    gl_Position = vec4(a_uv * 2.0 - 1.0, 0.0, 1.0);
+    gl_Position = vec4(tileUv(a_uv, gl_InstanceID) * 2.0 - 1.0, 0.0, 1.0);
 }`
 
 // Manual bilinear over the frame TENSOR texture (NEAREST-filtered; texelFetch
@@ -83,9 +94,20 @@ precision highp float;
 uniform sampler2D u_tex;
 uniform vec2 u_dir;
 uniform float u_sigma;
+uniform int u_grid;
+// The tile containing 'uv', as (lo.xy, hi.zw) - filter taps clamp to it so one
+// face's skin can't bleed into a neighbour's tile.
+vec4 tileBounds(vec2 uv) {
+    float g = float(u_grid);
+    vec2 t = floor(clamp(uv, vec2(0.0), vec2(0.99999)) * g);
+    return vec4(t / g, (t + vec2(1.0)) / g);
+}
 out vec4 fragColor;
 void main() {
     vec2 uv = gl_FragCoord.xy / ${ATLAS}.0;
+    vec4 tb = tileBounds(uv);
+    float ht = 0.5 / ${ATLAS}.0;
+    vec2 lo = tb.xy + ht, hi = tb.zw - ht;
     float s = max(u_sigma, 0.001);
     int R = int(clamp(ceil(s * 2.5), 1.0, 48.0));
     vec4 sum = vec4(0.0);
@@ -93,7 +115,7 @@ void main() {
     for (int i = -48; i <= 48; i++) {
         if (i < -R || i > R) continue;
         float w = exp(-float(i * i) / (2.0 * s * s));
-        sum += texture(u_tex, uv + u_dir * float(i)) * w;
+        sum += texture(u_tex, clamp(uv + u_dir * float(i), lo, hi)) * w;
         wsum += w;
     }
     fragColor = sum / wsum;
@@ -117,10 +139,18 @@ const BILATERAL_FRAG = `#version 300 es
 precision highp float;
 uniform sampler2D u_tex;
 uniform float u_sigma;
+uniform int u_grid;
+vec4 tileBounds(vec2 uv) {
+    float g = float(u_grid);
+    vec2 t = floor(clamp(uv, vec2(0.0), vec2(0.99999)) * g);
+    return vec4(t / g, (t + vec2(1.0)) / g);
+}
 out vec4 fragColor;
 void main() {
     vec2 uv = gl_FragCoord.xy / ${ATLAS}.0;
     vec2 texel = vec2(1.0 / ${ATLAS}.0);
+    vec4 tb = tileBounds(uv);
+    vec2 blo = tb.xy + texel * 0.5, bhi = tb.zw - texel * 0.5;
     float ss = max(u_sigma, 0.001);
     int R = int(clamp(ceil(ss), 1.0, 12.0));
     float sr = 0.15;
@@ -131,7 +161,7 @@ void main() {
         if (y < -R || y > R) continue;
         for (int x = -12; x <= 12; x++) {
             if (x < -R || x > R) continue;
-            vec3 sc = texture(u_tex, uv + texel * vec2(float(x), float(y))).rgb;
+            vec3 sc = texture(u_tex, clamp(uv + texel * vec2(float(x), float(y)), blo, bhi)).rgb;
             float ws = exp(-float(x * x + y * y) / (2.0 * ss * ss));
             vec3 d = sc - c;
             float wr = exp(-dot(d, d) / (2.0 * sr * sr));
@@ -163,9 +193,9 @@ ${LM_COMMON}
 out vec2 v_uv;
 out vec2 v_src;
 void main() {
-    vec3 l = lmFrame(int(a_idx));
+    vec3 l = lmFrame(int(a_idx), gl_InstanceID);
     if (l.z < u_thresh) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
-    v_uv = a_uv;
+    v_uv = tileUv(a_uv, gl_InstanceID);
     v_src = l.xy;
     gl_Position = vec4(l.x * 2.0 - 1.0, 1.0 - 2.0 * l.y, 0.0, 1.0);
 }`
@@ -222,6 +252,8 @@ export class FaceTouchupWebGL {
   private readonly box: WebGLTensor
   private readonly count: number
   private readonly params: FaceTouchupParams
+  private readonly slots: number
+  private readonly grid: number
 
   constructor(
     private readonly backend: WebGLBackend,
@@ -237,6 +269,17 @@ export class FaceTouchupWebGL {
     this.box = box as WebGLTensor
     this.count = topo.count
     this.params = params
+    // K faces share one atlas as a grid of tiles, so blur/combine/blit run ONCE
+    // regardless of K; only the two mesh draws scale (instanced). K=1 → grid 1
+    // → the whole atlas, i.e. the single-face layout unchanged.
+    this.slots = params.slots ?? 1
+    if (this.slots !== 1 && this.slots !== 4)
+      throw new Error(`FaceTouchup: slots must be 1 or 4, got ${this.slots}`)
+    this.grid = this.slots === 4 ? 2 : 1
+    if (box.w * box.h < this.slots)
+      throw new Error(`FaceTouchup: slots ${this.slots} exceeds the ${box.h}×${box.w} box tensor`)
+    if (landmarks.c < this.slots * 956)
+      throw new Error(`FaceTouchup: landmarks tensor holds ${landmarks.c / 956} faces < slots ${this.slots}`)
 
     this.progs = {
       unwrap:    compileProgram(gl, UNWRAP_VERT, UNWRAP_FRAG, 'touchup unwrap'),
@@ -296,6 +339,7 @@ export class FaceTouchupWebGL {
     gl.uniform1f(gl.getUniformLocation(prog, 'u_thresh'), this.params.thresh)
     gl.uniform1f(gl.getUniformLocation(prog, 'u_canvas_w'), this.frame.w)
     gl.uniform1f(gl.getUniformLocation(prog, 'u_canvas_h'), this.frame.h)
+    gl.uniform1i(gl.getUniformLocation(prog, 'u_grid'), this.grid)
   }
 
   private frameUniforms(prog: WebGLProgram): void {
@@ -324,7 +368,7 @@ export class FaceTouchupWebGL {
       this.frameUniforms(this.progs.unwrap)
       this.lmUniforms(this.progs.unwrap)
       gl.bindVertexArray(this.meshVao)
-      gl.drawArrays(gl.TRIANGLES, 0, this.count)
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.slots)
       gl.bindVertexArray(null)
     })
 
@@ -334,6 +378,7 @@ export class FaceTouchupWebGL {
         gl.useProgram(this.progs.bilateral)
         this.bindTex(this.progs.bilateral, 0, 'u_tex', this.atlas)
         gl.uniform1f(gl.getUniformLocation(this.progs.bilateral, 'u_sigma'), this.params.amount)
+        gl.uniform1i(gl.getUniformLocation(this.progs.bilateral, 'u_grid'), this.grid)
         gl.drawArrays(gl.TRIANGLES, 0, 6)
       })
     } else {
@@ -343,6 +388,7 @@ export class FaceTouchupWebGL {
           this.bindTex(this.progs.blur, 0, 'u_tex', src)
           gl.uniform2f(gl.getUniformLocation(this.progs.blur, 'u_dir'), dx, dy)
           gl.uniform1f(gl.getUniformLocation(this.progs.blur, 'u_sigma'), this.params.amount)
+          gl.uniform1i(gl.getUniformLocation(this.progs.blur, 'u_grid'), this.grid)
           gl.drawArrays(gl.TRIANGLES, 0, 6)
         })
       blur(this.atlas, this.ping, 1 / ATLAS, 0)
@@ -372,7 +418,7 @@ export class FaceTouchupWebGL {
     this.bindTex(this.progs.comp, 2, 'u_weight', this.weight)
     gl.uniform1f(gl.getUniformLocation(this.progs.comp, 'u_strength'), this.params.strength)
     gl.bindVertexArray(this.meshVao)
-    gl.drawArrays(gl.TRIANGLES, 0, this.count)
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.slots)
     gl.bindVertexArray(null)
   }
 }
@@ -400,9 +446,9 @@ ${LM_COMMON}
 out vec2 v_uv;
 out vec2 v_src;
 void main() {
-    vec3 l = lmFrame(int(a_idx));
+    vec3 l = lmFrame(int(a_idx), gl_InstanceID);
     if (l.z < u_thresh) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
-    v_uv = a_uv;
+    v_uv = tileUv(a_uv, gl_InstanceID);
     v_src = l.xy;
     gl_Position = vec4(l.x * 2.0 - 1.0, l.y * 2.0 - 1.0, 0.0, 1.0);
 }`
@@ -424,6 +470,8 @@ export class FaceTouchupStageWebGL {
   private readonly box: WebGLTensor
   private readonly count: number
   private readonly params: FaceTouchupParams
+  private readonly slots: number
+  private readonly grid: number
 
   constructor(
     private readonly backend: WebGLBackend,
@@ -440,6 +488,17 @@ export class FaceTouchupStageWebGL {
     this.box = box as WebGLTensor
     this.count = topo.count
     this.params = params
+    // K faces share one atlas as a grid of tiles, so blur/combine/blit run ONCE
+    // regardless of K; only the two mesh draws scale (instanced). K=1 → grid 1
+    // → the whole atlas, i.e. the single-face layout unchanged.
+    this.slots = params.slots ?? 1
+    if (this.slots !== 1 && this.slots !== 4)
+      throw new Error(`FaceTouchup: slots must be 1 or 4, got ${this.slots}`)
+    this.grid = this.slots === 4 ? 2 : 1
+    if (box.w * box.h < this.slots)
+      throw new Error(`FaceTouchup: slots ${this.slots} exceeds the ${box.h}×${box.w} box tensor`)
+    if (landmarks.c < this.slots * 956)
+      throw new Error(`FaceTouchup: landmarks tensor holds ${landmarks.c / 956} faces < slots ${this.slots}`)
     this.output = backend.tensor(frame.h, frame.w, 4) as WebGLTensor
 
     this.progs = {
@@ -498,6 +557,7 @@ export class FaceTouchupStageWebGL {
     gl.uniform1f(gl.getUniformLocation(prog, 'u_thresh'), this.params.thresh)
     gl.uniform1f(gl.getUniformLocation(prog, 'u_canvas_w'), this.frame.w)
     gl.uniform1f(gl.getUniformLocation(prog, 'u_canvas_h'), this.frame.h)
+    gl.uniform1i(gl.getUniformLocation(prog, 'u_grid'), this.grid)
   }
 
   private frameUniforms(prog: WebGLProgram): void {
@@ -525,7 +585,7 @@ export class FaceTouchupStageWebGL {
       this.frameUniforms(this.progs.unwrap)
       this.lmUniforms(this.progs.unwrap)
       gl.bindVertexArray(this.meshVao)
-      gl.drawArrays(gl.TRIANGLES, 0, this.count)
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.slots)
       gl.bindVertexArray(null)
     })
 
@@ -534,6 +594,7 @@ export class FaceTouchupStageWebGL {
         gl.useProgram(this.progs.bilateral)
         this.bindTex(this.progs.bilateral, 0, 'u_tex', this.atlas)
         gl.uniform1f(gl.getUniformLocation(this.progs.bilateral, 'u_sigma'), this.params.amount)
+        gl.uniform1i(gl.getUniformLocation(this.progs.bilateral, 'u_grid'), this.grid)
         gl.drawArrays(gl.TRIANGLES, 0, 6)
       })
     } else {
@@ -543,6 +604,7 @@ export class FaceTouchupStageWebGL {
           this.bindTex(this.progs.blur, 0, 'u_tex', src)
           gl.uniform2f(gl.getUniformLocation(this.progs.blur, 'u_dir'), dx, dy)
           gl.uniform1f(gl.getUniformLocation(this.progs.blur, 'u_sigma'), this.params.amount)
+          gl.uniform1i(gl.getUniformLocation(this.progs.blur, 'u_grid'), this.grid)
           gl.drawArrays(gl.TRIANGLES, 0, 6)
         })
       blur(this.atlas, this.ping, 1 / ATLAS, 0)
@@ -570,7 +632,7 @@ export class FaceTouchupStageWebGL {
       this.bindTex(this.progs.compT, 2, 'u_weight', this.weightTex)
       gl.uniform1f(gl.getUniformLocation(this.progs.compT, 'u_strength'), this.params.strength)
       gl.bindVertexArray(this.meshVao)
-      gl.drawArrays(gl.TRIANGLES, 0, this.count)
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, this.count, this.slots)
       gl.bindVertexArray(null)
     })
   }

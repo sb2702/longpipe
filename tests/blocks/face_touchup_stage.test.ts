@@ -50,6 +50,102 @@ function canonicalLandmarks(topo: FaceTopology): Float32Array {
   return lm
 }
 
+// Multi-face (slots: 4): the box tensor is 1×4×4 and the landmark tensor packs
+// 4 faces end to end. Landmarks are CROP coords, so every face reuses the same
+// canonical set — the box slot is what places it in the frame.
+function packed(topo: FaceTopology, n: number): Float32Array {
+  const one = canonicalLandmarks(topo)
+  const out = new Float32Array(one.length * n)
+  for (let i = 0; i < n; i++) out.set(one, i * one.length)
+  return out
+}
+
+describe.each(BACKENDS)('FaceTouchupStage multi-face ($name)', ({ create }) => {
+  it('retouches every occupied slot and leaves empty slots alone', async () => {
+    const backend = await create()
+    const topo = await makeTopo()
+    const img = gradient()
+    const frame = backend.tensor(H, W, 4, img)
+    const lm = backend.tensor(1, 1, 956 * 4, packed(topo, 4))
+    // Two faces present (slots 0,1), two empty (score 0).
+    const faces = [{ cx: 0.25, cy: 0.5, hs: 0.12 }, { cx: 0.75, cy: 0.5, hs: 0.12 }]
+    const box = backend.tensor(1, 4, 4, new Float32Array([
+      faces[0].cx, faces[0].cy, faces[0].hs, 0.9,
+      faces[1].cx, faces[1].cy, faces[1].hs, 0.9,
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+    ]))
+    const stage = backend.ops.FaceTouchupStage(frame, lm, box, topo, {
+      strength: 1, amount: 16, detail: 0, thresh: 0.15, slots: 4,
+    })
+    stage.run()
+    const got = await backend.readback(stage.output)
+    backend.destroy()
+
+    const diffAt = (x: number, y: number) => {
+      const p = (y * W + x) * 4
+      return Math.abs(got[p] - img[p]) + Math.abs(got[p + 1] - img[p + 1]) + Math.abs(got[p + 2] - img[p + 2])
+    }
+    const boxPx = (f: { cx: number; cy: number; hs: number }) => ({
+      x0: f.cx * W - f.hs * W, x1: f.cx * W + f.hs * W,
+      y0: f.cy * H - f.hs * W, y1: f.cy * H + f.hs * W,
+    })
+    const b = faces.map(boxPx)
+
+    // Both faces must actually change — the single-face bug is that only slot 0
+    // (or one merged box) gets touched.
+    const inside = b.map(r => {
+      let m = 0
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
+        if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1) m = Math.max(m, diffAt(x, y))
+      return m
+    })
+    expect(inside[0]).toBeGreaterThan(0.02)
+    expect(inside[1]).toBeGreaterThan(0.02)
+
+    // Well outside both boxes, nothing moved — in particular the empty slots
+    // (which would otherwise smear a degenerate box at the origin).
+    let outside = 0
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const near = b.some(r => x >= r.x0 - 4 && x <= r.x1 + 4 && y >= r.y0 - 4 && y <= r.y1 + 4)
+      if (!near) outside = Math.max(outside, diffAt(x, y))
+    }
+    expect(outside).toBeLessThan(1e-5)
+  })
+
+  it('slots:4 with one face ≈ slots:1 with that face (tiling is not a behavior change)', async () => {
+    const topo = await makeTopo()
+    const img = gradient()
+    const face = new Float32Array([0.5, 0.5, 0.15, 0.9])
+    const params = { strength: 1, amount: 16, detail: 0, thresh: 0.15 }
+
+    const runWith = async (slots: number) => {
+      const backend = await create()
+      const frame = backend.tensor(H, W, 4, img)
+      const lm = backend.tensor(1, 1, 956 * slots, packed(topo, slots))
+      const bx = new Float32Array(slots * 4)
+      bx.set(face, 0)
+      const box = backend.tensor(1, slots, 4, bx)
+      const stage = backend.ops.FaceTouchupStage(frame, lm, box, topo, { ...params, slots })
+      stage.run()
+      const out = await backend.readback(stage.output)
+      backend.destroy()
+      return out
+    }
+    const one = await runWith(1)
+    const four = await runWith(4)
+
+    // The 2×2 atlas halves each face's tile resolution, so this is a similarity
+    // check, not equality: the smoothing must land in the same place with the
+    // same character. A regression that broke tile mapping would blow past this.
+    let maxErr = 0
+    for (let p = 0; p < H * W; p++)
+      for (let c = 0; c < 3; c++)
+        maxErr = Math.max(maxErr, Math.abs(four[p * 4 + c] - one[p * 4 + c]))
+    expect(maxErr).toBeLessThan(0.15)
+  })
+})
+
 describe.each(BACKENDS)('FaceTouchupStage ($name)', ({ create }) => {
   it('no face (score 0) → exact passthrough', async () => {
     const backend = await create()
