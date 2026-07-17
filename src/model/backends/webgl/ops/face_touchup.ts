@@ -190,12 +190,14 @@ precision highp float;
 layout(location = 0) in vec2 a_uv;
 layout(location = 1) in float a_idx;
 ${LM_COMMON}
-out vec2 v_uv;
+out vec2 v_uv;        // TILED atlas uv — the atlas is per-face
+out vec2 v_uv_mask;   // UNTILED canonical uv — the weight mask is one shared asset
 out vec2 v_src;
 void main() {
     vec3 l = lmFrame(int(a_idx), gl_InstanceID);
     if (l.z < u_thresh) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
     v_uv = tileUv(a_uv, gl_InstanceID);
+    v_uv_mask = a_uv;
     v_src = l.xy;
     gl_Position = vec4(l.x * 2.0 - 1.0, 1.0 - 2.0 * l.y, 0.0, 1.0);
 }`
@@ -204,6 +206,7 @@ const COMP_FRAG = `#version 300 es
 precision highp float;
 precision highp int;
 in vec2 v_uv;
+in vec2 v_uv_mask;
 in vec2 v_src;
 uniform sampler2D u_smoothed;
 uniform sampler2D u_weight;
@@ -213,7 +216,9 @@ out vec4 fragColor;
 void main() {
     vec3 orig = frameBilinear(v_src);
     vec3 sm   = texture(u_smoothed, v_uv).rgb;
-    float w   = texture(u_weight, v_uv).r * u_strength;
+    // v_uv_mask, not v_uv: the atlas is tiled per face, the weight mask is one
+    // shared canonical asset. See face_touchup.wgsl fs_comp.
+    float w   = texture(u_weight, v_uv_mask).r * u_strength;
     fragColor = vec4(mix(orig, sm, w), 1.0);
 }`
 
@@ -445,12 +450,14 @@ precision highp float;
 layout(location = 0) in vec2 a_uv;
 layout(location = 1) in float a_idx;
 ${LM_COMMON}
-out vec2 v_uv;
+out vec2 v_uv;        // TILED atlas uv — the atlas is per-face
+out vec2 v_uv_mask;   // UNTILED canonical uv — the weight mask is one shared asset
 out vec2 v_src;
 void main() {
     vec3 l = lmFrame(int(a_idx), gl_InstanceID);
     if (l.z < u_thresh) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
     v_uv = tileUv(a_uv, gl_InstanceID);
+    v_uv_mask = a_uv;
     v_src = l.xy;
     gl_Position = vec4(l.x * 2.0 - 1.0, l.y * 2.0 - 1.0, 0.0, 1.0);
 }`

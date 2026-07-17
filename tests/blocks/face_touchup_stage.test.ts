@@ -151,6 +151,48 @@ describe.each(BACKENDS)('FaceTouchupStage multi-face ($name)', ({ create }) => {
     expect(maxDiffIn(0.75)).toBeLessThan(1e-5)      // slot 1 gated off despite a live box
   })
 
+  it('samples the weight mask UNTILED at slots:4 (a tiled lookup reads the wrong quadrant)', async () => {
+    // Regression. The atlas IS tiled per face, so it's sampled with the tiled uv.
+    // The weight mask is NOT — it's one canonical 512² asset shared by every face.
+    // Sampling it with the tiled uv made face 0 read only the mask's top-left
+    // QUADRANT, stretched over the whole face: invisible at slots:1 (tile_uv is
+    // identity) and badly wrong at slots:4, which is exactly what shipped to
+    // medium/large/xl.
+    //
+    // The other tests here can't see it: they use an ALL-WHITE mask, so reading
+    // the wrong region returns the same value. This one puts the weight only on
+    // the mask's RIGHT half (u > 0.5) — under the bug face 0 samples u∈[0,0.5],
+    // gets all-black, and nothing is retouched at all.
+    const backend = await create()
+    const topo = await makeTopo()
+    const half = new OffscreenCanvas(512, 512)
+    const hctx = half.getContext('2d')!
+    hctx.fillStyle = '#000'; hctx.fillRect(0, 0, 512, 512)
+    hctx.fillStyle = '#fff'; hctx.fillRect(256, 0, 256, 512)   // white only where u > 0.5
+    const topoHalf: FaceTopology = { ...topo, weightMask: await createImageBitmap(half) }
+
+    const img = gradient()
+    const frame = backend.tensor(H, W, 4, img)
+    const lm = backend.tensor(1, 1, 956 * 4, packed(topo, 4))
+    const box = backend.tensor(1, 4, 4, new Float32Array([
+      0.5, 0.5, 0.15, 0.9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]))
+    const stage = backend.ops.FaceTouchupStage(frame, lm, box, topoHalf, {
+      strength: 1, amount: 16, detail: 0, thresh: 0.15, slots: 4,
+    })
+    stage.run()
+    const got = await backend.readback(stage.output)
+    backend.destroy()
+
+    let maxDiff = 0
+    for (let p = 0; p < H * W; p++)
+      for (let c = 0; c < 3; c++)
+        maxDiff = Math.max(maxDiff, Math.abs(got[p * 4 + c] - img[p * 4 + c]))
+    // Correct: the mask's white half lands on the face and retouches it.
+    // Tiled lookup: face 0 reads only black → zero weight → nothing changes.
+    expect(maxDiff).toBeGreaterThan(0.02)
+  })
+
   it('slots:4 with one face ≈ slots:1 with that face (tiling is not a behavior change)', async () => {
     const topo = await makeTopo()
     const img = gradient()

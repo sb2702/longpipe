@@ -208,8 +208,10 @@ fn fs_pass(in: QOut) -> @location(0) vec4<f32> {
 
 struct CompOut {
     @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,    // atlas uv
-    @location(1) src: vec2<f32>,   // frame-fraction position
+    @location(0) uv: vec2<f32>,      // TILED atlas uv — the atlas is per-face
+    @location(1) src: vec2<f32>,     // frame-fraction position
+    @location(2) uv_mask: vec2<f32>, // UNTILED canonical uv — the weight mask is
+                                     // one static 512² asset shared by every face
 };
 
 @vertex
@@ -222,6 +224,7 @@ fn vs_comp(@builtin(instance_index) inst: u32,
         return out;
     }
     out.uv = tile_uv(a_uv, inst);
+    out.uv_mask = a_uv;
     out.src = l.xy;
     out.pos = vec4<f32>(l.x * 2.0 - 1.0, 1.0 - 2.0 * l.y, 0.0, 1.0);
     return out;
@@ -230,8 +233,12 @@ fn vs_comp(@builtin(instance_index) inst: u32,
 @fragment
 fn fs_comp(in: CompOut) -> @location(0) vec4<f32> {
     let orig = frame_bilinear(in.src);
-    let sm   = textureSample(tex0, samp, in.uv).rgb;              // smoothed atlas
-    let w    = textureSample(tex1, samp, in.uv).r * uni.strength; // weight mask
+    let sm   = textureSample(tex0, samp, in.uv).rgb;                   // smoothed atlas — TILED
+    // The weight mask is NOT tiled: it's one canonical 512² asset, so it must be
+    // sampled with the untiled uv. Using the tiled uv here made every face read
+    // only its quadrant OF THE MASK, stretched over the whole face — invisible at
+    // slots=1 (tile_uv is identity) and badly wrong at slots=4.
+    let w    = textureSample(tex1, samp, in.uv_mask).r * uni.strength; // weight mask — UNTILED
     return vec4<f32>(mix(orig, sm, w), 1.0);
 }
 
