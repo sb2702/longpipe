@@ -40,17 +40,12 @@ await pipeline.ready                  // optional — resolves once the effect i
 - **Adapts to the device.** Five model presets (`xs`–`xl`); autotune benchmarks the actual device at init and an adaptive controller swaps presets at runtime to hold 30 fps — on 10-year-old netbooks and the latest MacBook Pro alike.
 - **Production pedigree.** Built by the founder of [Vectorly](https://www.crunchbase.com/organization/vectorly), a commercial effects SDK acquired in 2021 — a ground-up redesign for the WebGPU era.
 
-### Quality
+### Best models on the web
 
-Average alpha error on the P3M-10K validation set (499 images): every Longpipe variant beats MediaPipe on both MAE and IoU.
+Longpipe's hydranet architecture, custom model-specific shaders, zero-memory-copy pipeline, developer friendly interface and 100% MIT open source license mean that 🐲 Longpipe pareto dominates on performance, model quality and ease of use.
 
-<img width="640" alt="lp-quality" src="https://github.com/user-attachments/assets/c7044937-95af-496f-893a-a05a50d7c914" />
+<img width="958" height="652" alt="lp-performance" src="https://github.com/user-attachments/assets/792b9f63-e8fd-4d30-aa90-9c92b6a0430c" />
 
-### Speed
-
-The zero-copy GPU pipeline delivers better real-world performance than MediaPipe or BodyPix — despite running much larger models.
-
-<img width="640" alt="lp-speed" src="https://github.com/user-attachments/assets/ce658b8d-dc62-4d6b-90f8-cd62dfef2a59" />
 
 ## Documentation
 
