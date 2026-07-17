@@ -16,6 +16,7 @@ Try the live demo: [longpipe.dev/demo](https://longpipe.dev/demo)
 - **Support across browsers:** Works on every browser, simplifying dozens of browser inconsistencies in one simple API.
 - **Performance:** Longpipe was built from the ground up to work as well on 10-year-old netbooks as it does on the latest MacBook Pro.
 - **Adaptivity:** Longpipe has several model variants (xl to xs), auto-selecting to provide the best quality while maintaining 30 fps.
+- **Effects that compose:** virtual backgrounds, skin touch-up, and auto-reframe all run together off a single shared encoder pass — enabling one doesn't cost you another inference.
 - Built by the founder of [Vectorly](https://www.crunchbase.com/organization/vectorly), a commercial effects SDK acquired in 2021. A ground-up redesign for the WebGPU era, with years of production lessons baked in.
 
 ## Install
@@ -153,6 +154,8 @@ The denoiser handles sample-rate conversion internally (it runs at 48 kHz and re
 ```ts
 new EffectsPipeline(stream, {
   background:       'blur',
+  touchup:          { strength: 0.6 },             // skin smoothing; omit to disable
+  reframe:          true,                          // auto-frame the subject; omit to disable
   preset:           'auto',
   adaptive:         true,                          // default; only applies when preset is 'auto'
   audio:            'denoise',                 // 'passthrough' | 'drop' | 'denoise' | { denoise: {...} }
@@ -188,6 +191,8 @@ new EffectsPipeline(stream, {
 })
 ```
 
+If you use touch-up, three more files must sit alongside the tier weights — they're fetched from the same base URL the first time the effect is enabled: `model_landmark_mesh.bin` (and `.f16.bin`), `face_topology.json`, and `weight_mask.png`. Miss these and matting still works, but touch-up fails to enable. Auto-reframe needs nothing extra.
+
 ## Browser support
 
 Works on Chromium (Chrome, Edge), Firefox, and Safari (desktop and iOS). WebGPU is used when available; WebGL2 is the fallback. Longpipe picks the optimal video frame transport for each browser internally — `MediaStreamTrackProcessor`, `transferControlToOffscreen` + `captureStream`, or an `ImageBitmap` shuttle as universal fallback — all invisible to the caller.
@@ -221,13 +226,43 @@ How it works: a 5-point face-keypoint head rides the matting encoder (no second 
 
 On first enable the landmark weights (`model_landmark_mesh.bin`, ~2.6 MB) and two small static assets are fetched from `weightsBaseUrl`, then cached; parameter updates are instant. With no face in frame the effect passes through cleanly.
 
-Current limitation: single face — with multiple people in frame, detection can jump between faces. Multi-face support is on the roadmap.
+Everyone in frame gets smoothed — up to **four faces** on the `medium`, `large` and `xl` presets. (`small` and `xs` decode keypoints on a coarser grid that can't reliably separate a second face, so they smooth one.) There's no per-face API and nothing to configure; the faces share a single atlas, so the smoothing passes run once regardless of how many people are in shot.
+
+## Auto-reframe
+
+Crop and zoom the output so the subject is framed — the "centre stage" behaviour from Meet, Zoom and Teams. It rides the same face keypoints as touch-up, so it needs **no extra model and no extra assets**: turning it on costs a crop, not an inference.
+
+```ts
+new EffectsPipeline(stream, { reframe: true })                 // auto-follow, all defaults
+new EffectsPipeline(stream, { reframe: { auto: false } })      // solve once, then freeze
+
+await pipeline.setReframe({ zoom: 1.6 })   // enable / update live
+await pipeline.reframe()                   // manual mode: re-solve now
+await pipeline.setReframe(null)            // disable
+```
+
+```ts
+type ReframeConfig = boolean | ReframeOptions
+
+interface ReframeOptions {
+  zoom?:    number   // crop = frame / zoom (default 1.35; relaxes toward 1 as needed)
+  gravity?: number   // 0..1 pull toward the subject (default 0.5; 1 would centre it exactly)
+  margin?:  number   // keep-out space around the face (default 0.04)
+  auto?:    boolean | { deadband?: number; ease?: number }   // default true
+}
+```
+
+Two modes, because apps ship both. **auto** (default) follows the subject with a deadband — it holds still, makes a deliberate move when they've actually gone somewhere, then holds again; continuous tracking reads as swimming, because a head moves constantly even when a person doesn't. **manual** (`auto: false`) frames once and freezes until you call `pipeline.reframe()` — the mode for a reframe button in your own UI.
+
+The crop must stay inside the frame *and* contain the subject, which has a useful consequence: if you sit hard in a corner, auto-reframe does nothing at all, because containing you would need a crop the size of the whole frame. That falls out of the constraints rather than being a special case, and it matches what the commercial implementations do.
+
+It reframes **you**, not your background: with a virtual background the image stays put while you zoom (it's a backdrop behind you, not part of the shot), while a *blurred* background reframes with you, since that is your real room. Neither needs configuring. Auto-reframe frames one subject — the largest face — and the choice is sticky, so two people side by side won't make the camera flip back and forth. That's the opposite of touch-up, which smooths everyone: framing is a choice about whose shot it is; smoothing isn't.
 
 ## How it works
 
 Two layers:
 
-- **Model** (`src/model/`) — a shared EfficientNet-Lite encoder (lite0; lite3 on the `xl` tier) feeding multiple heads: a U-Net matting decoder (sharpened at higher resolution by a lightweight U-Net *wrapper*), a 5-point face-keypoint head (drives touch-up, and auto-reframe later), and a small optical-flow head that provides temporal stability — the renderer warps the previous outputs along the predicted flow and blends them through a flow-gated stabilizer, so the matte is steady without any recurrent state in the network. A separate 478-point landmark model runs on the detected face crop. Written as TypeScript op classes — each layer is a class; weights load as binary tensors at init; the backend (WebGPU or WebGL2) is injected at construction. BatchNorm is fused into conv weights at export — there is no BN op at inference.
+- **Model** (`src/model/`) — a shared EfficientNet-Lite encoder (lite0; lite3 on the `xl` tier) feeding multiple heads: a U-Net matting decoder (sharpened at higher resolution by a lightweight U-Net *wrapper*), a 5-point face-keypoint head (drives touch-up and auto-reframe), and a small optical-flow head that provides temporal stability — the renderer warps the previous outputs along the predicted flow and blends them through a flow-gated stabilizer, so the matte is steady without any recurrent state in the network. A separate 478-point landmark model runs on the detected face crop. Written as TypeScript op classes — each layer is a class; weights load as binary tensors at init; the backend (WebGPU or WebGL2) is injected at construction. BatchNorm is fused into conv weights at export — there is no BN op at inference.
 - **Pipeline** (`src/pipeline/`) — capability detection, per-browser frame transport selection, worker spawn, audio passthrough, autotune, and the adaptive controller. Designed to absorb the browser/codec/canvas plumbing complexity so consumers don't have to. 
 
 Five trained presets cover the hardware range. "Resolution" is the model's working (canvas) resolution; the encoder runs at a lower internal resolution and the U-Net wrapper refines back up to this.
@@ -252,8 +287,8 @@ Training scripts, fixture generation, and the weight export pipeline are not yet
 - [x] Background segmentation / virtual backgrounds
 - [x] Background noise removal (audio, separate pipeline)
 - [x] Face landmarks + touch-up
-- [ ] Multi-face support
-- [ ] Auto-reframe
+- [x] Multi-face support
+- [x] Auto-reframe
 - [ ] AR effects
 - [ ] Lighting correction
 
