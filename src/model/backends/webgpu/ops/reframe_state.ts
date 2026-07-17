@@ -18,7 +18,7 @@ export class ReframeStateWebGPU extends WebGPUOp {
   constructor(backend: WebGPUBackend, boxes: Tensor, prev: Tensor, cmd: Tensor, params: ReframeStateParams) {
     super(backend);
     this.shader = backend.dtype === "f16" ? f16Src : f32Src;
-    this.output = backend.tensor(1, 1, 4);
+    this.output = backend.tensor(1, 1, 8);   // [0] view rect, [1] subject memory
     this.inputs = [boxes, prev, cmd];
 
     this.createUniform("params", "Params");

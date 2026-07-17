@@ -8,13 +8,14 @@ export class ReframeStateWebGL extends WebGLOp {
   readonly inputs: Tensor[]
   readonly weights: MLBuffer[] = []
   readonly output: WebGLTensor
-  protected dispatch: [number, number] = [1, 1]
+  protected dispatch: [number, number] = [2, 1]
   shader = shaderSrc
 
   constructor(backend: WebGLBackend, boxes: Tensor, prev: Tensor, cmd: Tensor, params: ReframeStateParams) {
     super(backend)
-    const outTexture = this.makeTexture(null, 1, 1)
-    this.output = { h: 1, w: 1, c: 4, texture: outTexture, texW: 1, texH: 1 }
+    // 1×1×8 = two vec4 groups → a 2×1 texture; one fragment per group.
+    const outTexture = this.makeTexture(null, 2, 1)
+    this.output = { h: 1, w: 1, c: 8, texture: outTexture, texW: 2, texH: 1 }
     this.inputs = [boxes, prev, cmd]
 
     this.samplers = [

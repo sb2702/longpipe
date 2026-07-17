@@ -475,7 +475,7 @@ export class Renderer {
     const t4 = (v: number[]) => this.backend.tensor(1, 1, 4, new Float32Array(v))
     // size 0 = uninitialised → the state op snaps on its first solve rather than
     // easing in from nothing, and Reframe is a bit-exact identity until then.
-    const state = t4([0, 0, 0, 0])
+    const state = this.backend.tensor(1, 1, 8, new Float32Array(8))
     const cmd   = t4([auto ? RF_AUTO : RF_HOLD, 0, 0, 0])
     const stateOp = this.backend.ops.ReframeState(fc.boxStable, state, cmd, {
       zoom:     cfg.zoom     ?? REFRAME_DEFAULTS.zoom,

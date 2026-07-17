@@ -94,7 +94,13 @@ describe.each(BACKENDS)('Renderer face chain ($name)', ({ name, kind, create }) 
 
     const stats = renderer.getStats()
     expect(stats.preset).toBe('small')
-    expect(stats.fps).toBeGreaterThan(0)
+    // NOT stats.fps: that's a count over a 1-SECOND wall-clock window, so under
+    // load (the backend.sync()s above can outlast it) the frames age out and it
+    // reads 0 — a timing property masquerading as a correctness one. `skipped` is
+    // a cumulative counter, and small is a skip tier, so 10 frames must have
+    // banked skips — which proves the same thing (the frame loop ran) without
+    // depending on how busy the machine is.
+    expect(stats.skipped).toBeGreaterThan(0)
     renderer.destroy()
   })
 })

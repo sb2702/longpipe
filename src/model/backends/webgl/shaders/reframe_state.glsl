@@ -1,7 +1,11 @@
 #version 300 es
-// Auto-reframe state update → 1×1 texture: (cx, cy, size, moving), frame
-// fractions. See reframe_state.wgsl for the full commentary — this mirrors it.
-// One fragment does the whole thing (it's one camera's worth of arithmetic).
+// Auto-reframe state update → 1×1×8 tensor, i.e. a 2×1 texture of vec4 groups:
+//   x=0  (cx, cy, size, moving)          — the view rect
+//   x=1  (subjX, subjY, subjHs, valid)   — the incumbent subject, for hysteresis
+// See reframe_state.wgsl for the full commentary — this mirrors it.
+//
+// A fragment shader writes ONE vec4, so both fragments redo the whole (tiny)
+// computation and each emits its own group — same shape as face_boxes.glsl.
 
 precision highp float;
 precision highp int;
@@ -21,20 +25,47 @@ out vec4 fragColor;
 
 const float MODE_HOLD  = 1.0;
 const float MODE_SOLVE = 2.0;
+const float SWITCH_RATIO     = 1.25;
+const float TRACK_RADIUS_MIN = 0.1;
 
 void main() {
-    vec4 prev = texelFetch(u_prev, ivec2(0, 0), 0);
+    int group = int(gl_FragCoord.x);   // 0 = view rect, 1 = subject memory
+    vec4 prev  = texelFetch(u_prev, ivec2(0, 0), 0);
+    vec4 prevS = texelFetch(u_prev, ivec2(1, 0), 0);
     float mode = texelFetch(u_cmd, ivec2(0, 0), 0).x;
 
-    // Subject = largest live face (no hysteresis yet — see the WGSL note).
-    int best = -1;
-    float bestHs = 0.0;
+    // Challenger = largest live face.
+    int chal = -1;
+    float chalHs = 0.0;
     for (int i = 0; i < u_k; i++) {
         vec4 b = texelFetch(u_box, ivec2(i, 0), 0);
-        if (b.w > 0.0 && b.z > bestHs) { bestHs = b.z; best = i; }
+        if (b.w > 0.0 && b.z > chalHs) { chalHs = b.z; chal = i; }
     }
-    if (best < 0) { fragColor = prev; return; }
-    vec4 subj = texelFetch(u_box, ivec2(best, 0), 0);
+    if (chal < 0) {
+        // Hold, and keep the subject memory — a one-frame detection miss must not
+        // hand the camera to someone else.
+        fragColor = (group == 0) ? prev : prevS;
+        return;
+    }
+
+    // Incumbent = the live face nearest where the subject was (slot indices are
+    // not stable identities, so it's tracked by position).
+    int inc = -1;
+    float incD = 1e9;
+    if (prevS.w > 0.5) {
+        float radius = max(TRACK_RADIUS_MIN, prevS.z * 2.0);
+        for (int i = 0; i < u_k; i++) {
+            vec4 b = texelFetch(u_box, ivec2(i, 0), 0);
+            if (b.w <= 0.0) continue;
+            float d = length(vec2(b.x - prevS.x, b.y - prevS.y));
+            if (d < radius && d < incD) { incD = d; inc = i; }
+        }
+    }
+
+    int pick = chal;
+    if (inc >= 0 && chalHs <= texelFetch(u_box, ivec2(inc, 0), 0).z * SWITCH_RATIO) pick = inc;
+    vec4 subj = texelFetch(u_box, ivec2(pick, 0), 0);
+    if (group == 1) { fragColor = vec4(subj.x, subj.y, subj.z, 1.0); return; }
 
     float halfX = subj.z;
     float halfY = subj.z * u_aspect;

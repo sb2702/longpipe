@@ -15,18 +15,30 @@ const boxes = (b: number[][], k = 4) => {
   return a
 }
 
+// State is 1×1×8: [0] view rect (cx, cy, size, moving), [1] subject memory
+// (subjX, subjY, subjHs, valid). `prev` may be given as 4 (rect only, no
+// incumbent) or 8 values.
 async function step(create: () => Promise<any>, boxData: Float32Array, prev: number[], mode: number, params = P) {
   const backend = await create()
   const k = boxData.length / 4
+  const p8 = new Float32Array(8)
+  p8.set(prev.slice(0, 8))
   const bt = backend.tensor(1, k, 4, boxData)
-  const pt = backend.tensor(1, 1, 4, new Float32Array(prev))
+  const pt = backend.tensor(1, 1, 8, p8)
   const ct = backend.tensor(1, 1, 4, new Float32Array([mode, 0, 0, 0]))
   const op = backend.ops.ReframeState(bt, pt, ct, params)
   op.run()
   const out = await backend.readback(op.output)
   backend.destroy()
-  return { cx: out[0], cy: out[1], size: out[2], moving: out[3] }
+  return {
+    cx: out[0], cy: out[1], size: out[2], moving: out[3],
+    subjX: out[4], subjY: out[5], subjHs: out[6], subjValid: out[7],
+  }
 }
+
+// prev state with an incumbent subject already latched at (x, hs).
+const withSubject = (rect: number[], x: number, y: number, hs: number) =>
+  [...rect, x, y, hs, 1]
 
 describe.each(BACKENDS)('ReframeState ($name)', ({ create }) => {
   it('pulls toward the subject without centring it (gravity 0.5)', async () => {
@@ -63,12 +75,60 @@ describe.each(BACKENDS)('ReframeState ($name)', ({ create }) => {
     expect(s.size).toBeLessThanOrEqual(1)
   })
 
-  it('picks the largest face as the subject', async () => {
+  it('picks the largest face when there is no incumbent', async () => {
     const s = await step(create, boxes([
       [0.2, 0.5, 0.04, 0.9],   // small, left
       [0.8, 0.5, 0.10, 0.9],   // large, right → should win
     ]), [0, 0, 0, 0], AUTO)
     expect(s.cx).toBeGreaterThan(0.5)
+    expect(s.subjX).toBeCloseTo(0.8, 2)
+    expect(s.subjValid).toBe(1)
+  })
+
+  it('hysteresis: a marginally bigger challenger does NOT steal the camera', async () => {
+    // Incumbent at x=0.25 (hs 0.08); challenger at x=0.75 is 12% bigger — under
+    // the 1.25× switch ratio, so the camera stays put. Without hysteresis the
+    // largest-face rule would hand off, and two people sitting side by side
+    // would trade the camera back and forth as the numbers jitter.
+    const s = await step(create, boxes([
+      [0.25, 0.5, 0.080, 0.9],
+      [0.75, 0.5, 0.090, 0.9],
+    ]), withSubject([0.4, 0.5, 0.74, 0], 0.25, 0.5, 0.08), AUTO)
+    expect(s.subjX).toBeCloseTo(0.25, 2)   // incumbent held
+  })
+
+  it('hysteresis: a decisively bigger challenger DOES take over', async () => {
+    // Same setup, challenger now 2× the incumbent — someone genuinely closer.
+    const s = await step(create, boxes([
+      [0.25, 0.5, 0.080, 0.9],
+      [0.75, 0.5, 0.160, 0.9],
+    ]), withSubject([0.4, 0.5, 0.74, 0], 0.25, 0.5, 0.08), AUTO)
+    expect(s.subjX).toBeCloseTo(0.75, 2)
+  })
+
+  it('hysteresis: the incumbent is tracked by position, not slot index', async () => {
+    // The decode orders slots by NMS score, so the same person can move slots
+    // between frames. Here the incumbent (hs 0.08, x 0.25) is in slot 1.
+    const s = await step(create, boxes([
+      [0.75, 0.5, 0.090, 0.9],
+      [0.25, 0.5, 0.080, 0.9],
+    ]), withSubject([0.4, 0.5, 0.74, 0], 0.25, 0.5, 0.08), AUTO)
+    expect(s.subjX).toBeCloseTo(0.25, 2)
+  })
+
+  it('the incumbent survives a one-frame detection miss', async () => {
+    const prev = withSubject([0.4, 0.5, 0.74, 0], 0.25, 0.5, 0.08)
+    const s = await step(create, boxes([]), prev, AUTO)
+    expect(s.subjValid).toBe(1)
+    expect(s.subjX).toBeCloseTo(0.25, 2)   // memory kept, not reset
+  })
+
+  it('a subject that walks away frees the camera for whoever is left', async () => {
+    // Incumbent memory at x=0.25, but nobody is near it any more → no incumbent
+    // is re-found, so the remaining face takes over immediately.
+    const s = await step(create, boxes([[0.75, 0.5, 0.06, 0.9]]),
+      withSubject([0.4, 0.5, 0.74, 0], 0.25, 0.5, 0.08), AUTO)
+    expect(s.subjX).toBeCloseTo(0.75, 2)
   })
 
   it('no face → holds the previous frame', async () => {
