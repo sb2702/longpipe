@@ -3,7 +3,8 @@
 Fast, high quality virtual effects in the browser
 
 
-<img width="640" height="360" alt="0087" src="https://github.com/user-attachments/assets/525f983c-6b3d-43ff-aedf-b1203e2955c1" />
+<img width="960" height="540" alt="video-effects-sdk" src="https://github.com/user-attachments/assets/5dbe1ccb-09dd-4f22-b4be-e3122767dbcc" />
+
 
 
 
