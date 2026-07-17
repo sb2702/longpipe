@@ -141,7 +141,7 @@ const TOUCHUP_THRESH = 0.15
 // One versioned path hosts everything — video model weights (model_*.bin) and
 // audio denoise assets (rnnoise.wasm / dfn.wasm / dfn_weights.pack). Filenames
 // disambiguate; no per-kind subfolder.
-const DEFAULT_WEIGHTS_BASE_URL = 'https://cdn.longpipe.dev/models/v/0.0.4/'
+const DEFAULT_WEIGHTS_BASE_URL = 'https://cdn.longpipe.dev/models/v/0.0.5/'
 
 const DEFAULTS = {
   background:     'blur'                  as BackgroundInput,

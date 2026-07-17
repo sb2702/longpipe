@@ -5,12 +5,12 @@ Scans for model_*.bin (and .f16.bin) files, computes size and sha256 for each,
 and writes both a machine-readable JSON manifest and a human-readable HTML
 listing into the output directory. Designed for the CDN bucket layout — drop
 the resulting files next to the weights to expose a browsable + scriptable
-index at e.g. https://cdn.longpipe.dev/models/v/0.0.4/.
+index at e.g. https://cdn.longpipe.dev/models/v/0.0.5/.
 
 Usage:
     python scripts/generate_weights_index.py
     python scripts/generate_weights_index.py --src weights --out weights
-    python scripts/generate_weights_index.py --base-url https://cdn.longpipe.dev/models/v/0.0.4/
+    python scripts/generate_weights_index.py --base-url https://cdn.longpipe.dev/models/v/0.0.5/
 """
 
 import argparse
@@ -27,8 +27,6 @@ PATTERN = "model_*.bin"
 AUDIO_FILES = ("dfn.wasm", "rnnoise.wasm", "dfn_weights.pack", "dfn_weights_int8.pack")
 # Touch-up static assets (the landmark weights already match model_*.bin;
 # these two are the canonical face mesh + skin-weight mask).
-TOUCHUP_FILES = ("face_topology.json", "weight_mask.png")
-# Touch-up static assets (landmark weights match model_*.bin; these two don't).
 TOUCHUP_FILES = ("face_topology.json", "weight_mask.png")
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_SRC = SCRIPT_DIR.parent / "weights"
@@ -68,9 +66,12 @@ def read_header(path: Path) -> dict:
         kind = "tier"
     elif "encoder" in keys:
         kind = "base-only"
+    elif "stem" in keys and "fc" in keys:
+        kind = "landmark"      # model_landmark_mesh — touch-up / AR, not a tier
     else:
         kind = "unknown"
-    return {"dtype": dtype, "kind": kind, "hasGru": "gru" in keys, "top": keys}
+    blobs = [k for k in keys if k in ("base", "wrapper", "gru", "flow", "face")]
+    return {"dtype": dtype, "kind": kind, "hasGru": "gru" in keys, "top": keys, "blobs": blobs}
 
 
 def describe(path: Path) -> dict:
@@ -80,7 +81,7 @@ def describe(path: Path) -> dict:
         return read_header(path)
     kind = {".wasm": "audio-wasm", ".pack": "audio-weights",
             ".json": "touchup-asset", ".png": "touchup-asset"}.get(path.suffix, "audio")
-    return {"dtype": "-", "kind": kind, "hasGru": False, "top": []}
+    return {"dtype": "-", "kind": kind, "hasGru": False, "top": [], "blobs": []}
 
 
 def render_html(files, generated, base_url):
@@ -160,9 +161,10 @@ def main():
         digest = sha256_of(p)
         hdr = describe(p)
         files.append({"name": p.name, "size": size, "sha256": digest,
-                      "dtype": hdr["dtype"], "kind": hdr["kind"], "hasGru": hdr["hasGru"]})
-        gru = " gru" if hdr["hasGru"] else ""
-        print(f"  {p.name}: {human_size(size)}  {hdr['dtype']} {hdr['kind']}{gru}  {digest[:12]}…")
+                      "dtype": hdr["dtype"], "kind": hdr["kind"],
+                      "hasGru": hdr["hasGru"], "blobs": hdr["blobs"]})
+        extra = " ".join(hdr["blobs"]) if hdr["blobs"] else ""
+        print(f"  {p.name}: {human_size(size)}  {hdr['dtype']} {hdr['kind']}  {extra}  {digest[:12]}…")
 
     generated = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 
