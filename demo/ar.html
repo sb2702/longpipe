@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Longpipe — face AR PoC (sunglasses)</title>
+    <style>
+      body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+      a { color: #6cf; }
+      .topbar { padding: 8px 16px; }
+      h2 { padding: 0 16px; margin: 8px 0; }
+      .desc { padding: 0 16px 8px; color: #aaa; font-size: 13px; max-width: 900px; line-height: 1.5; }
+      .controls { padding: 8px 16px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+      .sliders  { padding: 4px 16px 8px; display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+      label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: #bbb; }
+      select, input { background: #222; color: #ddd; border: 1px solid #444; padding: 4px 6px; }
+      input[type=range] { width: 110px; padding: 0; }
+      .val { font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; min-width: 34px; }
+      button { background: #2a6; color: #fff; border: none; padding: 6px 16px; cursor: pointer; border-radius: 4px; }
+      #status { padding: 8px 16px; font-family: ui-monospace, monospace; font-size: 12px; color: #6cf; }
+      .panels { padding: 12px 16px; }
+      canvas { background: #000; width: 768px; height: auto; }
+    </style>
+  </head>
+  <body>
+    <div class="topbar"><a href="/">← demos</a></div>
+    <h2>Face AR PoC — dummy 3D sunglasses</h2>
+    <p class="desc">
+      <b>Throwaway.</b> One question only: do our landmarks carry enough signal to hang AR
+      geometry off? Demo-only, not a production shape. The <b>pose fit</b> is CPU-side (cheap,
+      easy to iterate on); the <b>rendering</b> is real WebGL2 with a depth buffer, in its own
+      context — nothing shared with the SDK backend, since the landmarks come back to the CPU
+      anyway.
+    </p>
+    <p class="desc">
+      <b>model</b> — <b>jeeliz glasses</b> loads their actual glassesVTO meshes
+      (<code>glassesFramesBranchesBent.json</code> + <code>glassesLenses.json</code>, three.js
+      BufferGeometry) so this is an <b>apples-to-apples</b> against their demo: same mesh, our
+      tracking. They're auto-aligned into our canonical face space — scale from their lens x-span
+      to our ear-to-ear width, lens centre onto our eye midpoint — so the sliders only nudge.
+      <b>dummy</b> is the procedural pair, kept for reference.
+    </p>
+    <p class="desc">
+      <b>occluder</b> — a mesh drawn depth-only (writes z, paints nothing), so the far temple is
+      depth-tested away instead of tracking across your cheek. This is the trick their demo uses
+      (<code>occluderURL: models3D/face.json</code>) and it's most of the difference between
+      "glasses on a face" and "glasses pasted on a photo". <b>jeeliz head</b> is their
+      <code>face.json</code> — a full head, so it occludes properly. <b>canonical face</b> is ours,
+      built free from <code>face_topology.json</code>'s triangle list, but it stops at the ears so a
+      temple past the silhouette has nothing to hide behind. Set <b>off</b> to see what it buys.
+    </p>
+    <p class="desc">
+      <b>Nothing about the landmark model changes.</b> <code>LandmarkNet</code> stays 2D by
+      design. The depth comes from the <b>canonical face model</b> — one fixed, known 3D face
+      (<code>canonical_face.json</code>, exported from <code>ar-scope/canonical_face_model.obj</code>).
+      Known 3D model points + observed 2D points → pose is the standard AR fit, and it's exactly
+      why MediaPipe's own unreliable z is irrelevant here: it is never consulted.
+    </p>
+    <p class="desc">
+      The fit is <b>POSIT</b> — iterated weak perspective with a depth correction, i.e. true
+      perspective. This replaced a scaled-orthographic fit that was measurably wrong: with
+      <i>perfect</i> landmarks it had <b>6° of pose error head-on and 14° at 45° yaw</b>, which is
+      what "only okay looking straight at the camera" actually was. POSIT measures 0.00° across
+      that whole sweep and 0.29° under 3px of landmark noise.
+    </p>
+    <p class="desc">
+      It keeps the property that made the maths cheap: <b>AᵀA depends only on the canonical
+      model</b>, so it's constant and inverted once at init. Each of the ~8 iterations is just Aᵀb
+      (a sum over landmarks) plus a 4×4 matvec — a reduction and a tiny solve, i.e. one workgroup
+      if this moves to the GPU. <b>focal</b> is the camera's focal length as a fraction of frame
+      width (0.87 ≈ a 60° FOV webcam); being 200px out costs ~2.5° of pose, so it's worth nudging.
+      The rigid subset (above the jaw) is chosen <i>geometrically</i>, not from a copied index list,
+      so the mouth can't drag the pose around when you talk.
+    </p>
+    <p class="desc">
+      <b>residual</b> = RMS reprojection error in canvas px — the honest read on whether the fit
+      is tracking or guessing. The fit recovers known synthetic poses to ~1e-12px and holds scale
+      to 0.2% under 3px of landmark noise, so a high residual here means the landmarks are the
+      weak link, not the maths. The temples are what make yaw legible.
+    </p>
+    <div class="controls">
+      <label>tier
+        <select id="tier"><option value="large">large</option><option value="medium">medium</option><option value="xl">xl</option><option value="small">small</option><option value="xs">xs</option></select>
+      </label>
+      <label>backend
+        <select id="backend"><option value="webgpu">webgpu</option><option value="webgl">webgl</option></select>
+      </label>
+      <label>precision
+        <select id="dtype"><option value="f32">f32</option><option value="f16">f16</option></select>
+      </label>
+      <label>source
+        <select id="source">
+          <option value="webcam">webcam</option>
+          <option value="video">loop video</option>
+          <option value="image">test image</option>
+        </select>
+      </label>
+      <label>model
+        <select id="model"><option value="jeeliz">jeeliz glasses</option><option value="dummy">dummy</option></select>
+      </label>
+      <label>occluder
+        <select id="occluder"><option value="jeeliz">jeeliz head</option><option value="canonical">canonical face</option><option value="off">off</option></select>
+      </label>
+      <button id="run">Run</button>
+    </div>
+    <div class="sliders">
+      <label>forward <input id="fwd"  type="range" min="0" max="3"   step="0.1"  value="1.2" /><span id="fwd-v"  class="val"></span></label>
+      <label>size    <input id="size" type="range" min="0.6" max="1.6" step="0.05" value="1" /><span id="size-v" class="val"></span></label>
+      <label>focal   <input id="focal" type="range" min="0.4" max="2.0" step="0.05" value="0.87" /><span id="focal-v" class="val"></span></label>
+    </div>
+    <div id="status">idle — pick a tier and press Run</div>
+    <div class="panels">
+      <canvas id="view"></canvas>
+    </div>
+    <script type="module" src="./ar.ts"></script>
+  </body>
+</html>

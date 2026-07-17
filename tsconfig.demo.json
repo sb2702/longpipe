@@ -1,0 +1,12 @@
+{
+  // The main tsconfig only includes src/, so demo code was never typechecked —
+  // which let a reference to an undefined variable sit in demo/ar.ts unnoticed.
+  // Vite's dev server transpiles without checking, so nothing else catches it.
+  //   npx tsc --noEmit -p tsconfig.demo.json
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "resolveJsonModule": true
+  },
+  "include": ["demo/**/*.ts", "src/**/*.ts"]
+}

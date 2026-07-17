@@ -35,6 +35,10 @@
         <span class="desc">The full landmark chain with zero per-frame readback: matting taps → heatmaps → soft-argmax box (compute) → 256² crop → LandmarkNet → 478 vertex-pulled dots. The stats line is an optional 16-byte readback every 30 frames.</span>
       </li>
       <li>
+        <a href="/ar.html">Face AR PoC — sunglasses (scratch)</a>
+        <span class="desc">Throwaway test of whether the landmarks can carry AR geometry. Dummy procedural sunglasses posed by a scaled-orthographic fit of the canonical face model against our 2D landmarks — the model stays 2D, the depth is a fixed known face. CPU-side; AᵀA is constant so the per-frame cost is a reduction plus a 4×4 solve.</span>
+      </li>
+      <li>
         <a href="/reframe.html">Auto-reframe v0 (scratch)</a>
         <span class="desc">Throwaway pad for the reframe rule, CPU-side so it can be dialled in with sliders: frame centre as the base, subject "gravity" pulling the crop centre, aspect-preserving shrink, must stay inside the frame AND contain the subject (which is what makes a corner head a no-op). auto = deadband tracking; manual = solve once on a button, Meet-style.</span>
       </li>
