@@ -56,7 +56,10 @@ Full docs live at **[longpipe.dev/docs](https://longpipe.dev/docs)**:
 - [Architecture](https://longpipe.dev/docs/architecture) — the hydranet: one encoder, many heads
 - [Backgrounds](https://longpipe.dev/docs/backgrounds) · [Touch-up](https://longpipe.dev/docs/touchup) · [Auto-reframe](https://longpipe.dev/docs/reframe) · [Audio denoise](https://longpipe.dev/docs/audio)
 - [Presets & autotune](https://longpipe.dev/docs/presets)
+- [Model layer](https://longpipe.dev/docs/model-layer) — drive the model directly, without the pipeline
 - [Self-hosting weights](https://longpipe.dev/docs/self-hosting)
+
+Machine-readable for LLMs and agents: [`llms.txt`](https://longpipe.dev/llms.txt) · [`llms-full.txt`](https://longpipe.dev/llms-full.txt)
 
 ## Roadmap
 
