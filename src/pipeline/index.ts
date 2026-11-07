@@ -18,6 +18,7 @@ import type { InitData, PipelineError } from './messages'
 import { selectTopology } from './topology'
 import { buildOutputStream, normalizeAudio } from './audio'
 import { AudioDenoiser } from '~/audio/denoiser.ts'
+import { DEFAULT_WEIGHTS_BASE_URL } from '~/weights_url.ts'
 import type { DenoiseOptions } from './audio'
 import type { AudioStats } from '~/audio/messages.ts'
 import { WorkerController } from './worker_controller'
@@ -135,13 +136,7 @@ export interface ReframeAutoOptions {
 const TOUCHUP_DEFAULTS = { strength: 0.6, amount: 8, detail: 0.35, style: 'freq-sep' as FaceTouchupStyle }
 const TOUCHUP_THRESH = 0.15
 
-// Public CDN where Longpipe hosts its own model weights. Versioned in the
-// path so SDK upgrades that change weight shapes can move to a new prefix
-// without breaking older SDKs in the wild.
-// One versioned path hosts everything — video model weights (model_*.bin) and
-// audio denoise assets (rnnoise.wasm / dfn.wasm / dfn_weights.pack). Filenames
-// disambiguate; no per-kind subfolder.
-const DEFAULT_WEIGHTS_BASE_URL = 'https://cdn.longpipe.dev/models/v/0.0.5/'
+// Public CDN default — see src/weights_url.ts.
 
 const DEFAULTS = {
   background:     'blur'                  as BackgroundInput,

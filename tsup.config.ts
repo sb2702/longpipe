@@ -75,7 +75,7 @@ const inlineWorklet: esbuild.Plugin = {
 }
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/model.ts', 'src/audio.ts'],
   format: ['esm', 'cjs'],
   dts: true,
   minify: true,
