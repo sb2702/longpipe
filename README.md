@@ -58,8 +58,19 @@ Full docs live at **[longpipe.dev/docs](https://longpipe.dev/docs)**:
 - [Presets & autotune](https://longpipe.dev/docs/presets)
 - [Model layer](https://longpipe.dev/docs/model-layer) — drive the model directly, without the pipeline
 - [Self-hosting weights](https://longpipe.dev/docs/self-hosting)
+- [ONNX & other runtimes](https://longpipe.dev/docs/onnx)
 
 Machine-readable for LLMs and agents: [`llms.txt`](https://longpipe.dev/llms.txt) · [`llms-full.txt`](https://longpipe.dev/llms-full.txt)
+
+## Models (ONNX)
+
+The trained models are also published as official ONNX exports (all five tiers, matting, face keypoints,
+optical flow and the 478-point face mesh) for Python, native apps, servers and `onnxruntime-web`:
+
+- **Hugging Face:** [huggingface.co/Longpipe/longpipe](https://huggingface.co/Longpipe/longpipe)
+- **CDN:** `https://cdn.longpipe.dev/models/v/0.0.5/onnx/` (CORS-enabled)
+
+Inputs, outputs and examples: [longpipe.dev/docs/onnx](https://longpipe.dev/docs/onnx).
 
 ## Roadmap
 
