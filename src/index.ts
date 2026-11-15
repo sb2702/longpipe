@@ -5,7 +5,7 @@ export { Pipeline as EffectsPipeline } from '~/pipeline/index.ts'
 export type {
   PipelineOptions, TouchupOptions,
   BackgroundInput, Background, BlurInput, ColorInput, ImageInput, VideoInput,
-  PresetName, ManualPreset, ModelName,
+  PresetName, ManualPreset, ModelName, ModelChoice,
   AudioMode, AudioInput, DenoiseOptions, DenoiseModel, DenoiseTier, DenoiseModelOption, AudioStats,
   PipelineError, ErrorSource,
 } from '~/pipeline/index.ts'

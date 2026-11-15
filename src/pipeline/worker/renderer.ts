@@ -14,6 +14,8 @@ import { OpticalFlowNet } from '~/model/networks/optical_flow_net.ts'
 import { FaceHeatmapNet } from '~/model/networks/face_heatmap_net.ts'
 import { LandmarkNet } from '~/model/networks/landmark_net.ts'
 import { TIER_CONFIG } from '~/model/tier_config.ts'
+import { MediaPipeSelfie, MEDIAPIPE_SELFIE_CONFIG } from '~/model/networks/mediapipe_selfie.ts'
+import type { MediaPipeSelfieVariant, MediaPipeSelfieWeights } from '~/model/networks/mediapipe_selfie.ts'
 import type { FaceTopology, FaceTouchupParams, FaceTouchupStageOp } from '~/model/backend.ts'
 
 // Auto-reframe defaults — tuned by eye in demo/reframe.html. `auto` adds the
@@ -121,6 +123,10 @@ export class Renderer {
   // null until the first setPreset call. Stats use a 'boot' placeholder
   // while null; process() runs passthrough.
   private preset:  ManualPreset | null = null
+  // Set while a MediaPipe selfie model is attached (preset stays null, so the
+  // model runs every frame and every tier-dependent path stays off). Doubles as
+  // the stats label.
+  private mediapipe: MediaPipeSelfieVariant | null = null
   private enabled: boolean
   // Current background tracked here so setPreset can rebuild the RenderOp
   // with the same background (otherwise an adaptive swap would flash to
@@ -589,6 +595,31 @@ export class Renderer {
   // calls swap presets at runtime (used by adaptive controller). The
   // RenderOp instance is reused: only the network-dependent pieces
   // (network, networkInput, upscaler, compositor) are rebuilt.
+  // Attach Google's MediaPipe selfie segmenter instead of a Longpipe tier. Same
+  // Input op → network → bilinear alpha upscale → compositor path as a tier; no
+  // flow / face chains (it has no heads for them) and no frame skipping.
+  setMediaPipeSelfie(variant: MediaPipeSelfieVariant, weightsBuf: ArrayBuffer): void {
+    const cfg = MEDIAPIPE_SELFIE_CONFIG[variant]
+    if (!cfg) throw new Error(`renderer: unknown MediaPipe selfie variant '${variant}'`)
+    const w = loadWeightsFromBinary(weightsBuf) as unknown as MediaPipeSelfieWeights
+    const networkInput = this.backend.ops.Input(cfg.inputRes.h, cfg.inputRes.w)
+    const net = new MediaPipeSelfie(this.backend, networkInput.output, w)
+    this.renderOp.attachNetwork(net, networkInput, {
+      upscaler:   'bilinear',
+      background: this.translateBackgroundFor('main', this.currentBackground),
+    })
+    this.flow            = null
+    this.preset          = null
+    this.mediapipe       = variant
+    this.skipCounter     = 0
+    this.tier            = null
+    this.tierInput       = null
+    this.lastTierWeights = null
+    this.faceCfg         = null
+    this.reframeCfg      = null
+    this.buildFaceChain()   // clears the face chain / reframe view
+  }
+
   setPreset(preset: ManualPreset, weightsBuf: ArrayBuffer): void {
     const cfg = TIER_CONFIG[preset.model]
     if (!cfg) throw new Error(`renderer: no TIER_CONFIG entry for model '${preset.model}'`)
@@ -652,6 +683,7 @@ export class Renderer {
     }
 
     this.preset          = preset
+    this.mediapipe       = null
     this.skipCounter     = 0
     this.tier            = tier
     this.tierInput       = networkInput
@@ -664,6 +696,7 @@ export class Renderer {
   // config rebuilds the chain in place (adaptive tier swaps do the same via
   // setPreset — the chain rides the current tier's encoder taps).
   setFaceEffects(cfg: FaceEffectsConfig | null): void {
+    if (cfg && this.mediapipe) throw new Error('renderer: touchup requires a Longpipe model (MediaPipe selfie is segmentation-only)')
     this.faceCfg = cfg
     if (this.preset) this.buildFaceChain()
   }
@@ -671,6 +704,7 @@ export class Renderer {
   // Configure (or clear) auto-reframe. Independent of touch-up: either consumer
   // pulls up the shared face DETECTION half of the chain.
   setReframe(cfg: ReframeConfig | null): void {
+    if (cfg && this.mediapipe) throw new Error('renderer: reframe requires a Longpipe model (MediaPipe selfie is segmentation-only)')
     this.reframeCfg = cfg
     if (this.preset) this.buildFaceChain()
   }
@@ -799,7 +833,7 @@ export class Renderer {
       modelMs:    median(this.modelRunSamples.map(s => s.ms)),
       displayMs:  median(this.displayRunSamples.map(s => s.ms)),
       skipped:    this.skippedCount,
-      preset:     this.preset?.model ?? 'boot',
+      preset:     this.mediapipe ? `mediapipe-selfie-${this.mediapipe}` : this.preset?.model ?? 'boot',
       skipFrames: this.preset?.skipFrames ?? 0,
       enabled:    this.enabled,
       inputPath:  this.topology.input,

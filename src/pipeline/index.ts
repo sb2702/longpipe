@@ -18,7 +18,11 @@ import type { InitData, PipelineError } from './messages'
 import { selectTopology } from './topology'
 import { buildOutputStream, normalizeAudio } from './audio'
 import { AudioDenoiser } from '~/audio/denoiser.ts'
-import { DEFAULT_WEIGHTS_BASE_URL } from '~/weights_url.ts'
+import { DEFAULT_WEIGHTS_BASE_URL, DEFAULT_MEDIAPIPE_WEIGHTS_BASE_URL } from '~/weights_url.ts'
+import { MEDIAPIPE_SELFIE_CONFIG } from '~/model/networks/mediapipe_selfie.ts'
+import type { MediaPipeSelfieVariant } from '~/model/networks/mediapipe_selfie.ts'
+import { resolveModel, validateModelOptions, requiresLongpipe, isMediaPipe } from './model_choice'
+import type { ModelChoice, ResolvedModel } from './model_choice'
 import type { DenoiseOptions } from './audio'
 import type { AudioStats } from '~/audio/messages.ts'
 import { WorkerController } from './worker_controller'
@@ -54,8 +58,16 @@ export interface PipelineOptions {
   // Resolved on the main thread by normalizeBackground() before init.
   // Default: 'none' (passthrough).
   background?:     BackgroundInput
+  // Segmentation model. 'longpipe' (default): Longpipe's tiers — all effects,
+  // presets/autotune/adaptive. 'mediapipe-selfie': Google's MediaPipe Selfie
+  // Segmenter on the same GPU pipeline — background effects only (touchup,
+  // reframe and non-'auto' presets throw). See pipeline/model_choice.ts.
+  model?:          ModelChoice
   preset?:         PresetName | ManualPreset    // default: 'auto' (worker microbenches, picks best fit)
-  weightsBaseUrl?: string                       // default: DEFAULT_WEIGHTS_BASE_URL
+  // default: DEFAULT_WEIGHTS_BASE_URL. MediaPipe weights default to
+  // DEFAULT_MEDIAPIPE_WEIGHTS_BASE_URL, but when this is set they're fetched
+  // from here too (self-hosters keep every file in one folder).
+  weightsBaseUrl?: string
   // Numeric precision preference. Default 'f16' (halves bandwidth + weight
   // downloads; falls back to f32 when the adapter lacks shader-f16). Force
   // 'f32' for maximum fidelity or to A/B-test f16-specific issues.
@@ -183,6 +195,15 @@ function weightsUrlFor(baseUrl: string, model: string, dtype: Dtype): string {
 // f16 (≈half the download). Falls back to the f32 .bin if the f16 one isn't
 // hosted (e.g. a CDN that only ships f32) — the f16 backend converts on upload,
 // and the loader decodes f16 bits correctly either way (see utils/weights.ts).
+// MediaPipe selfie weights: one fp16 pack per variant (lossless — the source
+// model is fp16; the backend converts on upload if it runs f32).
+async function fetchMediaPipeWeights(baseUrl: string, variant: MediaPipeSelfieVariant): Promise<ArrayBuffer> {
+  const url = `${baseUrl.replace(/\/$/, '')}/${MEDIAPIPE_SELFIE_CONFIG[variant].file}`
+  const r = await fetch(url)
+  if (!r.ok) throw new Error(`weights fetch failed: ${r.status} ${url}`)
+  return r.arrayBuffer()
+}
+
 async function fetchModelWeights(baseUrl: string, model: string, dtype: Dtype): Promise<ArrayBuffer> {
   if (dtype === 'f16') {
     const r = await fetch(weightsUrlFor(baseUrl, model, 'f16'))
@@ -265,6 +286,11 @@ export class Pipeline implements PromiseLike<Pipeline> {
   private weightsBaseUrl: string = DEFAULT_WEIGHTS_BASE_URL
   private resolvedDtype:  Dtype = 'f32'
 
+  // Resolved segmentation model (see model_choice.ts). MediaPipe models gate
+  // off every Longpipe-only feature (touch-up, reframe, presets, adaptive).
+  private readonly model: ResolvedModel
+  private readonly modelName: ModelChoice
+
   // Cleanup callback for the current background. Set by normalizeBackground
   // for kinds that own resources (currently: video, which holds a hidden
   // <video> element + rVFC loop + MessageChannel). Called when bg is
@@ -281,6 +307,12 @@ export class Pipeline implements PromiseLike<Pipeline> {
     // (and downstream main-thread modules) honor the flag from the start.
     setDebug(opts.debug)
 
+    // Model-dependent option checks throw synchronously, before any side effect
+    // (no worker, no transport). Checked against the caller's raw options so the
+    // DEFAULTS preset ('auto') doesn't count as an explicit choice.
+    validateModelOptions(options.model, options)
+    this.modelName = options.model ?? 'longpipe'
+
     // Pick the best transport pair for this browser. Each axis is chosen
     // independently — the worker's renderer is identical across all 6
     // combos. See pipeline/topology.ts for the selection logic and
@@ -289,6 +321,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
 
     const inputSetup  = setupInput(topology.input,   inputStream)
     const outputSize  = pickOutputSize(inputStream, opts.outputResolution)
+    this.model = resolveModel(options.model, outputSize)
     const outputSetup = setupOutput(topology.output, outputSize)
     this.inputCleanup  = inputSetup.cleanup
     this.outputCleanup = outputSetup.cleanup
@@ -357,6 +390,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     // event fires on first frame.
     const partialInit = {
       topology,
+      model:      this.model,
       preset:     opts.preset,
       enabled:    opts.enabled,
       backend:    'auto' as const,
@@ -372,7 +406,12 @@ export class Pipeline implements PromiseLike<Pipeline> {
     ]
 
     this.weightsBaseUrl = opts.weightsBaseUrl
-    void this.bootstrap(partialInit, opts.background, transferList, opts.weightsBaseUrl, opts.adaptive, opts.onError, opts.touchup, opts.reframe)
+    // MediaPipe weights: the caller's weightsBaseUrl if they set one (self-
+    // hosting, one flat folder), else their own CDN prefix.
+    const modelBaseUrl = isMediaPipe(this.model) && options.weightsBaseUrl === undefined
+      ? DEFAULT_MEDIAPIPE_WEIGHTS_BASE_URL
+      : opts.weightsBaseUrl
+    void this.bootstrap(partialInit, opts.background, transferList, modelBaseUrl, opts.adaptive, opts.onError, opts.touchup, opts.reframe)
   }
 
   // Async second half of construction: normalize background → init handshake
@@ -399,8 +438,10 @@ export class Pipeline implements PromiseLike<Pipeline> {
       const initRes = await this.controller.sendMessage('init', initData, initTransferList)
       log('init resolved:', initRes)
 
-      log('fetching weights:', initRes.resolvedPreset.model, initRes.resolvedDtype)
-      const weights = await fetchModelWeights(weightsBaseUrl, initRes.resolvedPreset.model, initRes.resolvedDtype)
+      const model = this.model
+      const weights = isMediaPipe(model)
+        ? await fetchMediaPipeWeights(weightsBaseUrl, model.variant)
+        : await fetchModelWeights(weightsBaseUrl, initRes.resolvedPreset!.model, initRes.resolvedDtype)
       log('weights bytes:', weights.byteLength)
 
       this.resolvedDtype = initRes.resolvedDtype
@@ -424,7 +465,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
       // Adaptive controller — only when caller used 'auto' AND didn't
       // disable it. Explicit preset choices are respected and never
       // auto-overridden.
-      if (initData.preset === 'auto' && adaptive) {
+      if (initData.preset === 'auto' && adaptive && initRes.resolvedPreset) {
         this.adaptive = new AdaptiveController({
           backendKind:     initRes.resolvedBackend,
           initialModel:    initRes.resolvedPreset.model,
@@ -487,6 +528,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // the loaded tier weights to carry a face blob (all current tiers do) — if
   // they don't, the worker silently leaves the effect off.
   async setTouchup(opts: TouchupOptions | null): Promise<void> {
+    if (opts !== null && isMediaPipe(this.model)) throw requiresLongpipe('touchup', this.modelName)
     await this.ready
     if (opts === null) {
       await this.controller.sendMessage('setTouchup', null)
@@ -509,6 +551,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // default; `false` (or null) turns it off. Needs no assets — it rides the face
   // heatmaps the tier already carries — so unlike setTouchup this never fetches.
   async setReframe(cfg: ReframeConfig | null): Promise<void> {
+    if (cfg && isMediaPipe(this.model)) throw requiresLongpipe('reframe', this.modelName)
     await this.ready
     const normalized = cfg === true ? {} : (cfg === false || cfg === null ? null : cfg)
     await this.controller.sendMessage('setReframe', normalized)
@@ -518,11 +561,13 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // wire to a "reframe" button. In auto mode the camera already tracks, so this
   // is a no-op there.
   async reframe(): Promise<void> {
+    if (isMediaPipe(this.model)) throw requiresLongpipe('reframe', this.modelName)
     await this.ready
     await this.controller.sendMessage('reframeNow', undefined)
   }
 
   setPreset(p: PresetName | ManualPreset, weights?: ArrayBuffer): void {
+    if (isMediaPipe(this.model)) throw requiresLongpipe('setPreset', this.modelName)
     void this.controller.sendMessage('setPreset', { preset: p, weights })
   }
 
@@ -624,6 +669,7 @@ export type {
   BackgroundInput, Background, BlurInput, ColorInput, ImageInput, VideoInput,
 }                                                             from './background'
 export type { PresetName, ManualPreset, ModelName }           from './presets'
+export type { ModelChoice }                                   from './model_choice'
 export type { AudioMode, AudioInput, DenoiseOptions }         from './audio'
 export type { DenoiseModel, DenoiseTier, DenoiseModelOption } from '~/audio/kernels.ts'
 export type { AudioStats }                                    from '~/audio/messages.ts'

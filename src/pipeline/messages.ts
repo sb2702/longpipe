@@ -10,6 +10,7 @@ import type { Dtype, FaceTouchupParams } from '~/model/backend.ts'
 import type { ManualPreset, PresetName } from './presets'
 import type { Background } from './background'
 import type { Topology } from './topology'
+import type { ResolvedModel } from './model_choice'
 
 // ── Command-keyed maps ──────────────────────────────────────────────────────
 // Type-safe sendMessage<C>(cmd, data) → Promise<response>.
@@ -69,6 +70,9 @@ export type CmdName = keyof CmdDataMap
 
 export interface InitData {
   topology:   Topology
+  // Segmentation model. MediaPipe skips autotune (resolvedPreset → null) and
+  // startRender's weights are a MediaPipe pack.
+  model:      ResolvedModel
   preset:     PresetName | ManualPreset
   background: Background
   enabled:    boolean
@@ -105,7 +109,7 @@ export interface InitData {
 }
 
 export interface InitResponse {
-  resolvedPreset:  ManualPreset                    // 'auto' resolves to a concrete preset
+  resolvedPreset:  ManualPreset | null             // 'auto' resolves to a concrete preset; null for MediaPipe models
   resolvedBackend: 'webgpu' | 'webgl'              // what the worker actually got
   resolvedDtype:   Dtype                           // patched if downgraded (f16 → f32)
 }

@@ -47,6 +47,8 @@ let pumpAbort: AbortController | null = null
 // needs to know which preset the autotune chose (so it can pass it to
 // renderer.setPreset alongside the weights main fetched).
 let resolvedPreset: ManualPreset | null = null
+// Model resolved on main (InitData.model). MediaPipe: no preset / autotune.
+let model: import('../model_choice').ResolvedModel = { family: 'longpipe' }
 
 
 self.onmessage = async function (event: MessageEvent<WorkerRequest>) {
@@ -151,6 +153,14 @@ async function handleInit(data: InitData): Promise<InitResponse> {
   // so the consumer sees live video while this runs (~1-2s on cold start).
   // Note: autotune competes with passthrough for GPU; passthrough is cheap
   // (one Input.run + one CompositePassthrough) so contention is minor.
+  model = data.model ?? { family: 'longpipe' }
+  if (model.family === 'mediapipe-selfie') {
+    // One fixed model — nothing to autotune. startRender carries its weights.
+    log('handleInit: MediaPipe selfie', model.variant, '— skipping autotune')
+    resolvedPreset = null
+    return { resolvedPreset: null, resolvedBackend: setup.resolvedBackend, resolvedDtype: setup.resolvedDtype }
+  }
+
   log('handleInit: resolvePreset…')
   const preset = await resolvePreset(data.preset, setup.resolvedDtype, setup.backend)
   log('handleInit: preset resolved:', preset)
@@ -166,10 +176,16 @@ async function handleInit(data: InitData): Promise<InitResponse> {
 
 async function handleStartRender(weights: ArrayBuffer): Promise<void> {
   log('handleStartRender: start; weights bytes:', weights.byteLength)
-  if (!renderer || !resolvedPreset) throw new Error('handleStartRender: handleInit not completed')
+  if (!renderer) throw new Error('handleStartRender: handleInit not completed')
 
-  log('handleStartRender: attaching network via setPreset…')
-  renderer.setPreset(resolvedPreset, weights)
+  if (model.family === 'mediapipe-selfie') {
+    log('handleStartRender: attaching MediaPipe selfie', model.variant)
+    renderer.setMediaPipeSelfie(model.variant, weights)
+  } else {
+    if (!resolvedPreset) throw new Error('handleStartRender: handleInit not completed')
+    log('handleStartRender: attaching network via setPreset…')
+    renderer.setPreset(resolvedPreset, weights)
+  }
 
   log('handleStartRender: ready (effect mode active)')
   emit('ready', undefined)
@@ -201,6 +217,8 @@ async function handleSetPreset(
   data: CmdDataMap['setPreset'],
 ): Promise<PresetSwapResult> {
   if (!renderer)      throw new Error('handleSetPreset: not initialized')
+  if (model.family === 'mediapipe-selfie')
+    throw new Error("handleSetPreset: presets select Longpipe tiers; not available with a MediaPipe model")
   if (!data.weights)  throw new Error('handleSetPreset: weights required for runtime preset swap')
   if (data.preset === 'auto') {
     throw new Error("handleSetPreset: 'auto' not supported on runtime swap (use at init for autotune)")
