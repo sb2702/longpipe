@@ -328,6 +328,8 @@ def eval_one(s):
 def discover(root: Path, sets, limit):
     if not root.is_dir():
         raise SystemExit(f'--p3m-root {root} does not exist.\n{DATASET_HELP}')
+    if not (root / 'validation').is_dir() and (root / 'P3M-10k' / 'validation').is_dir():
+        root = root / 'P3M-10k'   # pointed at the folder the zip was extracted into
     samples, problems = [], []
     for name in sets:
         folder, img_sub = SETS[name]
@@ -338,6 +340,9 @@ def discover(root: Path, sets, limit):
         if problems:
             continue
         imgs = sorted(p for p in (base / img_sub).iterdir() if p.suffix.lower() in ('.jpg', '.jpeg', '.png'))
+        if not imgs:
+            problems.append(f'{base / img_sub} (no images)')
+            continue
         if limit:
             imgs = imgs[:limit]
         for p in imgs:
