@@ -159,8 +159,10 @@ An earlier version of the README showed a bar chart, "Mean Absolute Error,
 Background Segmentation (P3M 10k Validation set)": XL 0.0077, L 0.0108, M 0.0109,
 S 0.0125, XS 0.0139, MediaPipe Selfie 0.0307, described as the "average alpha
 error on the P3M-10K validation set (499 images)… every Longpipe variant beats
-MediaPipe on both MAD and IoU". The current README's performance/accuracy scatter
-plot uses the same accuracy figures.
+MediaPipe on both MAD and IoU". It was later replaced by a scatter plot
+(accuracy as 1 − MAE against "FPS throughput on Intel i380 graphics", with
+MediaPipe and Banuba points) that had no stated scale and no published data
+behind it; the README now shows the tables from this directory instead.
 
 That chart came from `training/benchmark_accuracy.py` in the (private) training
 repo, run in May 2026 (results file `benchmark_accuracy.json`, removed from that
@@ -226,8 +228,8 @@ on the GPU, output as a new `VideoFrame` at the input resolution.
 | Longpipe {xs…xl} — WebGL2 | `longpipe/model` `WebGLBackend` | SDK `Input` op | SDK `RenderOp` |
 | MediaPipe — GPU (WebGL) | `@mediapipe/tasks-vision` 1.1.1 `ImageSegmenter`, GPU delegate | MediaPipe's own | our WebGL shader, in MediaPipe's context, on its mask texture (no readback) |
 | MediaPipe — CPU (WASM) | same, CPU delegate (XNNPACK) | MediaPipe's own | mask (`Float32Array`) uploaded, our WebGPU shader |
-| Passthrough | none | | | 
-| Canvas copy — WebGPU / WebGL2 | none: alpha = 1 | | same composite shaders as the MediaPipe pipelines |
+| Passthrough | none | none | none |
+| Canvas copy — WebGPU / WebGL2 | none (alpha = 1) | none | same composite shaders as the MediaPipe pipelines |
 
 MediaPipe runs with both the square and the landscape selfie model (same files and
 hashes as the quality benchmark).
