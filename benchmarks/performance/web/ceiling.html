@@ -1,0 +1,61 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Output-path ceiling</title>
+<p>Output-path investigation: driven by <code>tools/ceiling.mjs</code>. See <code>benchmarks/METHODOLOGY.md</code>.</p>
+<script type="module">
+  import { ROUTES, ENCODER_VARIANTS, transcode, encodeOnly, readbackThroughput } from './src/ceiling.js'
+  import { demux, environment } from './src/bench.js'
+  import { WebGPUFrames } from './src/frames/webgpu.js'
+
+  async function getFile(sample) {
+    const url = `/assets/media/woman_on_video_call_${sample}.mp4`
+    return new File([await (await fetch(url)).blob()], url.split('/').pop(), { type: 'video/mp4' })
+  }
+
+  // One warm-up + `runs` timed transcodes of a route.
+  async function run(routeName, sample, encoder = 'default', runs = 3, readback = 0) {
+    const file = await getFile(sample)
+    const route = await ROUTES[routeName]()
+    await transcode(route, file, ENCODER_VARIANTS[encoder], readback)
+    const out = []
+    for (let i = 0; i < runs; i++) out.push(await transcode(route, file, ENCODER_VARIANTS[encoder], readback))
+    route.destroy?.()
+    return out
+  }
+
+  // Encoder-only throughput for different frame sources.
+  async function encoderOnly(source, sample, encoder = 'default') {
+    const file = await getFile(sample)
+    const { config, chunks } = await demux(file)
+    const w = config.codedWidth, h = config.codedHeight
+    let make
+    if (source === 'decoded') {
+      const frame = await new Promise((resolve) => {
+        const d = new VideoDecoder({ output: (f) => resolve(f), error: console.error })
+        d.configure(config); d.decode(chunks[0]); d.flush()
+      })
+      make = (i) => new VideoFrame(frame, { timestamp: i * 41666 })
+    } else if (source === 'webgpu-canvas') {
+      const device = await (await navigator.gpu.requestAdapter()).requestDevice()
+      const canvas = new OffscreenCanvas(w, h)
+      const ctx = canvas.getContext('webgpu')
+      ctx.configure({ device, format: navigator.gpu.getPreferredCanvasFormat(), alphaMode: 'opaque' })
+      make = (i) => {
+        const enc = device.createCommandEncoder()
+        enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'store', clearValue: [i / 192, 0.5, 0.2, 1] }] }).end()
+        device.queue.submit([enc.finish()])
+        return new VideoFrame(canvas, { timestamp: i * 41666 })
+      }
+    } else if (source === 'cpu-rgba' || source === 'cpu-nv12') {
+      const nv12 = source === 'cpu-nv12'
+      const buf = new Uint8Array(nv12 ? w * h * 3 / 2 : w * h * 4).fill(128)
+      make = (i) => new VideoFrame(buf, { format: nv12 ? 'NV12' : 'RGBA', codedWidth: w, codedHeight: h, timestamp: i * 41666 })
+    }
+    await encodeOnly(make, w, h, 48, ENCODER_VARIANTS[encoder])
+    const out = []
+    for (let i = 0; i < 3; i++) out.push(await encodeOnly(make, w, h, 192, ENCODER_VARIANTS[encoder]))
+    return out
+  }
+
+  window.ceiling = { run, encoderOnly, readbackThroughput, environment, routes: Object.keys(ROUTES), encoders: Object.keys(ENCODER_VARIANTS) }
+</script>
