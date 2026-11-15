@@ -1,0 +1,136 @@
+--- a/src/pages/docs/api.mdx
++++ b/src/pages/docs/api.mdx
+@@ -34,6 +34,8 @@
+ ```ts
+ interface PipelineOptions {
+   background?:        BackgroundInput              // default: 'blur'
++  model?:             'longpipe' | 'mediapipe-selfie'
++                    | 'mediapipe-selfie-square' | 'mediapipe-selfie-landscape'   // default: 'longpipe'
+   touchup?:           TouchupOptions               // default: off
+   reframe?:           boolean | ReframeOptions     // default: off
+   preset?:            PresetName | ManualPreset    // default: 'auto'
+@@ -100,6 +102,21 @@
+ 
+ </Param>
+ 
++<Param name="model" type="'longpipe' | 'mediapipe-selfie' | …" default="'longpipe'">
++
++Which segmentation model runs inside the pipeline. Everything else — the worker, frame transport, WebGPU / WebGL2 backends, zero-copy input and the compositor — is the same either way.
++
++```ts
++new EffectsPipeline(stream, { model: 'mediapipe-selfie', background: 'blur' })
++```
++
++- `'longpipe'` (default): Longpipe's own models (five tiers, see [Presets](/docs/presets)). Every effect: backgrounds, touch-up, auto-reframe, optical-flow temporal stabilization.
++- `'mediapipe-selfie'`: Google's [MediaPipe Selfie Segmenter](/docs/models#mediapipe-selfie). **Background effects only.** The square (256×256) or landscape (256×144) variant is picked from the output aspect ratio; `'mediapipe-selfie-square'` / `'mediapipe-selfie-landscape'` force one.
++
++With a MediaPipe model, `touchup`, `reframe` and any `preset` other than `'auto'` **throw at construction** (`…requires a Longpipe model; set model: 'longpipe'`), as do `setTouchup()`, `setReframe()`, `reframe()` and `setPreset()` later. Autotune and the adaptive controller don't run. See [Models](/docs/models).
++
++</Param>
++
+ <Param name="touchup" type="TouchupOptions" default="off">
+ 
+ Skin smoothing. Composes with the background rather than replacing it — both ride the same encoder pass, so enabling it adds the landmark model and the smoothing passes, not a second inference.
+@@ -111,7 +128,7 @@
+ 
+ `strength` (0–1, default `0.6`) is the knob to expose to users. `amount`, `detail` and `style` tune the look. Smooths every face in frame (up to four, on `medium` and above).
+ 
+-Needs three extra files from `weightsBaseUrl` on first enable — see [Touch-up](/docs/touchup).
++Needs three extra files from `weightsBaseUrl` on first enable — see [Touch-up](/docs/touchup). Requires `model: 'longpipe'`.
+ 
+ </Param>
+ 
+@@ -126,19 +143,19 @@
+ 
+ `auto: true` (default) follows the subject with a deadband — hold, deliberate move, hold. `auto: false` is manual: it frames once and holds until you call `pipeline.reframe()`, which is the mode for a reframe button in your own UI.
+ 
+-Applies to you, not to a virtual background. See [Auto-reframe](/docs/reframe).
++Applies to you, not to a virtual background. See [Auto-reframe](/docs/reframe). Requires `model: 'longpipe'`.
+ 
+ </Param>
+ 
+ <Param name="preset" type="'auto' | 'fast' | 'balanced' | 'quality'" default="'auto'">
+ 
+-Model size selection. `'auto'` runs an init-time microbenchmark and picks the largest preset whose per-frame model cost fits the frame budget (~half a 30fps frame) on the user's hardware; while in `'auto'` mode the adaptive controller (see below) can swap up or down at runtime. Explicit choices — `'fast'`, `'balanced'`, `'quality'` — are always respected and never auto-overridden. Pass a `ManualPreset` object to pin a specific model + dtype + resolution combination. See [Presets & autotune](/docs/presets).
++Model size selection. `'auto'` runs an init-time microbenchmark and picks the largest preset whose per-frame model cost fits the frame budget (~half a 30fps frame) on the user's hardware; while in `'auto'` mode the adaptive controller (see below) can swap up or down at runtime. Explicit choices — `'fast'`, `'balanced'`, `'quality'` — are always respected and never auto-overridden. Pass a `ManualPreset` object to pin a specific model + dtype + resolution combination. See [Presets & autotune](/docs/presets). Presets pick a Longpipe tier: with `model: 'mediapipe-selfie'` only `'auto'` (ignored) is accepted.
+ 
+ </Param>
+ 
+ <Param name="weightsBaseUrl" type="string" default="cdn.longpipe.dev/...">
+ 
+-Where the SDK fetches model weight files. The default points at a public, versioned CDN (`https://cdn.longpipe.dev/models/v/0.0.5/`) — fine for prototyping. Override to self-host: offline use, locked-down corporate networks, or to avoid the public CDN dependency. The SDK fetches files of the form `model_${preset}.bin`. See [Self-hosting weights](/docs/self-hosting).
++Where the SDK fetches model weight files. The default points at a public, versioned CDN (`https://cdn.longpipe.dev/models/v/0.0.5/`) — fine for prototyping. Override to self-host: offline use, locked-down corporate networks, or to avoid the public CDN dependency. The SDK fetches files of the form `model_${preset}.bin`. With `model: 'mediapipe-selfie'` the default is `https://cdn.longpipe.dev/models/mediapipe/selfie/v1/`; if you set `weightsBaseUrl`, the MediaPipe files are fetched from it too. See [Self-hosting weights](/docs/self-hosting).
+ 
+ </Param>
+ 
+@@ -192,7 +209,7 @@
+ - **`pipeline.reframe(): Promise<void>`** — recompute the frame now and hold it. The manual-mode entry point — wire it to a "reframe" button. A no-op in `auto` mode, where the camera already follows.
+ - **`pipeline.setDenoise(input: boolean | DenoiseOptions): void`** — toggle or reconfigure audio denoise at runtime. `false` = passthrough; an object updates the DFN params live. Only effective when `audio: 'denoise'` was set at construction. See [Audio denoise](/docs/audio).
+ - **`pipeline.getAudioStats(): AudioStats | null`** — current denoise telemetry (model, per-hop p50/p95 ms, buffered latency, sample rate). `null` when denoise isn't active.
+-- **`pipeline.setPreset(preset: PresetName | ManualPreset): void`** — manually swap presets. Disables the adaptive controller.
++- **`pipeline.setPreset(preset: PresetName | ManualPreset): void`** — manually swap presets. Disables the adaptive controller. Throws with a MediaPipe `model`.
+ - **`pipeline.getStats(): Promise<PipelineStats>`** — runtime counters (model time, fps, current preset, etc). Single postMessage round-trip.
+ - **`pipeline.attachPreview(canvas: HTMLCanvasElement): void`** — attach a second canvas for previewing candidate effects. See [Preview](#preview).
+ - **`pipeline.setPreview({ background, fps? }): Promise<void>`** — render a candidate effect to the preview canvas. See [Preview](#preview).
+--- a/src/pages/docs/self-hosting.mdx
++++ b/src/pages/docs/self-hosting.mdx
+@@ -26,6 +26,17 @@
+ 
+ Miss these and matting still works, but enabling touch-up fails. [Auto-reframe](/docs/reframe) needs nothing extra.
+ 
++### MediaPipe selfie weights
++
++If you use [`model: 'mediapipe-selfie'`](/docs/models#mediapipe-selfie), host these two files in the **same folder** as everything else (the SDK fetches them from `weightsBaseUrl` when you set it):
++
++- `mediapipe_selfie_segmenter.f16.bin` (square, 256×256)
++- `mediapipe_selfie_segmenter_landscape.f16.bin` (landscape, 256×144)
++
++You only need the variant(s) you use: `'mediapipe-selfie'` picks landscape for 16:9-ish output and square otherwise. Download them from `https://cdn.longpipe.dev/models/mediapipe/selfie/v1/`, which also has `manifest.json` (sizes and sha256), `LICENSE` and `NOTICE.md`, or regenerate them from Google's original `.tflite` files with [`scripts/convert_mediapipe_selfie.py`](https://github.com/sb2702/longpipe/blob/main/scripts/convert_mediapipe_selfie.py). These weights are Google's, under **Apache-2.0**: keep the `LICENSE` and `NOTICE.md` alongside them when you redistribute.
++
++Without `weightsBaseUrl`, MediaPipe weights come from `https://cdn.longpipe.dev/models/mediapipe/selfie/v1/` (versioned separately from Longpipe's own weights, since they only change if Google's model does).
++
+ ## ONNX files
+ 
+ The official ONNX exports (for Python, native apps or `onnxruntime-web`) live under the same versioned
+--- a/src/pages/docs/model-layer.mdx
++++ b/src/pages/docs/model-layer.mdx
+@@ -122,6 +122,28 @@
+ 
+ The alpha tensor persists between model runs, so the skipped frames still composite correctly — they just use a matte that's one frame old. This is exactly what the pipeline does for the `xs`, `small` and `medium` presets.
+ 
++## Running MediaPipe's selfie model instead
++
++`MediaPipeSelfie` is a drop-in for `TierModel`: same backends, same `Input` op, and its `output` has the same contract (alpha in channel 0), so `RenderOp.attachNetwork` takes either.
++
++```js
++import {
++  WebGPUBackend, RenderOp, loadWeightsFromBinary,
++  MediaPipeSelfie, MEDIAPIPE_SELFIE_CONFIG, pickMediaPipeSelfieVariant, DEFAULT_MEDIAPIPE_WEIGHTS_BASE_URL,
++} from 'longpipe/model'
++
++const variant = pickMediaPipeSelfieVariant(1280, 720)        // 'landscape' (or 'square')
++const cfg = MEDIAPIPE_SELFIE_CONFIG[variant]                  // { inputRes: { w: 256, h: 144 }, file }
++const w = loadWeightsFromBinary(
++  await fetch(DEFAULT_MEDIAPIPE_WEIGHTS_BASE_URL + cfg.file).then(r => r.arrayBuffer()))
++
++const input = backend.ops.Input(cfg.inputRes.h, cfg.inputRes.w)
++const model = new MediaPipeSelfie(backend, input.output, w)
++renderOp.attachNetwork(model, input, { upscaler: 'bilinear', background: { mode: 'blur', sigma: 8 } })
++```
++
++It runs every frame (no skipping needed) and has no face or flow heads, so there's nothing to pair it with for touch-up, reframe or temporal stabilization. Its output matches Google's TFLite reference to ~1e-5 in f32; in f16 the mean difference is ~5e-5 (worst pixels ~0.1, at edges). The weights are Apache-2.0 (© Google); see [Models](/docs/models#mediapipe-selfie).
++
+ ## Resolutions
+ 
+ Two numbers per tier, and they are not the same thing:
+--- a/src/pages/docs/presets.mdx
++++ b/src/pages/docs/presets.mdx
+@@ -24,6 +24,8 @@
+ 
+ The three named shortcuts — `'fast'`, `'balanced'`, `'quality'` — map to `xs`, `medium`, `xl` respectively.
+ 
++Presets, autotune and the adaptive controller apply to Longpipe's own models only. With [`model: 'mediapipe-selfie'`](/docs/models#mediapipe-selfie) there is one fixed model: nothing is benchmarked or swapped, and an explicit preset throws.
++
+ ## Autotune (`preset: 'auto'`)
+ 
+ On init, the worker microbenchmarks the candidate presets on the real device and picks the largest one whose measured per-frame model cost fits the frame budget — roughly half of a 30fps source frame (~16 ms; WebGL is more conservative, since it has no live upgrade path). The benchmark uses zero-filled weights of the correct shapes (GPU cost is shape-driven), so it runs before any weights are fetched.

@@ -1,0 +1,95 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>MediaPipe-in-Longpipe smoke</title>
+<video id="src" muted loop playsinline crossorigin="anonymous" src="/assets/media/woman_on_video_call_720p.mp4"></video>
+<video id="out" muted playsinline></video>
+<script type="module">
+  import { EffectsPipeline } from 'longpipe'
+  import { longpipeMediaPipe, getVisionTasks, segmenterOptions } from './src/pipelines.js'
+
+  const GREEN = [0, 177 / 255, 64 / 255]
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const isGreen = (d, j) => Math.abs(d[j]) < 14 && Math.abs(d[j + 1] - 177) < 14 && Math.abs(d[j + 2] - 64) < 14
+
+  // A: the real EffectsPipeline (worker, transports, compositor) with model: 'mediapipe-selfie'.
+  async function pipelineSmoke(model = 'mediapipe-selfie') {
+    const res = { model }
+    const src = document.getElementById('src')
+    await src.play()
+    const stream = src.captureStream()
+    try { new EffectsPipeline(stream, { model, touchup: true }); res.touchupThrows = false }
+    catch (e) { res.touchupThrows = e.message }
+    try { new EffectsPipeline(stream, { model, reframe: true }); res.reframeThrows = false }
+    catch (e) { res.reframeThrows = e.message }
+    const t0 = performance.now()
+    const p = new EffectsPipeline(stream, { model, background: { color: GREEN }, debug: true })
+    await p.ready
+    res.readyMs = Math.round(performance.now() - t0)
+    try { await p.setTouchup({}); res.setTouchupThrows = false } catch (e) { res.setTouchupThrows = e.message }
+    const out = document.getElementById('out')
+    out.srcObject = p.stream
+    await out.play()
+    await sleep(3000)
+    res.stats = await p.getStats()
+    const c = new OffscreenCanvas(320, 180), ctx = c.getContext('2d', { willReadFrequently: true })
+    ctx.drawImage(out, 0, 0, 320, 180)
+    const d = ctx.getImageData(0, 0, 320, 180).data
+    let g = 0, gl = 0, gr = 0
+    for (let y = 0; y < 180; y++) for (let x = 0; x < 320; x++) {
+      const j = (y * 320 + x) * 4, isG = isGreen(d, j); g += isG
+      if (x < 40) gl += isG; if (x >= 140 && x < 180 && y > 60) gr += isG
+    }
+    res.greenShare = +(g / (320 * 180)).toFixed(3)
+    res.greenLeftEdge = +(gl / (40 * 180)).toFixed(3)      // background strip: should be ~1
+    res.greenCentre = +(gr / (40 * 120)).toFixed(3)        // the person: should be ~0
+    res.thumb = c.convertToBlob ? await new Promise(async (r) => { const b = await c.convertToBlob({ type: 'image/jpeg', quality: 0.7 }); const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b) }) : null
+    p.destroy()
+    return res
+  }
+
+  // B: alpha vs MediaPipe Tasks (tasks-vision 1.1.1, CPU delegate) on the same frame,
+  // both at frame resolution (ours bilinearly upsampled, half-pixel centres).
+  async function maskCompare(variants = ['landscape', 'square'], kinds = ['webgpu', 'webgl']) {
+    const src = document.getElementById('src')
+    src.pause()
+    const out = {}
+    for (const t of [2.0, 4.0, 6.5]) {
+      src.currentTime = t
+      await new Promise((r) => src.addEventListener('seeked', r, { once: true }))
+      const bmp = await createImageBitmap(src)
+      const W = bmp.width, H = bmp.height
+      for (const v of variants) {
+        const { vision, fileset } = await getVisionTasks()
+        const seg = await vision.ImageSegmenter.createFromOptions(fileset, { ...segmenterOptions(v, 'CPU'), runningMode: 'IMAGE' })
+        const r = seg.segment(bmp)
+        const mp = r.confidenceMasks.at(-1).getAsFloat32Array().slice()
+        r.close(); seg.close()
+        for (const k of kinds) {
+          const p = await longpipeMediaPipe(k, v, 'f32', { width: W, height: H })
+          const frame = new VideoFrame(bmp, { timestamp: 0 })
+          p.infer(frame); frame.close()
+          const a = await p.backend.readback(p.model.output)
+          const { w: mw, h: mh } = p.model.output
+          p.destroy()
+          let max = 0, sum = 0, inter = 0, uni = 0
+          for (let y = 0; y < H; y++) {
+            const sy = Math.min(Math.max((y + 0.5) * mh / H - 0.5, 0), mh - 1), y0 = Math.floor(sy), y1 = Math.min(y0 + 1, mh - 1), fy = sy - y0
+            for (let x = 0; x < W; x++) {
+              const sx = Math.min(Math.max((x + 0.5) * mw / W - 0.5, 0), mw - 1), x0 = Math.floor(sx), x1 = Math.min(x0 + 1, mw - 1), fx = sx - x0
+              const at = (yy, xx) => a[(yy * mw + xx) * 4]
+              const ours = (at(y0, x0) * (1 - fx) + at(y0, x1) * fx) * (1 - fy) + (at(y1, x0) * (1 - fx) + at(y1, x1) * fx) * fy
+              const ref = mp[y * W + x], dd = Math.abs(ours - ref)
+              max = Math.max(max, dd); sum += dd
+              const A = ours > 0.5, B = ref > 0.5; inter += A && B; uni += A || B
+            }
+          }
+          const key = `${k}-${v}`
+          ;(out[key] ??= []).push({ t, max: +max.toFixed(4), mean: +(sum / (W * H)).toFixed(5), iou: +(inter / uni).toFixed(4) })
+        }
+      }
+      bmp.close()
+    }
+    return out
+  }
+  window.smoke = { pipelineSmoke, maskCompare, gpu: !!navigator.gpu }
+</script>

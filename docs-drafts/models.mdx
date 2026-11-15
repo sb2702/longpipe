@@ -1,0 +1,39 @@
+---
+layout: ../../layouts/Docs.astro
+title: Models — Longpipe
+description: Longpipe's own models vs MediaPipe's selfie segmenter inside Longpipe
+---
+
+# Models
+
+Longpipe is a video-effects SDK: a worker, per-browser frame transport, WebGPU and WebGL2 backends with a zero-copy input path, a compositor (blur, image, video and colour backgrounds) and a set of effects. The segmentation model inside it is a choice:
+
+```ts
+new EffectsPipeline(stream, { model: 'longpipe' })          // default
+new EffectsPipeline(stream, { model: 'mediapipe-selfie' })  // Google's selfie segmenter
+```
+
+| | `'longpipe'` (default) | `'mediapipe-selfie'` |
+|---|---|---|
+| Network | Longpipe hydranet, 5 tiers (`xs`–`xl`) | MediaPipe Selfie Segmenter (MobileNetV3-style), square 256×256 or landscape 256×144 |
+| Background blur / image / video / colour | ✓ | ✓ |
+| Touch-up | ✓ | ✗ (throws) |
+| Auto-reframe | ✓ | ✗ (throws) |
+| Temporal stabilization | optical-flow head + gated stabilizer | none (per-frame mask) |
+| Presets, autotune, adaptive | ✓ | ✗ — one fixed model |
+| Weights licence | MIT | Apache-2.0 (© Google) |
+
+## Why there are two
+
+Longpipe's own models are the reason the SDK exists: one encoder pass drives the matte, the face keypoints (touch-up, reframe) and the optical flow (temporal stability), so adding an effect doesn't add an inference. They are also more accurate per frame — on the P3M-10k benchmark even the `xs` tier has a lower mean absolute error than either MediaPipe variant ([benchmarks](https://github.com/sb2702/longpipe/tree/main/benchmarks)) — and faster: on an Apple M4, `xs` runs in ~1.7 ms per frame on WebGPU against ~2.6–3.1 ms for MediaPipe's model on the same backend.
+
+`model: 'mediapipe-selfie'` is for when you specifically want MediaPipe's model — to match an existing MediaPipe deployment's output, or for a like-for-like comparison — while still getting Longpipe's pipeline. It runs on the same backends, input path and compositor as Longpipe's tiers; the network is the only difference. Compared with running it through `@mediapipe/tasks-vision`, it skips MediaPipe's own runtime and its full-resolution mask resample, and it can use WebGPU.
+
+## MediaPipe selfie
+
+- **Variants.** `'mediapipe-selfie'` picks the variant whose aspect ratio is closest to your output: landscape (256×144) for 16:9-ish video, square (256×256) for 4:3, square or portrait. `'mediapipe-selfie-square'` and `'mediapipe-selfie-landscape'` force one. The frame is stretched to the model's input (as MediaPipe does), and the mask is bilinearly upsampled to the output by Longpipe's compositor.
+- **Precision.** Runs in the pipeline's dtype (f16 where supported, else f32). In f32 the mask matches Google's TFLite reference to ~1e-5; in f16 the mean difference is ~5e-5 (worst pixels ~0.1, on edges).
+- **No temporal smoothing.** The mask is computed fresh every frame, as with MediaPipe; there is no flow head to stabilize it.
+- **Errors.** `touchup`, `reframe` or a `preset` other than `'auto'` throw at construction: `touchup requires a Longpipe model; set model: 'longpipe'`. `setTouchup()`, `setReframe()`, `reframe()` and `setPreset()` throw at runtime.
+- **Weights.** Served from `https://cdn.longpipe.dev/models/mediapipe/selfie/v1/` (`mediapipe_selfie_segmenter.f16.bin`, `mediapipe_selfie_segmenter_landscape.f16.bin`, ~214 KB each), or from your `weightsBaseUrl` — see [Self-hosting](/docs/self-hosting#mediapipe-selfie-weights). They are Google's [selfie segmenter](https://ai.google.dev/edge/mediapipe/solutions/vision/image_segmenter#selfie-model) weights, licensed under Apache-2.0 per the [model card](https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Selfie%20Segmentation.pdf), losslessly repacked for Longpipe's shaders by [`scripts/convert_mediapipe_selfie.py`](https://github.com/sb2702/longpipe/blob/main/scripts/convert_mediapipe_selfie.py) ([NOTICE](https://github.com/sb2702/longpipe/blob/main/third_party/mediapipe/NOTICE.md)).
+- **Model layer.** `MediaPipeSelfie` is exported from `longpipe/model` as a drop-in for `TierModel` — see [Model layer](/docs/model-layer#running-mediapipes-selfie-model-instead).

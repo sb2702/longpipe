@@ -47,6 +47,21 @@ Longpipe's hydranet architecture, custom model-specific shaders, zero-memory-cop
 <img width="958" height="652" alt="lp-performance" src="https://github.com/user-attachments/assets/792b9f63-e8fd-4d30-aa90-9c92b6a0430c" />
 
 
+## Models
+
+Longpipe runs one of two segmentation models through the same GPU pipeline (WebGPU / WebGL2 backends, zero-copy frame input, compositor, worker and transports):
+
+| `model` | What it is | Background effects | Touch-up, auto-reframe | Flow stabilization | Presets / autotune |
+|---|---|---|---|---|---|
+| `'longpipe'` (default) | Longpipe's own hydranet, five tiers `xs`–`xl` | ✓ | ✓ | ✓ | ✓ |
+| `'mediapipe-selfie'` | Google's [MediaPipe Selfie Segmenter](https://ai.google.dev/edge/mediapipe/solutions/vision/image_segmenter#selfie-model), square 256×256 or landscape 256×144 (picked from the output aspect; force with `'mediapipe-selfie-square'` / `'mediapipe-selfie-landscape'`) | ✓ | ✗ (throws) | ✗ | ✗ (one fixed model) |
+
+```ts
+const pipeline = new EffectsPipeline(stream, { model: 'mediapipe-selfie', background: 'blur' })
+```
+
+Use `'mediapipe-selfie'` if you specifically want MediaPipe's model, e.g. to match an existing MediaPipe deployment while getting Longpipe's pipeline. Longpipe's own models drive every effect from one encoder pass, and are more accurate (lower error on P3M-10k, even at `xs`) and faster (`xs`: ~1.7 ms/frame vs ~2.6–3.1 ms for MediaPipe's model on the same WebGPU backend, Apple M4). The MediaPipe weights are Apache-2.0 (© Google) and are converted by [`scripts/convert_mediapipe_selfie.py`](scripts/convert_mediapipe_selfie.py); see [`third_party/mediapipe/NOTICE.md`](third_party/mediapipe/NOTICE.md). They are served from `cdn.longpipe.dev/models/mediapipe/selfie/v1/`, or from your `weightsBaseUrl` if you self-host.
+
 ## Documentation
 
 Full docs live at **[longpipe.dev/docs](https://longpipe.dev/docs)**:
@@ -84,6 +99,6 @@ Inputs, outputs and examples: [longpipe.dev/docs/onnx](https://longpipe.dev/docs
 
 ## License
 
-SDK source code **and** pre-trained model weights are MIT-licensed — see [LICENSE](LICENSE) and [WEIGHTS_LICENSE](WEIGHTS_LICENSE). You're free to self-host the weights inside other open-source or commercial projects under MIT-compatible terms.
+SDK source code **and** Longpipe's pre-trained model weights are MIT-licensed — see [LICENSE](LICENSE) and [WEIGHTS_LICENSE](WEIGHTS_LICENSE). You're free to self-host the weights inside other open-source or commercial projects under MIT-compatible terms. The optional MediaPipe selfie weights are Google's, under Apache-2.0 ([NOTICE](third_party/mediapipe/NOTICE.md)).
 
 The weights were trained on permissively-licensed public datasets (P3M-10k, AISegment, COCO, OpenImages), Z-Image synthetics, and a custom webcam dataset collected with participants' explicit, informed consent. The full dataset list and provenance details: [longpipe.dev/docs/licensing](https://longpipe.dev/docs/licensing).
