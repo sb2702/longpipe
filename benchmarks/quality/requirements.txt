@@ -1,0 +1,8 @@
+# benchmarks/quality/eval_p3m.py — versions used for the published results are
+# recorded in results/<date>-p3m.json ("environment.packages").
+numpy
+pillow
+scipy
+onnxruntime
+mediapipe
+huggingface_hub
