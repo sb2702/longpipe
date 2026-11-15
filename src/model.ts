@@ -28,6 +28,19 @@ export type { BaseNetwork, BaseNetworkCtor } from '~/model/tier_model.ts'
 export { TIER_CONFIG } from '~/model/tier_config.ts'
 export type { TierConfig, Res } from '~/model/tier_config.ts'
 
+// ── MediaPipe selfie segmenter (optional, segmentation-only) ─────────────
+// Google's selfie segmenter on the same backends / Input op / RenderOp. Its
+// output has TierModel's contract (alpha in channel 0), so attachNetwork takes
+// either. No face / flow heads: touch-up, reframe and flow stabilization need
+// a Longpipe tier.
+export {
+  MediaPipeSelfie, MEDIAPIPE_SELFIE_CONFIG, pickMediaPipeSelfieVariant,
+} from '~/model/networks/mediapipe_selfie.ts'
+export type {
+  MediaPipeSelfieVariant, MediaPipeSelfieConfig, MediaPipeSelfieWeights,
+} from '~/model/networks/mediapipe_selfie.ts'
+export { DEFAULT_WEIGHTS_BASE_URL, DEFAULT_MEDIAPIPE_WEIGHTS_BASE_URL } from '~/weights_url.ts'
+
 // ── Weights ───────────────────────────────────────────────────────────────
 // Parses a model_<tier>.bin (or .f16.bin) into the nested weights object.
 export { loadWeightsFromBinary } from '~/utils/loadWeights.ts'
