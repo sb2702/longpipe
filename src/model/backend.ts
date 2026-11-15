@@ -32,7 +32,9 @@ export interface Presenter {
 // single-output callers are unaffected.
 export type RenderTarget = "main" | "preview";
 
-export type Activation = "none" | "relu6" | "relu" | "leaky";
+// hswish / sigmoid are supported by Conv2d and DepthwiseConv2d only (added for
+// the MediaPipe selfie segmenter's MobileNetV3 blocks + squeeze-excite gates).
+export type Activation = "none" | "relu6" | "relu" | "leaky" | "hswish" | "sigmoid";
 
 export interface Conv2dParams {
   outChannels: number;
@@ -269,6 +271,11 @@ export interface Backend {
     // Generic elementwise primitives (temporal models / effects)
     Tanh:            (input: Tensor) => Op;
     ElementwiseMul:  (a: Tensor, b: Tensor) => Op;
+    // Global average pool (H, W, C) → (1, 1, C), and the broadcast multiply
+    // x (H, W, C) * scale (1, 1, C). Together: squeeze-excite / attention gates
+    // (MediaPipe selfie segmenter).
+    GlobalAvgPool:   (input: Tensor) => Op;
+    ChannelScale:    (x: Tensor, scale: Tensor) => Op;
 
     // Optical-flow temporal. Bilinear gather-warp: out[p] = sample(source,
     // p + flowScale·flow[p].xy), clamped to edge. Source + flow share resolution.

@@ -22,7 +22,7 @@ struct Params {
     stride      : u32,
     pad_top     : u32,
     pad_left    : u32,
-    activation  : u32,   // 0 = none, 1 = relu6, 2 = relu, 3 = leaky
+    activation  : u32,   // 0 = none, 1 = relu6, 2 = relu, 3 = leaky, 4 = hswish, 5 = sigmoid
 }
 
 @group(0) @binding(0) var<storage, read>       input_buf  : array<vec4<f32>>;
@@ -37,6 +37,8 @@ fn act(v: vec4<f32>, a: u32) -> vec4<f32> {
     if (a == 1u) { return clamp(v, vec4<f32>(0.0), vec4<f32>(6.0)); }
     if (a == 2u) { return max(v, vec4<f32>(0.0)); }
     if (a == 3u) { return max(v, 0.1 * v); }   // leaky relu (slope 0.1)
+    if (a == 4u) { return v * clamp(v + 3.0, vec4<f32>(0.0), vec4<f32>(6.0)) / 6.0; }   // hard-swish
+    if (a == 5u) { return 1.0 / (1.0 + exp(-v)); }                                       // sigmoid
     return v;
 }
 

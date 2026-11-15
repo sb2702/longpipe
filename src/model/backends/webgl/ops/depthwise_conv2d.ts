@@ -3,7 +3,7 @@ import type { DepthwiseWeights } from '~/model/weights.ts'
 import type { WebGLBackend } from '~/model/backends/webgl/index.ts'
 import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op.ts'
 import depthwiseSrc from '~/model/backends/webgl/shaders/depthwise_conv2d.glsl'
-import { convOutSize, resolvePad } from '~/model/backends/webgpu/ops/conv_utils.ts'
+import { convOutSize, resolvePad, activationCode } from '~/model/backends/webgpu/ops/conv_utils.ts'
 import { toUploadView } from '~/utils/weights.ts'
 
 export class DepthwiseConv2DWebGL extends WebGLOp {
@@ -53,7 +53,7 @@ export class DepthwiseConv2DWebGL extends WebGLOp {
       u_stride:      params.stride,
       u_pad_top:     padTop,
       u_pad_left:    padLeft,
-      u_apply_relu6: params.activation === 'relu6' ? 1 : 0,
+      u_activation:  activationCode(params.activation),
     }
 
     this.defaultSetup()

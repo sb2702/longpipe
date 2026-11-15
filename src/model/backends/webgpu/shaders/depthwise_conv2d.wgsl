@@ -22,7 +22,7 @@ struct Params {
     stride         : u32,
     pad_top        : u32,
     pad_left       : u32,
-    apply_relu6    : u32,
+    activation     : u32,   // 0 none, 1 relu6, 2 relu, 3 leaky, 4 hswish, 5 sigmoid
     _pad0          : u32,
 }
 
@@ -66,9 +66,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
     }
 
-    if (params.apply_relu6 == 1u) {
-        result = clamp(result, vec4<f32>(0.0), vec4<f32>(6.0));
-    }
+    let a = params.activation;
+    if (a == 1u)      { result = clamp(result, vec4<f32>(0.0), vec4<f32>(6.0)); }
+    else if (a == 2u) { result = max(result, vec4<f32>(0.0)); }
+    else if (a == 3u) { result = max(result, 0.1 * result); }
+    else if (a == 4u) { result = result * clamp(result + 3.0, vec4<f32>(0.0), vec4<f32>(6.0)) / 6.0; }
+    else if (a == 5u) { result = 1.0 / (1.0 + exp(-result)); }
 
     let out_idx = y * params.out_w * C + x * C + c;
     output_buf[out_idx] = result;

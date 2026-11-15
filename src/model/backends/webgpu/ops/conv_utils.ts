@@ -1,3 +1,5 @@
+import type { Activation } from "~/model/backend.ts";
+
 export function convOutSize(
   inSize: number,
   kernel: number,
@@ -39,4 +41,17 @@ export function resolvePad(
   if (typeof padding === "number") return padding;
   if (padding === "same") return samePadHalf(inSize, outSize, kernel, stride);
   return 0;
+}
+
+// Shader activation code shared by the Conv2d / DepthwiseConv2d shaders (both
+// backends): 0 none, 1 relu6, 2 relu, 3 leaky(0.1), 4 hswish, 5 sigmoid.
+export function activationCode(a: Activation): number {
+  switch (a) {
+    case "relu6":   return 1;
+    case "relu":    return 2;
+    case "leaky":   return 3;
+    case "hswish":  return 4;
+    case "sigmoid": return 5;
+    default:        return 0;
+  }
 }

@@ -39,6 +39,8 @@ import { CompositeImageWebGPU } from "~/model/backends/webgpu/ops/composite_imag
 import { CompositeImageBilinearWebGPU } from "~/model/backends/webgpu/ops/composite_image_bilinear.ts";
 import { CompositePassthroughWebGPU } from "~/model/backends/webgpu/ops/composite_passthrough.ts";
 import { InputWebGPU } from "~/model/backends/webgpu/ops/input.ts";
+import { GlobalAvgPoolWebGPU } from "~/model/backends/webgpu/ops/global_avg_pool.ts";
+import { ChannelScaleWebGPU } from "~/model/backends/webgpu/ops/channel_scale.ts";
 
 const STORAGE = navigator.gpu ? GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST : 0;
 
@@ -85,6 +87,8 @@ export class WebGPUBackend implements Backend {
       Sigmoid:          (input)                         => new SigmoidWebGPU(this, input),
       Tanh:             (input)                         => new TanhWebGPU(this, input),
       ElementwiseMul:   (a, b)                          => new ElementwiseMulWebGPU(this, a, b),
+      GlobalAvgPool:    (input)                         => new GlobalAvgPoolWebGPU(this, input),
+      ChannelScale:     (x, scale)                      => new ChannelScaleWebGPU(this, x, scale),
       Warp:             (source, flow, params)          => new WarpWebGPU(this, source, flow, params),
       FaceBoxFromHeatmaps: (heatmaps, params)            => new FaceBoxWebGPU(this, heatmaps, params),
       FaceBoxesFromHeatmaps: (heatmaps, params)          => new FaceBoxesWebGPU(this, heatmaps, params),

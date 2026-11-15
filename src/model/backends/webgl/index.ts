@@ -39,6 +39,8 @@ import { CompositeImageWebGL } from '~/model/backends/webgl/ops/composite_image.
 import { CompositeImageBilinearWebGL } from '~/model/backends/webgl/ops/composite_image_bilinear.ts'
 import { CompositePassthroughWebGL } from '~/model/backends/webgl/ops/composite_passthrough.ts'
 import { InputWebGL } from '~/model/backends/webgl/ops/input.ts'
+import { GlobalAvgPoolWebGL } from '~/model/backends/webgl/ops/global_avg_pool.ts'
+import { ChannelScaleWebGL } from '~/model/backends/webgl/ops/channel_scale.ts'
 
 export interface WebGLBackendOptions {
   canvas: HTMLCanvasElement | OffscreenCanvas;
@@ -81,6 +83,8 @@ export class WebGLBackend implements Backend {
       Sigmoid:          (input)                          => new SigmoidWebGL(this, input),
       Tanh:             (input)                          => new TanhWebGL(this, input),
       ElementwiseMul:   (a, b)                          => new ElementwiseMulWebGL(this, a, b),
+      GlobalAvgPool:    (input)                          => new GlobalAvgPoolWebGL(this, input),
+      ChannelScale:     (x, scale)                       => new ChannelScaleWebGL(this, x, scale),
       Warp:             (source, flow, params)          => new WarpWebGL(this, source, flow, params),
       FaceBoxFromHeatmaps: (heatmaps, params)            => new FaceBoxWebGL(this, heatmaps, params),
       FaceBoxesFromHeatmaps: (heatmaps, params)          => new FaceBoxesWebGL(this, heatmaps, params),

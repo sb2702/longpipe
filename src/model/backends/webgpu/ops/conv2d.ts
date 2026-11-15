@@ -8,7 +8,7 @@ import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op.t
 // accumulator register pressure.
 import conv2dF32Src from "~/model/backends/webgpu/shaders/conv2d_cblock2.wgsl";
 import conv2dF16Src from "~/model/backends/webgpu/shaders/conv2d_cblock2_f16.wgsl";
-import { convOutSize, resolvePad } from "~/model/backends/webgpu/ops/conv_utils.ts";
+import { convOutSize, resolvePad, activationCode } from "~/model/backends/webgpu/ops/conv_utils.ts";
 import { toUploadView } from "~/utils/weights.ts";
 
 export class Conv2DWebGPU extends WebGPUOp {
@@ -39,7 +39,7 @@ export class Conv2DWebGPU extends WebGPUOp {
       inGroups, outGroups,
       params.kernel, params.kernel,
       params.stride, padTop, padLeft,
-      params.activation === "relu6" ? 1 : params.activation === "relu" ? 2 : params.activation === "leaky" ? 3 : 0,
+      activationCode(params.activation),
     ]));
 
     this.defaultSetup();

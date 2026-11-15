@@ -22,7 +22,7 @@ uniform int u_kernel_w;
 uniform int u_stride;
 uniform int u_pad_top;
 uniform int u_pad_left;
-uniform int u_apply_relu6;   // 0 = none, 1 = relu6
+uniform int u_activation;    // 0 = none, 1 = relu6, 2 = relu, 3 = leaky(0.1), 4 = hswish, 5 = sigmoid
 
 out vec4 fragColor;
 
@@ -51,7 +51,11 @@ void main() {
         }
     }
 
-    if (u_apply_relu6 == 1) result = clamp(result, 0.0, 6.0);
+    if      (u_activation == 1) result = clamp(result, 0.0, 6.0);
+    else if (u_activation == 2) result = max(result, vec4(0.0));
+    else if (u_activation == 3) result = max(result, 0.1 * result);
+    else if (u_activation == 4) result = result * clamp(result + 3.0, 0.0, 6.0) / 6.0;
+    else if (u_activation == 5) result = 1.0 / (1.0 + exp(-result));
 
     fragColor = result;
 }

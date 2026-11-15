@@ -4,7 +4,7 @@ import type { WebGPUBackend } from "~/model/backends/webgpu/index.ts";
 import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op.ts";
 import depthwiseF32Src from "~/model/backends/webgpu/shaders/depthwise_conv2d.wgsl";
 import depthwiseF16Src from "~/model/backends/webgpu/shaders/depthwise_conv2d_f16.wgsl";
-import { convOutSize, resolvePad } from "~/model/backends/webgpu/ops/conv_utils.ts";
+import { convOutSize, resolvePad, activationCode } from "~/model/backends/webgpu/ops/conv_utils.ts";
 import { toUploadView } from "~/utils/weights.ts";
 
 export class DepthwiseConv2DWebGPU extends WebGPUOp {
@@ -34,7 +34,7 @@ export class DepthwiseConv2DWebGPU extends WebGPUOp {
       channelGroups,
       params.kernel, params.kernel,
       params.stride, padTop, padLeft,
-      params.activation === "relu6" ? 1 : 0,
+      activationCode(params.activation),
       0, // _pad0
     ]));
 
