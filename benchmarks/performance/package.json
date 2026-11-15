@@ -1,0 +1,25 @@
+{
+  "name": "longpipe-performance-benchmark",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Longpipe vs MediaPipe selfie segmentation: a reproducible WebCodecs transcode benchmark (decode -> background replacement -> H.264 encode)",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "postinstall": "node tools/fetch_assets.mjs",
+    "dev": "vite --port 5174 --strictPort",
+    "bench": "node tools/bench.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.1.1",
+    "longpipe": "0.0.16",
+    "webcodecs-utils": "0.2.6"
+  },
+  "devDependencies": {
+    "playwright-core": "1.64.1",
+    "vite": "8.3.2"
+  }
+}

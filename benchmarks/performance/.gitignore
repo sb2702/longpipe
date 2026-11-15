@@ -1,0 +1,4 @@
+node_modules
+# downloaded by tools/fetch_assets.mjs (npm install)
+web/public/vendor
+web/public/assets

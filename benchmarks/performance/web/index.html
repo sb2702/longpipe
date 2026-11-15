@@ -1,0 +1,142 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Longpipe vs MediaPipe benchmark</title>
+<style>
+  body { font: 14px/1.45 system-ui, sans-serif; margin: 24px; max-width: 1100px; }
+  fieldset { border: 1px solid #ccc; border-radius: 6px; margin: 0 0 12px; }
+  label { margin-right: 14px; white-space: nowrap; display: inline-block; }
+  table { border-collapse: collapse; margin: 12px 0; font-variant-numeric: tabular-nums; }
+  th, td { padding: 4px 12px; border-bottom: 1px solid #ddd; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  #status, #env { color: #555; }
+  #checks { display: flex; flex-wrap: wrap; gap: 12px; }
+  #checks figure { margin: 0; font-size: 12px; width: 240px; }
+  #checks canvas { width: 240px; display: block; }
+  .err { color: #c00; }
+</style>
+
+<h1>Background replacement: Longpipe vs MediaPipe</h1>
+<p id="env"></p>
+<p>Close other tabs and apps, plug in the power, and run <b>Check outputs</b> before trusting any timings.
+  See <code>benchmarks/METHODOLOGY.md</code> for what is measured.</p>
+<fieldset id="pipelines"><legend>Pipelines</legend></fieldset>
+<fieldset>
+  <legend>Run</legend>
+  <label>Mode
+    <select id="mode">
+      <option value="transcode">Transcode FPS (decode → process → encode → mux)</option>
+      <option value="process">Process latency (decode → process → wait for output pixels)</option>
+      <option value="model">Model latency (ms per frame, GPU-synchronised)</option>
+    </select>
+  </label>
+  <label>Timed runs <input id="runs" type="number" min="1" value="5" style="width: 4em"></label>
+  <label>Sample
+    <select id="sample">
+      <option value="360p">360p</option>
+      <option value="720p">720p</option>
+    </select>
+  </label>
+  <button id="check">Check outputs</button>
+  <button id="run">Run benchmark</button>
+  <button id="download" disabled>Download JSON</button>
+</fieldset>
+<div id="status"></div>
+<table id="results" hidden>
+  <thead><tr><th>Pipeline</th><th>Median</th><th>Min–max</th><th>Mask (model output)</th><th>Init ms</th><th>Runs</th></tr></thead>
+  <tbody></tbody>
+</table>
+<div id="checks"></div>
+
+<script type="module">
+  import { PIPELINES } from './src/pipelines.js'
+  import { benchmarkAll, checkOutputs, environment } from './src/bench.js'
+
+  const $ = (id) => document.getElementById(id)
+  const params = new URLSearchParams(location.search)
+  const selected = params.get('pipelines')?.split(',') ?? Object.keys(PIPELINES)
+  for (const [name, { label }] of Object.entries(PIPELINES)) {
+    $('pipelines').insertAdjacentHTML('beforeend',
+      `<label><input type="checkbox" value="${name}" ${selected.includes(name) ? 'checked' : ''}> ${label}</label>`)
+  }
+  for (const key of ['mode', 'runs', 'sample']) if (params.get(key)) $(key).value = params.get(key)
+
+  const env = await environment()
+  $('env').textContent = `GPU: ${env.webgpu ? [env.webgpu.vendor, env.webgpu.architecture, env.webgpu.description].filter(Boolean).join(' ') : 'no WebGPU'}` +
+    ` · WebGL: ${env.webglRenderer} · cross-origin isolated: ${env.crossOriginIsolated}` +
+    ` · ${navigator.userAgent.match(/Chrome\/[\d.]+|Firefox\/[\d.]+|Version\/[\d.]+ Safari/)?.[0] ?? ''}`
+
+  async function getFile() {
+    const url = `/assets/media/woman_on_video_call_${$('sample').value}.mp4`
+    const blob = await (await fetch(url)).blob()
+    return new File([blob], url.split('/').pop(), { type: 'video/mp4' })
+  }
+  const chosen = () => [...$('pipelines').querySelectorAll('input:checked')].map((i) => i.value)
+  const status = (s) => ($('status').textContent = s)
+  let lastReport = null
+
+  function addRow(r) {
+    const tbody = $('results').querySelector('tbody')
+    if (r.error) {
+      tbody.insertAdjacentHTML('beforeend', `<tr><td>${r.label}</td><td colspan="5" class="err">${r.error}</td></tr>`)
+      return
+    }
+    const model = $('mode').value === 'model'
+    if (model && r.medianMs == null) return
+    const [med, lo, hi] = model ? [r.medianMs, r.minMs, r.maxMs] : [r.medianFps, r.minFps, r.maxFps]
+    const unit = model ? ' ms' : ' fps'
+    tbody.insertAdjacentHTML('beforeend', `<tr><td>${r.label}</td><td>${med.toFixed(model ? 2 : 1)}${unit}</td>` +
+      `<td>${lo.toFixed(model ? 2 : 0)}–${hi.toFixed(model ? 2 : 0)}</td><td>${r.maskRes ?? '–'}</td><td>${r.initMs.toFixed(0)}</td>` +
+      `<td>${r.runs.map((x) => (model ? x.medianMs.toFixed(2) : x.fps.toFixed(0))).join(' / ')}</td></tr>`)
+  }
+
+  async function runAll() {
+    const file = await getFile()
+    $('results').querySelector('tbody').replaceChildren()
+    $('results').hidden = false
+    $('download').disabled = true
+    const report = await benchmarkAll(chosen(), file, {
+      mode: $('mode').value, runs: Number($('runs').value), onProgress: status, onResult: addRow,
+    })
+    status(`Done (${report.config.mode}, ${report.config.width}x${report.config.height}).`)
+    lastReport = report
+    $('download').disabled = false
+    return report
+  }
+
+  async function checkAll() {
+    status('Checking outputs…')
+    const out = await checkOutputs(chosen(), await getFile())
+    $('checks').replaceChildren()
+    const summary = {}
+    for (const [name, r] of Object.entries(out)) {
+      const fig = document.createElement('figure')
+      if (r.error) {
+        fig.append(Object.assign(document.createElement('figcaption'), { className: 'err', textContent: `${PIPELINES[name].label}: ${r.error}` }))
+        summary[name] = { error: r.error }
+      } else {
+        const c = document.createElement('canvas')
+        c.width = r.bitmap.width; c.height = r.bitmap.height
+        c.getContext('2d').drawImage(r.bitmap, 0, 0)
+        fig.append(c, Object.assign(document.createElement('figcaption'), {
+          textContent: `${PIPELINES[name].label}: ${(r.background * 100).toFixed(1)}% background` +
+            (r.agreement != null ? `, ${(r.agreement * 100).toFixed(1)}% agree w/ MediaPipe GPU` : ''),
+        }))
+        summary[name] = { background: r.background, agreement: r.agreement, thumbnail: c.toDataURL('image/jpeg', 0.8) }
+      }
+      $('checks').append(fig)
+    }
+    status('Checked.')
+    return summary
+  }
+
+  $('download').onclick = () => {
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(lastReport, null, 2)], { type: 'application/json' }))
+    a.download = `bench-${lastReport.environment.date.slice(0, 10)}-${lastReport.config.mode}-${lastReport.config.height}p.json`
+    a.click()
+  }
+  $('run').onclick = runAll
+  $('check').onclick = checkAll
+  window.bench = { runAll, checkAll }   // hooks for tools/bench.mjs
+</script>
