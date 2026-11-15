@@ -14,8 +14,9 @@
     "bench": "node tools/bench.mjs"
   },
   "dependencies": {
+    "@litertjs/core": "2.5.3",
     "@mediapipe/tasks-vision": "1.1.1",
-    "longpipe": "0.0.16",
+    "longpipe": "0.0.17",
     "webcodecs-utils": "0.2.6"
   },
   "devDependencies": {

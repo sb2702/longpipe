@@ -56,6 +56,37 @@ export function encoderConfig(width, height) {
   return { codec: getCodecString('avc', width, height, bitrate), width, height, bitrate }
 }
 
+// The output stage between process() and the encoder, the same for every
+// pipeline (passthrough included). 'direct' hands the pipeline's VideoFrame to
+// the encoder as is. 'readback' copies each frame's pixels to CPU memory with
+// VideoFrame.copyTo() (async, up to `depth` frames in flight, output kept in
+// order) and gives the encoder a new RGBA VideoFrame over that buffer.
+//
+// Why: in Chrome 157 on the M4 tested, the encoder takes ~10 ms per frame to
+// consume a canvas-backed VideoFrame (any canvas type, any encoder setting),
+// which capped every effect pipeline at ~80-150 fps, while copyTo() on the same
+// frames runs at ~800 fps (360p) and the encoder takes CPU RGBA frames at
+// >1,000 fps. See METHODOLOGY.md, "Output path".
+export function readbackStream(depth = 4) {
+  const pending = []
+  return new TransformStream({
+    async transform(frame, controller) {
+      const w = frame.displayWidth, h = frame.displayHeight
+      const buf = new Uint8Array(w * h * 4)
+      pending.push(frame.copyTo(buf, { format: 'RGBA' }).then(() => {
+        const out = new VideoFrame(buf, { format: 'RGBA', codedWidth: w, codedHeight: h, timestamp: frame.timestamp, duration: frame.duration ?? undefined })
+        frame.close()
+        return out
+      }))
+      if (pending.length >= depth) controller.enqueue(await pending.shift())
+    },
+    async flush(controller) {
+      while (pending.length) controller.enqueue(await pending.shift())
+    },
+  })
+}
+export const OUTPUT_PATHS = ['readback', 'direct']
+
 // Forces a frame's GPU work to finish without reading back the whole frame:
 // draw it into a 1x1 (GPU-backed) canvas and read that single pixel.
 const probe = new OffscreenCanvas(1, 1).getContext('2d')
@@ -65,10 +96,10 @@ function waitForPixels(frame) {
 }
 
 // One pass over the clip.
-// mode 'transcode': decode -> process -> encode -> mux (throughput).
+// mode 'transcode': decode -> process -> output stage -> encode -> mux (throughput).
 // mode 'process':   decode -> process -> wait for the output's pixels, one frame
 //                   at a time, no encoder (per-frame latency of the whole effect).
-export async function runOnce(pipeline, file, mode = 'transcode') {
+export async function runOnce(pipeline, file, mode = 'transcode', output = 'readback') {
   const { config: decoderConfig, chunks } = await demux(file)
   const { codedWidth: width, codedHeight: height } = decoderConfig
   const latencies = []
@@ -84,7 +115,10 @@ export async function runOnce(pipeline, file, mode = 'transcode') {
     }))
   if (mode === 'transcode') {
     const muxer = new SimpleMuxer({ video: 'avc' })
-    await processed.pipeThrough(new VideoEncodeStream(encoderConfig(width, height))).pipeTo(muxer.videoSink())
+    await processed
+      .pipeThrough(output === 'readback' ? readbackStream() : new TransformStream())
+      .pipeThrough(new VideoEncodeStream(encoderConfig(width, height)))
+      .pipeTo(muxer.videoSink())
     await muxer.finalize()
   } else {
     await processed.pipeTo(new WritableStream({ write: (frame) => frame.close() }))
@@ -129,9 +163,51 @@ export async function runModel(pipeline, frames, iterations) {
   return { iterations, medianMs: median(ms), p90Ms: percentile(ms, 0.9), meanMs: ms.reduce((a, b) => a + b, 0) / ms.length }
 }
 
+// One measurement of one pipeline, for tools/bench.mjs, which interleaves
+// pipelines across rounds and repeats any measurement that overlapped background
+// load: create -> warm-up (one untimed pass over the clip, or 30 model
+// iterations) -> one timed pass (or `modelIterations`) -> destroy.
+// t0/t1 (epoch ms) bracket the timed part.
+export async function runOne(name, file, { mode = 'transcode', output = 'readback', modelIterations = 200 } = {}) {
+  const { config } = await demux(file)
+  const size = { width: config.codedWidth, height: config.codedHeight }
+  const r = { name, label: PIPELINES[name].label }
+  let pipeline, frames
+  try {
+    const t = performance.now()
+    pipeline = await PIPELINES[name].create(size)
+    r.initMs = performance.now() - t
+    r.maskRes = pipeline.maskRes
+    if (pipeline.dtype) r.dtype = pipeline.dtype
+    if (pipeline.preset) r.preset = pipeline.preset
+    if (mode === 'model') {
+      if (!pipeline.infer) { r.skipped = 'no model-only mode'; return r }
+      frames = await decodeFrames(file, 48)
+      await runModel(pipeline, frames, 30)
+      r.t0 = Date.now()
+      Object.assign(r, await runModel(pipeline, frames, modelIterations))
+    } else {
+      r.warmupFps = (await runOnce(pipeline, file, mode, output)).fps
+      pipeline.counters?.reset()
+      r.t0 = Date.now()
+      Object.assign(r, await runOnce(pipeline, file, mode, output))
+      if (pipeline.counters) r.counts = pipeline.counters.read()
+    }
+    r.t1 = Date.now()
+    if (pipeline.deliveredMaskRes) r.deliveredMaskRes = pipeline.deliveredMaskRes
+  } catch (e) {
+    console.error(e)
+    r.error = String(e?.message ?? e)
+  } finally {
+    frames?.forEach((f) => f.close())
+    try { pipeline?.destroy?.() } catch (e) { console.error(e) }
+  }
+  return r
+}
+
 // Benchmark several pipelines on one file, sequentially: each pipeline in turn
 // is created, warmed up (one untimed pass), timed `runs` times, destroyed.
-export async function benchmarkAll(names, file, { mode = 'transcode', runs = 5, modelIterations = 200, onProgress, onResult } = {}) {
+export async function benchmarkAll(names, file, { mode = 'transcode', output = 'readback', runs = 5, modelIterations = 200, onProgress, onResult } = {}) {
   const { config } = await demux(file)
   const size = { width: config.codedWidth, height: config.codedHeight }
   const frames = mode === 'model' ? await decodeFrames(file, 48) : null
@@ -147,10 +223,10 @@ export async function benchmarkAll(names, file, { mode = 'transcode', runs = 5, 
       if (pipeline.dtype) r.dtype = pipeline.dtype
       if (mode !== 'model') {
         onProgress?.(`${name}: warming up…`)
-        r.warmupFps = (await runOnce(pipeline, file, mode)).fps
+        r.warmupFps = (await runOnce(pipeline, file, mode, output)).fps
         for (let i = 0; i < runs; i++) {
           onProgress?.(`${name}: run ${i + 1}/${runs}`)
-          r.runs.push(await runOnce(pipeline, file, mode))
+          r.runs.push(await runOnce(pipeline, file, mode, output))
         }
         const fps = r.runs.map((x) => x.fps)
         Object.assign(r, { medianFps: median(fps), minFps: Math.min(...fps), maxFps: Math.max(...fps) })
@@ -176,7 +252,7 @@ export async function benchmarkAll(names, file, { mode = 'transcode', runs = 5, 
   frames?.forEach((f) => f.close())
   return {
     config: {
-      mode, runs, order: 'sequential', file: file.name, frames: results.find((r) => r.runs.length)?.runs[0].frames,
+      mode, output, runs, order: 'sequential', file: file.name, frames: results.find((r) => r.runs.length)?.runs[0].frames,
       ...(mode === 'model' && { modelIterations }),
       width: config.codedWidth, height: config.codedHeight, decoder: config.codec,
       ...(mode === 'transcode' && { encoder: encoderConfig(config.codedWidth, config.codedHeight) }),
@@ -214,11 +290,15 @@ export async function checkOutputs(names, file, frameIndex = 96) {
   const size = { width: config.codedWidth, height: config.codedHeight }
   const frames = await decodeFrames(file, frameIndex + 1)
   const target = frames.pop()
+  const history = frames.splice(-12)
   frames.forEach((f) => f.close())
   const out = {}
   for (const name of names) {
     try {
       const pipeline = await PIPELINES[name].create(size)
+      // Temporal pipelines (as shipped) see the 12 preceding frames first, so the
+      // checked frame goes through the flow/stabiliser path with real history.
+      if (pipeline.temporal) for (const f of history) { const o = await pipeline.process(f); if (o !== f) o.close() }
       const frame = await pipeline.process(target)
       const bitmap = await createImageBitmap(frame)
       if (frame !== target) frame.close()
@@ -233,6 +313,7 @@ export async function checkOutputs(names, file, frameIndex = 96) {
     }
   }
   target.close()
+  history.forEach((f) => f.close())
   // Background share = pixels that are (nearly) the green fill color.
   const isGreen = (d, j) => Math.abs(d[j]) < 12 && Math.abs(d[j + 1] - 177) < 12 && Math.abs(d[j + 2] - 64) < 12
   const ref = out['mediapipe-gpu']?.pixels

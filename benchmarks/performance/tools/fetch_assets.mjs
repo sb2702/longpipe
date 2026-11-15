@@ -1,5 +1,5 @@
 // Downloads everything the benchmark page loads, pinned by URL + sha256, into
-// web/public/assets/, and copies the MediaPipe / web-demuxer WASM out of
+// web/public/assets/, and copies the MediaPipe / LiteRT / web-demuxer WASM out of
 // node_modules into web/public/vendor/. Runs on `npm install`; safe to re-run.
 //
 // Nothing is fetched at benchmark time, so a run can't silently pick up a newer
@@ -16,6 +16,8 @@ const root = new URL('../', import.meta.url).pathname
 const CLIP_BASE = 'https://raw.githubusercontent.com/sb2702/webrtc-hacks-webgpu/2c6528cf3c87f726c946ca24c1aa096ea5ef2db1/segmentation/web/public/media'
 const MP_BASE = 'https://storage.googleapis.com/mediapipe-models/image_segmenter'
 const LP_BASE = 'https://cdn.longpipe.dev/models/v/0.0.5'   // the SDK's default weights URL (src/weights_url.ts)
+// MediaPipe selfie weights converted for Longpipe's engine (DEFAULT_MEDIAPIPE_WEIGHTS_BASE_URL, src/weights_url.ts)
+const LP_MP_BASE = 'https://cdn.longpipe.dev/models/mediapipe/selfie/v1'
 
 export const ASSETS = {
   'media/woman_on_video_call_720p.mp4': [`${CLIP_BASE}/woman_on_video_call.mp4`, '28375ef0dbed9d8d4d5ae0f9866f6b39d9a003580979dab91546c8dab92b8d5c'],
@@ -27,6 +29,11 @@ export const ASSETS = {
   'models/model_medium.f16.bin': [`${LP_BASE}/model_medium.f16.bin`, '7d8bf5d787da24e679193e70db1e7b9ca62f473ef79d8f14db1604dda8d99dd5'],
   'models/model_large.bin': [`${LP_BASE}/model_large.bin`, '5294fbbfd1eac70a6ee8d99dbe4de9a6d8c459d2c8a893c24402b35464e121f5'],
   'models/model_xl.bin': [`${LP_BASE}/model_xl.bin`, 'c1ea11f3ff2a17eb60fe53c5d37d91c410f6d992ecb245236b21c7ef80217032'],
+  // EffectsPipeline fetches the .f16.bin for every preset when the backend runs f16 (its default), large/xl included.
+  'models/model_large.f16.bin': [`${LP_BASE}/model_large.f16.bin`, '40ad8b9f538cf70b89b09a41f916ab441610c9a92ff4222a27071fa22fe92ae9'],
+  'models/model_xl.f16.bin': [`${LP_BASE}/model_xl.f16.bin`, '4f25cb0c267d8966329ea7882afd42a64856786d5de1a276b67eb20f42043fe4'],
+  'models/mediapipe_selfie_segmenter.f16.bin': [`${LP_MP_BASE}/mediapipe_selfie_segmenter.f16.bin`, 'b0f9be147827c08667fa8eb46c7cb350c8b4978e657b55214e896a9ea69a4c4d'],
+  'models/mediapipe_selfie_segmenter_landscape.f16.bin': [`${LP_MP_BASE}/mediapipe_selfie_segmenter_landscape.f16.bin`, 'a74992eb5f952397d69387aab45c80f6faaec73a9e8bfae263ea28df383fc0cc'],
 }
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
@@ -45,6 +52,7 @@ for (const [path, [url, digest]] of Object.entries(ASSETS)) {
 }
 
 const copies = {
+  'node_modules/@litertjs/core/wasm': 'web/public/vendor/litert',
   'node_modules/@mediapipe/tasks-vision/wasm': 'web/public/vendor/mediapipe',
   'node_modules/web-demuxer/dist/wasm-files/web-demuxer.wasm': 'web/public/vendor/web-demuxer.wasm',
 }

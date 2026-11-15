@@ -8,12 +8,28 @@
 // mix(green, frame, alpha), with the alpha bilinearly upsampled to the frame size,
 // on the GPU, output as a new VideoFrame at the input's resolution.
 //
-// Structure and the MediaPipe pipelines are adapted from
-// github.com/sb2702/webrtc-hacks-webgpu (segmentation/web/src/pipelines.js, MIT).
+// Structure, the MediaPipe Tasks pipelines and the LiteRT.js pipeline are adapted
+// from github.com/sb2702/webrtc-hacks-webgpu (segmentation/web/src/pipelines.js,
+// commit 2c6528c, MIT, (c) 2026 Sam Bhattacharyya).
+//
+// Rows (model x engine x pipeline), see benchmarks/METHODOLOGY.md:
+//   1. mediapipe-*            MediaPipe selfie model, MediaPipe Tasks engine (GPU / CPU delegate)
+//   2. litert-*               MediaPipe selfie model, LiteRT.js engine (WebGPU)
+//   3. lp-mediapipe-*         MediaPipe selfie model, Longpipe engine (`longpipe/model` MediaPipeSelfie)
+//   4. longpipe-*             Longpipe model, Longpipe engine, network on every frame (`longpipe/model`)
+//   5. shipped-*              Longpipe model, Longpipe engine, the SDK's own per-frame renderer
+//                             (key frames + learned optical-flow frames + stabiliser), as EffectsPipeline runs it
 
 import {
   WebGPUBackend, WebGLBackend, TierModel, TIER_CONFIG, RenderOp, loadWeightsFromBinary,
+  MediaPipeSelfie, MEDIAPIPE_SELFIE_CONFIG,
 } from 'longpipe/model'
+// Row 5 drives the SDK's internal Renderer (not exported by the package), compiled
+// from this repo's src/ (vite.config.js); it needs the backends from the same source.
+import { Renderer } from '~/pipeline/worker/renderer.ts'
+import { PRESETS } from '~/pipeline/presets.ts'
+import { WebGPUBackend as SrcWebGPUBackend } from '~/model/backends/webgpu/index.ts'
+import { WebGLBackend as SrcWebGLBackend } from '~/model/backends/webgl/index.ts'
 import { WebGPUFrames } from './frames/webgpu.js'
 import { WebGLFrames, GLHelper } from './frames/webgl.js'
 
@@ -87,6 +103,9 @@ async function canvasCopyWebGL() {
   const frames = new WebGLFrames(new GLHelper(gl), canvas)
   const ones = gl.createTexture()
   gl.bindTexture(gl.TEXTURE_2D, ones)
+  // NEAREST: the default mipmapped min filter would leave the texture incomplete (reads 0).
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 1, 1, 0, gl.RED, gl.FLOAT, new Float32Array([1]))
   return {
     maskRes: null,
@@ -100,19 +119,22 @@ async function canvasCopyWebGL() {
 
 // ---- Longpipe, via the public model layer (`longpipe/model`) -----------------
 
-// Same precision per tier as the SDK's production presets (src/pipeline/presets.ts).
-// Override for experiments: ?dtype=f16 or ?dtype=f32 (npm run bench -- --dtype f16).
-const PRESET_DTYPE = { xs: 'f16', small: 'f16', medium: 'f16', large: 'f32', xl: 'f32' }
-const DTYPE_OVERRIDE = new URLSearchParams(location.search).get('dtype')
-export const LONGPIPE_DTYPE = Object.fromEntries(Object.entries(PRESET_DTYPE).map(([t, d]) => [t, DTYPE_OVERRIDE ?? d]))
+// Precision. EffectsPipeline creates ONE backend for all presets, with dtype
+// 'f16' by default (src/pipeline/index.ts:397), falling back to f32 only when
+// WebGPU lacks shader-f16 (src/pipeline/worker/setup_backend.ts:349); the
+// preset's own dtype in presets.ts (f32 for large/xl) is overridden by the
+// resolved one (src/pipeline/worker/resolve_preset.ts:476). So as shipped every
+// preset runs f16 where available. The `-f32` variants run large/xl at the
+// precision presets.ts lists for them (what the 2026-11-15 run measured).
+// Weights file: the one EffectsPipeline fetches for that precision
+// (fetchModelWeights, src/pipeline/index.ts:207): .f16.bin for f16, .bin for f32.
+const weightsFile = (tier, dtype) => `/assets/models/model_${tier}${dtype === 'f16' ? '.f16' : ''}.bin`
 
-async function longpipe(kind, tier, { width, height }) {
+async function longpipe(kind, tier, { width, height }, requested = 'f16') {
   const cfg = TIER_CONFIG[tier]
-  let dtype = LONGPIPE_DTYPE[tier]
+  let dtype = requested
   if (kind === 'webgpu' && dtype === 'f16' && !(await WebGPUBackend.hasF16Support())) dtype = 'f32'
-  // The weights file the SDK ships for the preset's precision; backends convert
-  // at upload if the file's precision differs from the backend's.
-  const file = `/assets/models/model_${tier}${PRESET_DTYPE[tier] === 'f16' ? '.f16' : ''}.bin`
+  const file = weightsFile(tier, dtype)
   const weights = loadWeightsFromBinary(await (await fetch(file)).arrayBuffer())
 
   // The backend's canvas is the output: frame-sized, like every other pipeline.
@@ -142,6 +164,157 @@ async function longpipe(kind, tier, { width, height }) {
     },
     wait: () => (kind === 'webgpu' ? backend.sync() : glWait(backend.gl)),
     destroy: () => backend.destroy(),
+  }
+}
+
+// ---- MediaPipe selfie model on Longpipe's engine (`longpipe/model`) -----------
+// Same backend / Input op / RenderOp path as longpipe() above; only the network
+// differs. This is exactly what EffectsPipeline({ model: 'mediapipe-selfie' })
+// runs per frame (Renderer.setMediaPipeSelfie, src/pipeline/worker/renderer.ts:601:
+// no frame skipping, no flow; RenderOp.runModel + runDisplay every frame).
+// Weights: Longpipe's conversion of the same .tflite files (f16 packs from
+// DEFAULT_MEDIAPIPE_WEIGHTS_BASE_URL), at the SDK's default backend precision.
+// Adapted from the 0.0.17 MediaPipe work's bench patch (docs-drafts/bench/).
+async function longpipeMediaPipe(kind, variant, { width, height }, requested = 'f16') {
+  const cfg = MEDIAPIPE_SELFIE_CONFIG[variant]
+  let dtype = requested
+  if (kind === 'webgpu' && dtype === 'f16' && !(await WebGPUBackend.hasF16Support())) dtype = 'f32'
+  const weights = loadWeightsFromBinary(await (await fetch(`/assets/models/${cfg.file}`)).arrayBuffer())
+  const canvas = new OffscreenCanvas(width, height)
+  const backend = kind === 'webgpu'
+    ? await WebGPUBackend.create({ canvas, dtype })
+    : await WebGLBackend.create({ canvas, dtype })
+  const input = backend.ops.Input(cfg.inputRes.h, cfg.inputRes.w)
+  const model = new MediaPipeSelfie(backend, input.output, weights)
+  const render = new RenderOp(backend)
+  render.attachNetwork(model, input, { upscaler: 'bilinear', background: { mode: 'solid', color: GREEN } })
+  return {
+    dtype,
+    maskRes: `${cfg.inputRes.w}x${cfg.inputRes.h}`,
+    process(frame) { render.setSource(frame); render.run(); return outputFrame(canvas, frame) },
+    infer(frame) { input.setSource(frame); input.run(); model.run() },
+    wait: () => (kind === 'webgpu' ? backend.sync() : glWait(backend.gl)),
+    destroy: () => backend.destroy(),
+  }
+}
+
+// ---- Longpipe as shipped: the SDK's own per-frame renderer ------------------
+// The worker's Renderer (src/pipeline/worker/renderer.ts) with a fixed preset:
+// what EffectsPipeline runs per frame in Chrome, where its output adapter is
+// `renderer.process(frame); new VideoFrame(renderer.canvas)`
+// (src/pipeline/worker/adapters/output_mstg.ts:15-16). Not included: the worker
+// thread and MediaStreamTrack transports (every pipeline here runs on the page's
+// main thread, fed by the same decoder), autotune and the adaptive controller
+// (a fixed preset disables both: src/pipeline/index.ts:468), touch-up/reframe (off).
+//
+// Per frame, with the shipped weights (all carry a `flow` blob, so the flow path
+// is wired: renderer.ts:653), Renderer.stepFlow (renderer.ts:382) runs:
+//   skipFrames > 0 (xs: 2, small/medium: 1; presets.ts:30-34)
+//     key frame (every skipFrames+1-th; shouldRunModel, renderer.ts:532):
+//       full network (TierModel), flow net NOT run (cached flow reused)
+//     off frame: learned OpticalFlowNet (last key frame -> current, on the base-res
+//       frame pair + the key frame's cached encoder taps) + warp of the last key
+//       frame's alpha
+//   skipFrames = 0 (large, xl): flow net AND full network, every frame
+//   then on every frame: warp the previous stabilised alpha, flow-gated
+//   stabiliser blend, re-upscale (applyAlpha), composite.
+// `counters` counts full-network and flow-network runs to verify this.
+async function shipped(kind, tier, { width, height }) {
+  // EffectsPipeline's default backend precision, patched into the preset as
+  // resolve_preset.ts:476 does (see weightsFile above).
+  let dtype = 'f16'
+  if (kind === 'webgpu' && !(await SrcWebGPUBackend.hasF16Support())) dtype = 'f32'
+  const preset = { ...PRESETS.find((p) => p.model === tier), dtype }
+  const canvas = new OffscreenCanvas(width, height)
+  const backend = kind === 'webgpu'
+    ? await SrcWebGPUBackend.create({ canvas, dtype })
+    : SrcWebGLBackend.create({ canvas, dtype })
+  const renderer = new Renderer({
+    backend, backendKind: kind, canvas,
+    background: { kind: 'color', rgb: GREEN }, enabled: true,
+    topology: { input: 'mstp', output: 'mstg' },   // only reported in stats
+  })
+  renderer.setPreset(preset, await (await fetch(weightsFile(tier, dtype))).arrayBuffer())
+
+  // Instrumentation: count calls into the real objects the renderer built.
+  const counts = { frames: 0, network: 0, flow: 0 }
+  const wrap = (obj, key) => {
+    if (!obj) return
+    const run = obj.run.bind(obj)
+    obj.run = () => { counts[key]++; run() }
+  }
+  wrap(renderer.renderOp.network, 'network')   // TierModel: the full matting network
+  wrap(renderer.flow?.net, 'flow')             // OpticalFlowNet
+  return {
+    dtype,
+    maskRes: `${TIER_CONFIG[tier].canvasRes.w}x${TIER_CONFIG[tier].canvasRes.h}`,
+    temporal: true,
+    preset: { model: preset.model, dtype: preset.dtype, skipFrames: preset.skipFrames, flowWired: !!renderer.flow },
+    process(frame) {
+      counts.frames++
+      renderer.process(frame)
+      return outputFrame(canvas, frame)
+    },
+    counters: {
+      reset: () => { counts.frames = counts.network = counts.flow = 0 },
+      read: () => ({ ...counts }),
+    },
+    destroy: () => renderer.destroy(),
+  }
+}
+
+// ---- MediaPipe selfie model on LiteRT.js (WebGPU) -----------------------------
+// LiteRT.js (Google's TFLite web runtime) runs the original .tflite on WebGPU,
+// sharing our GPUDevice: the frame is resized into a dense [1, H, W, 3] f32
+// buffer by a WebGPU compute pass (4-tap box filter, from the article harness),
+// LiteRT runs on that buffer and hands back its output buffer, which our WebGPU
+// shader composites (bilinear upsample). No readback. Default precision (fp32).
+let liteRtPromise
+async function getLiteRt() {
+  return (liteRtPromise ??= (async () => {
+    const litert = await import('@litertjs/core')
+    await litert.loadLiteRt('/vendor/litert/', { threads: self.crossOriginIsolated })
+    litert.setWebGpuDevice(await getDevice())
+    return litert
+  })())
+}
+
+async function liteRt(variant) {
+  const [litert, device] = await Promise.all([getLiteRt(), getDevice()])
+  const { url, res } = MP_MODELS[variant]
+  const [W, H] = res.split('x').map(Number)
+  const model = await litert.loadAndCompile(url, { accelerator: 'webgpu' })
+  const frames = new WebGPUFrames(device)
+  frames.setColor(GREEN)
+  const inputBuffer = device.createBuffer({ size: W * H * 3 * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST })
+  const inputTensor = new litert.Tensor(inputBuffer, [1, H, W, 3], 'float32')
+  const preprocess = (frame) => {
+    const src = frames.import(frame)
+    const encoder = device.createCommandEncoder()
+    const pass = encoder.beginComputePass()
+    frames.preprocess(pass, src, inputBuffer, { width: W, height: H, stride: 3 })
+    pass.end()
+    device.queue.submit([encoder.finish()])
+    return src
+  }
+  let last
+  return {
+    maskRes: res,
+    async process(frame) {
+      const src = preprocess(frame)
+      const [out] = await model.run([inputTensor])
+      const encoder = device.createCommandEncoder()
+      frames.composite(encoder, src, out.toGpuBuffer(), { width: W, height: H, stride: 1 })
+      device.queue.submit([encoder.finish()])
+      out.delete()
+      return frames.output(frame)
+    },
+    infer(frame) {
+      preprocess(frame)
+      last = model.run([inputTensor]).then(([out]) => out.delete())
+    },
+    wait: async () => { await last; await device.queue.onSubmittedWorkDone() },
+    destroy: () => model.delete?.(),
   }
 }
 
@@ -254,14 +427,27 @@ export const PIPELINES = {
   'passthrough': { label: 'Passthrough (decode → encode, no effect)', create: passthrough },
   'canvas-copy-webgpu': { label: 'Canvas copy, WebGPU (no model: output-path ceiling)', create: canvasCopyWebGPU },
   'canvas-copy-webgl': { label: 'Canvas copy, WebGL2 (no model: output-path ceiling)', create: canvasCopyWebGL },
-  ...Object.fromEntries(TIERS.map((t) => [`longpipe-webgpu-${t}`, {
-    label: `Longpipe ${t} — WebGPU (${LONGPIPE_DTYPE[t]})`, create: (size) => longpipe('webgpu', t, size),
-  }])),
-  ...Object.fromEntries(TIERS.map((t) => [`longpipe-webgl-${t}`, {
-    label: `Longpipe ${t} — WebGL2 (${LONGPIPE_DTYPE[t]})`, create: (size) => longpipe('webgl', t, size),
-  }])),
-  'mediapipe-gpu': { label: 'MediaPipe selfie (square) — GPU (WebGL)', create: () => mediaPipeGPU('square') },
-  'mediapipe-gpu-landscape': { label: 'MediaPipe selfie landscape — GPU (WebGL)', create: () => mediaPipeGPU('landscape') },
-  'mediapipe-cpu': { label: 'MediaPipe selfie (square) — CPU (WASM)', create: () => mediaPipeCPU('square') },
-  'mediapipe-cpu-landscape': { label: 'MediaPipe selfie landscape — CPU (WASM)', create: () => mediaPipeCPU('landscape') },
+  // 1. MediaPipe selfie model, MediaPipe Tasks engine, every frame
+  'mediapipe-gpu': { label: 'MediaPipe square — Tasks, GPU delegate (WebGL)', create: () => mediaPipeGPU('square') },
+  'mediapipe-gpu-landscape': { label: 'MediaPipe landscape — Tasks, GPU delegate (WebGL)', create: () => mediaPipeGPU('landscape') },
+  'mediapipe-cpu': { label: 'MediaPipe square — Tasks, CPU delegate (WASM)', create: () => mediaPipeCPU('square') },
+  'mediapipe-cpu-landscape': { label: 'MediaPipe landscape — Tasks, CPU delegate (WASM)', create: () => mediaPipeCPU('landscape') },
+  // 2. MediaPipe selfie model, LiteRT.js engine, every frame
+  'litert-webgpu': { label: 'MediaPipe square — LiteRT.js, WebGPU (fp32)', create: () => liteRt('square') },
+  'litert-webgpu-landscape': { label: 'MediaPipe landscape — LiteRT.js, WebGPU (fp32)', create: () => liteRt('landscape') },
+  // 3. MediaPipe selfie model, Longpipe engine, every frame
+  ...Object.fromEntries(['webgpu', 'webgl'].flatMap((k) => ['square', 'landscape'].map((v) => [`lp-mediapipe-${k}-${v}`, {
+    label: `MediaPipe ${v} — Longpipe engine, ${k === 'webgpu' ? 'WebGPU' : 'WebGL2'} (f16)`, create: (size) => longpipeMediaPipe(k, v, size),
+  }]))),
+  // 4. Longpipe model, Longpipe engine, network every frame
+  ...Object.fromEntries(['webgpu', 'webgl'].flatMap((k) => TIERS.map((t) => [`longpipe-${k}-${t}`, {
+    label: `Longpipe ${t} — network every frame, ${k === 'webgpu' ? 'WebGPU' : 'WebGL2'} (f16)`, create: (size) => longpipe(k, t, size, 'f16'),
+  }]))),
+  ...Object.fromEntries(['webgpu', 'webgl'].flatMap((k) => ['large', 'xl'].map((t) => [`longpipe-${k}-${t}-f32`, {
+    label: `Longpipe ${t} — network every frame, ${k === 'webgpu' ? 'WebGPU' : 'WebGL2'} (f32)`, create: (size) => longpipe(k, t, size, 'f32'),
+  }]))),
+  // 5. Longpipe model, Longpipe engine, as shipped (SDK renderer: key + flow frames)
+  ...Object.fromEntries(['webgpu', 'webgl'].flatMap((k) => TIERS.map((t) => [`shipped-${k}-${t}`, {
+    label: `Longpipe ${t} — as shipped, ${k === 'webgpu' ? 'WebGPU' : 'WebGL2'} (f16)`, create: (size) => shipped(k, t, size),
+  }]))),
 }

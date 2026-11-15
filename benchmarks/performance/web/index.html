@@ -50,7 +50,7 @@
 
 <script type="module">
   import { PIPELINES } from './src/pipelines.js'
-  import { benchmarkAll, checkOutputs, environment } from './src/bench.js'
+  import { benchmarkAll, checkOutputs, environment, runOne } from './src/bench.js'
 
   const $ = (id) => document.getElementById(id)
   const params = new URLSearchParams(location.search)
@@ -66,8 +66,8 @@
     ` · WebGL: ${env.webglRenderer} · cross-origin isolated: ${env.crossOriginIsolated}` +
     ` · ${navigator.userAgent.match(/Chrome\/[\d.]+|Firefox\/[\d.]+|Version\/[\d.]+ Safari/)?.[0] ?? ''}`
 
-  async function getFile() {
-    const url = `/assets/media/woman_on_video_call_${$('sample').value}.mp4`
+  async function getFile(sample = $('sample').value) {
+    const url = `/assets/media/woman_on_video_call_${sample}.mp4`
     const blob = await (await fetch(url)).blob()
     return new File([blob], url.split('/').pop(), { type: 'video/mp4' })
   }
@@ -138,5 +138,10 @@
   }
   $('run').onclick = runAll
   $('check').onclick = checkAll
-  window.bench = { runAll, checkAll }   // hooks for tools/bench.mjs
+  const files = {}
+  window.bench = {   // hooks for tools/bench.mjs
+    runAll, checkAll, environment,
+    pipelines: () => Object.keys(PIPELINES),
+    runOne: async (name, sample, opts) => runOne(name, (files[sample] ??= await getFile(sample)), opts),
+  }
 </script>
