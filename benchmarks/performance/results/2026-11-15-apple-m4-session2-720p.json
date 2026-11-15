@@ -1,0 +1,960 @@
+{
+  "host": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "cpus": 10,
+    "memoryGB": 16,
+    "loadavg": [
+      4.79052734375,
+      5.080078125,
+      4.26416015625
+    ],
+    "chrome": "157.0.8103.51",
+    "headless": true,
+    "macos": "26.5.1",
+    "model": "Mac16,1",
+    "chip": "Apple M4",
+    "power": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=7274595)\t100%; discharging; 1:56 remaining present: true",
+    "lowPowerMode": "lowpowermode         0"
+  },
+  "versions": {
+    "longpipe": "0.0.16",
+    "@mediapipe/tasks-vision": "1.1.1",
+    "webcodecs-utils": "0.2.6",
+    "vite": "8.3.2",
+    "playwright-core": "1.64.1"
+  },
+  "reports": [
+    {
+      "config": {
+        "mode": "transcode",
+        "runs": 5,
+        "order": "sequential",
+        "file": "woman_on_video_call_720p.mp4",
+        "frames": 192,
+        "width": 1280,
+        "height": 720,
+        "decoder": "avc1.64001f",
+        "encoder": {
+          "codec": "avc1.64001f",
+          "width": 1280,
+          "height": 720,
+          "bitrate": 2211840
+        }
+      },
+      "environment": {
+        "date": "2026-11-15T20:11:49.102Z",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+        "platform": {
+          "platform": "macOS",
+          "platformVersion": "26.5.1",
+          "architecture": "arm",
+          "model": "",
+          "browsers": [
+            {
+              "brand": "Not-A.Brand",
+              "version": "99.0.0.0"
+            },
+            {
+              "brand": "Google Chrome",
+              "version": "157.0.8103.51"
+            },
+            {
+              "brand": "Chromium",
+              "version": "157.0.8103.51"
+            }
+          ]
+        },
+        "hardwareConcurrency": 10,
+        "deviceMemoryGB": 16,
+        "crossOriginIsolated": true,
+        "webgpu": {
+          "vendor": "apple",
+          "architecture": "metal-3",
+          "device": "",
+          "description": "",
+          "features": [
+            "atomic-vec2u-min-max",
+            "bgra8unorm-storage",
+            "chromium-experimental-subgroup-matrix",
+            "clip-distances",
+            "core-features-and-limits",
+            "depth-clip-control",
+            "depth32float-stencil8",
+            "dual-source-blending",
+            "float32-blendable",
+            "float32-filterable",
+            "indirect-first-instance",
+            "primitive-index",
+            "rg11b10ufloat-renderable",
+            "shader-f16",
+            "subgroup-size-control",
+            "subgroups",
+            "texture-component-swizzle",
+            "texture-compression-astc",
+            "texture-compression-astc-sliced-3d",
+            "texture-compression-bc",
+            "texture-compression-bc-sliced-3d",
+            "texture-compression-etc2",
+            "texture-compression-unaligned",
+            "texture-formats-tier1",
+            "texture-formats-tier2",
+            "timestamp-query"
+          ]
+        },
+        "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+      },
+      "results": [
+        {
+          "name": "passthrough",
+          "label": "Passthrough (decode → encode, no effect)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 482.31999999284744,
+              "fps": 398.07596616944613,
+              "meanProcessMs": 0.003541666859139999,
+              "medianProcessMs": 0
+            },
+            {
+              "frames": 192,
+              "ms": 479.7600000202656,
+              "fps": 400.2001000331201,
+              "meanProcessMs": 0.005104166300346454,
+              "medianProcessMs": 0
+            },
+            {
+              "frames": 192,
+              "ms": 477.8899999856949,
+              "fps": 401.76609681254536,
+              "meanProcessMs": 0.004531250335276127,
+              "medianProcessMs": 0
+            },
+            {
+              "frames": 192,
+              "ms": 481.0900000035763,
+              "fps": 399.0937246639355,
+              "meanProcessMs": 0.003802083277453979,
+              "medianProcessMs": 0
+            },
+            {
+              "frames": 192,
+              "ms": 483.75,
+              "fps": 396.8992248062016,
+              "meanProcessMs": 0.004661458544433117,
+              "medianProcessMs": 0
+            }
+          ],
+          "startedAt": "2026-11-15T20:08:31.826Z",
+          "initMs": 0.02499997615814209,
+          "maskRes": null,
+          "warmupFps": 356.4268211135565,
+          "medianFps": 399.0937246639355,
+          "minFps": 396.8992248062016,
+          "maxFps": 401.76609681254536,
+          "endedAt": "2026-11-15T20:08:34.770Z"
+        },
+        {
+          "name": "canvas-copy-webgpu",
+          "label": "Canvas copy, WebGPU (no model: output-path ceiling)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 1187.7100000083447,
+              "fps": 161.65562300448008,
+              "meanProcessMs": 0.19124999890724817,
+              "medianProcessMs": 0.17000000178813934
+            },
+            {
+              "frames": 192,
+              "ms": 1208.4449999928474,
+              "fps": 158.88186884892272,
+              "meanProcessMs": 0.20015625158945718,
+              "medianProcessMs": 0.16250000894069672
+            },
+            {
+              "frames": 192,
+              "ms": 1261.25,
+              "fps": 152.2299306243806,
+              "meanProcessMs": 0.1968489574889342,
+              "medianProcessMs": 0.16999998688697815
+            },
+            {
+              "frames": 192,
+              "ms": 1248.2350000143051,
+              "fps": 153.81718987033662,
+              "meanProcessMs": 0.19486979100232324,
+              "medianProcessMs": 0.16499999165534973
+            },
+            {
+              "frames": 192,
+              "ms": 1183.9350000023842,
+              "fps": 162.17106513416138,
+              "meanProcessMs": 0.18164062717308602,
+              "medianProcessMs": 0.14000001549720764
+            }
+          ],
+          "startedAt": "2026-11-15T20:08:34.770Z",
+          "initMs": 2.435000002384186,
+          "maskRes": null,
+          "warmupFps": 159.92869845574845,
+          "medianFps": 158.88186884892272,
+          "minFps": 152.2299306243806,
+          "maxFps": 162.17106513416138,
+          "endedAt": "2026-11-15T20:08:42.063Z"
+        },
+        {
+          "name": "canvas-copy-webgl",
+          "label": "Canvas copy, WebGL2 (no model: output-path ceiling)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 1457.6050000190735,
+              "fps": 131.72292904969973,
+              "meanProcessMs": 0.3026302096744378,
+              "medianProcessMs": 0.2750000059604645
+            },
+            {
+              "frames": 192,
+              "ms": 1529.925000011921,
+              "fps": 125.49634785921138,
+              "meanProcessMs": 0.31320312588165206,
+              "medianProcessMs": 0.27000001072883606
+            },
+            {
+              "frames": 192,
+              "ms": 1335.469999998808,
+              "fps": 143.76960920138333,
+              "meanProcessMs": 0.2649739580228925,
+              "medianProcessMs": 0.2199999988079071
+            },
+            {
+              "frames": 192,
+              "ms": 1349.2599999904633,
+              "fps": 142.30022382739952,
+              "meanProcessMs": 0.2835416675855716,
+              "medianProcessMs": 0.19249999523162842
+            },
+            {
+              "frames": 192,
+              "ms": 1683.1799999773502,
+              "fps": 114.06979645824192,
+              "meanProcessMs": 0.25986978954946,
+              "medianProcessMs": 0.22999998927116394
+            }
+          ],
+          "startedAt": "2026-11-15T20:08:42.063Z",
+          "initMs": 12.504999995231628,
+          "maskRes": null,
+          "warmupFps": 131.71886255489343,
+          "medianFps": 131.72292904969973,
+          "minFps": 114.06979645824192,
+          "maxFps": 143.76960920138333,
+          "endedAt": "2026-11-15T20:08:50.889Z"
+        },
+        {
+          "name": "longpipe-webgpu-xs",
+          "label": "Longpipe xs — WebGPU (f16)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 1667.6450000107288,
+              "fps": 115.13241727032118,
+              "meanProcessMs": 0.37075520819053054,
+              "medianProcessMs": 0.3199999928474426
+            },
+            {
+              "frames": 192,
+              "ms": 1794.3700000047684,
+              "fps": 107.0013430894909,
+              "meanProcessMs": 0.38911458182459074,
+              "medianProcessMs": 0.3474999964237213
+            },
+            {
+              "frames": 192,
+              "ms": 1774.5250000059605,
+              "fps": 108.19796847007233,
+              "meanProcessMs": 0.3500781247081856,
+              "medianProcessMs": 0.29500001668930054
+            },
+            {
+              "frames": 192,
+              "ms": 1767.5750000178814,
+              "fps": 108.62339646015454,
+              "meanProcessMs": 0.3524999995715916,
+              "medianProcessMs": 0.29749999940395355
+            },
+            {
+              "frames": 192,
+              "ms": 1893.219999998808,
+              "fps": 101.41452129183132,
+              "meanProcessMs": 0.39492187680055696,
+              "medianProcessMs": 0.32999998331069946
+            }
+          ],
+          "startedAt": "2026-11-15T20:08:50.889Z",
+          "initMs": 23.804999977350235,
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "warmupFps": 107.85486779431982,
+          "medianFps": 108.19796847007233,
+          "minFps": 101.41452129183132,
+          "maxFps": 115.13241727032118,
+          "endedAt": "2026-11-15T20:09:01.592Z"
+        },
+        {
+          "name": "longpipe-webgpu-small",
+          "label": "Longpipe small — WebGPU (f16)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 1721.035000026226,
+              "fps": 111.56077592673839,
+              "meanProcessMs": 0.3595833337555329,
+              "medianProcessMs": 0.3149999976158142
+            },
+            {
+              "frames": 192,
+              "ms": 1849.3899999856949,
+              "fps": 103.81801567083478,
+              "meanProcessMs": 0.39958333255102235,
+              "medianProcessMs": 0.3400000035762787
+            },
+            {
+              "frames": 192,
+              "ms": 1799.969999998808,
+              "fps": 106.66844447414522,
+              "meanProcessMs": 0.34458333253860474,
+              "medianProcessMs": 0.3199999928474426
+            },
+            {
+              "frames": 192,
+              "ms": 1743.7299999892712,
+              "fps": 110.1087897789115,
+              "meanProcessMs": 0.3592187495281299,
+              "medianProcessMs": 0.3425000011920929
+            },
+            {
+              "frames": 192,
+              "ms": 1765.6100000143051,
+              "fps": 108.7442866762447,
+              "meanProcessMs": 0.3668489600531757,
+              "medianProcessMs": 0.3199999928474426
+            }
+          ],
+          "startedAt": "2026-11-15T20:09:01.592Z",
+          "initMs": 26.560000002384186,
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "warmupFps": 107.68941699073794,
+          "medianFps": 108.7442866762447,
+          "minFps": 103.81801567083478,
+          "maxFps": 111.56077592673839,
+          "endedAt": "2026-11-15T20:09:12.282Z"
+        },
+        {
+          "name": "longpipe-webgpu-medium",
+          "label": "Longpipe medium — WebGPU (f16)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 1729.4350000023842,
+              "fps": 111.01891658243028,
+              "meanProcessMs": 0.47513020876795053,
+              "medianProcessMs": 0.39750000834465027
+            },
+            {
+              "frames": 192,
+              "ms": 1697.4200000166893,
+              "fps": 113.11284184121327,
+              "meanProcessMs": 0.5687239590721825,
+              "medianProcessMs": 0.5125000178813934
+            },
+            {
+              "frames": 192,
+              "ms": 1654.2400000095367,
+              "fps": 116.06538349870219,
+              "meanProcessMs": 0.4922135407105088,
+              "medianProcessMs": 0.4449999928474426
+            },
+            {
+              "frames": 192,
+              "ms": 1637.8799999952316,
+              "fps": 117.2247051069425,
+              "meanProcessMs": 0.48841145758827526,
+              "medianProcessMs": 0.4050000011920929
+            },
+            {
+              "frames": 192,
+              "ms": 1573.1800000071526,
+              "fps": 122.04579259787631,
+              "meanProcessMs": 0.4642968752110998,
+              "medianProcessMs": 0.38500000536441803
+            }
+          ],
+          "startedAt": "2026-11-15T20:09:12.283Z",
+          "initMs": 51.00499999523163,
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "warmupFps": 100.46464900138189,
+          "medianFps": 116.06538349870219,
+          "minFps": 111.01891658243028,
+          "maxFps": 122.04579259787631,
+          "endedAt": "2026-11-15T20:09:22.538Z"
+        },
+        {
+          "name": "longpipe-webgpu-large",
+          "label": "Longpipe large — WebGPU (f32)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 1840.5450000166893,
+              "fps": 104.31692786552843,
+              "meanProcessMs": 0.5586718739941716,
+              "medianProcessMs": 0.4649999886751175
+            },
+            {
+              "frames": 192,
+              "ms": 1943.5900000035763,
+              "fps": 98.78626665070654,
+              "meanProcessMs": 0.690989583885918,
+              "medianProcessMs": 0.4750000089406967
+            },
+            {
+              "frames": 192,
+              "ms": 1847.0200000107288,
+              "fps": 103.95122954753317,
+              "meanProcessMs": 0.6423958347489437,
+              "medianProcessMs": 0.44750000536441803
+            },
+            {
+              "frames": 192,
+              "ms": 1855.1649999916553,
+              "fps": 103.49483738689746,
+              "meanProcessMs": 0.6034114590535561,
+              "medianProcessMs": 0.4650000035762787
+            },
+            {
+              "frames": 192,
+              "ms": 2009.199999988079,
+              "fps": 95.56042205909773,
+              "meanProcessMs": 0.6691927090287209,
+              "medianProcessMs": 0.48750001192092896
+            }
+          ],
+          "startedAt": "2026-11-15T20:09:22.538Z",
+          "initMs": 65.56499999761581,
+          "maskRes": "640x400",
+          "dtype": "f32",
+          "warmupFps": 102.2211810804982,
+          "medianFps": 103.49483738689746,
+          "minFps": 95.56042205909773,
+          "maxFps": 104.31692786552843,
+          "endedAt": "2026-11-15T20:09:33.978Z"
+        },
+        {
+          "name": "longpipe-webgpu-xl",
+          "label": "Longpipe xl — WebGPU (f32)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 3193.094999998808,
+              "fps": 60.1297487234397,
+              "meanProcessMs": 1.3070052084513009,
+              "medianProcessMs": 0.5575000047683716
+            },
+            {
+              "frames": 192,
+              "ms": 3092.4300000071526,
+              "fps": 62.08709655499265,
+              "meanProcessMs": 1.3182291681878269,
+              "medianProcessMs": 0.4950000047683716
+            },
+            {
+              "frames": 192,
+              "ms": 3142.1050000190735,
+              "fps": 61.10553275553634,
+              "meanProcessMs": 1.3189322925172746,
+              "medianProcessMs": 0.46000000834465027
+            },
+            {
+              "frames": 192,
+              "ms": 3110.1599999964237,
+              "fps": 61.73315842278879,
+              "meanProcessMs": 1.1784635409712791,
+              "medianProcessMs": 0.5099999904632568
+            },
+            {
+              "frames": 192,
+              "ms": 3090.645000010729,
+              "fps": 62.12295491696183,
+              "meanProcessMs": 1.3464843737892807,
+              "medianProcessMs": 0.5074999928474426
+            }
+          ],
+          "startedAt": "2026-11-15T20:09:33.978Z",
+          "initMs": 76.85499998927116,
+          "maskRes": "1280x768",
+          "dtype": "f32",
+          "warmupFps": 59.378841648800105,
+          "medianFps": 61.73315842278879,
+          "minFps": 60.1297487234397,
+          "maxFps": 62.12295491696183,
+          "endedAt": "2026-11-15T20:09:52.918Z"
+        },
+        {
+          "name": "longpipe-webgl-xs",
+          "label": "Longpipe xs — WebGL2 (f16)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 1851.7349999845028,
+              "fps": 103.68654262170713,
+              "meanProcessMs": 0.4989062510430813,
+              "medianProcessMs": 0.44750000536441803
+            },
+            {
+              "frames": 192,
+              "ms": 1853.8700000047684,
+              "fps": 103.56713253869266,
+              "meanProcessMs": 0.4711979175917804,
+              "medianProcessMs": 0.4650000035762787
+            },
+            {
+              "frames": 192,
+              "ms": 1790.8050000071526,
+              "fps": 107.2143533211227,
+              "meanProcessMs": 0.4742968742114802,
+              "medianProcessMs": 0.4349999874830246
+            },
+            {
+              "frames": 192,
+              "ms": 1761.3299999833107,
+              "fps": 109.00853332528219,
+              "meanProcessMs": 0.46716145845130086,
+              "medianProcessMs": 0.429999977350235
+            },
+            {
+              "frames": 192,
+              "ms": 1813.8999999761581,
+              "fps": 105.8492750441169,
+              "meanProcessMs": 0.4583072921571632,
+              "medianProcessMs": 0.4300000071525574
+            }
+          ],
+          "startedAt": "2026-11-15T20:09:52.918Z",
+          "initMs": 65.72499999403954,
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "warmupFps": 107.40988338833901,
+          "medianFps": 105.8492750441169,
+          "minFps": 103.56713253869266,
+          "maxFps": 109.00853332528219,
+          "endedAt": "2026-11-15T20:10:03.844Z"
+        },
+        {
+          "name": "longpipe-webgl-small",
+          "label": "Longpipe small — WebGL2 (f16)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 1893.7400000095367,
+              "fps": 101.386673988527,
+              "meanProcessMs": 0.5169010421571633,
+              "medianProcessMs": 0.48499999940395355
+            },
+            {
+              "frames": 192,
+              "ms": 1876.0600000023842,
+              "fps": 102.34214257526732,
+              "meanProcessMs": 0.5118229168777665,
+              "medianProcessMs": 0.45500001311302185
+            },
+            {
+              "frames": 192,
+              "ms": 1811.9450000226498,
+              "fps": 105.96348123016976,
+              "meanProcessMs": 0.44585937603066367,
+              "medianProcessMs": 0.42000001668930054
+            },
+            {
+              "frames": 192,
+              "ms": 1804.6599999964237,
+              "fps": 106.39123158954068,
+              "meanProcessMs": 0.4875781247392297,
+              "medianProcessMs": 0.4450000077486038
+            },
+            {
+              "frames": 192,
+              "ms": 1840.1049999892712,
+              "fps": 104.34187179596788,
+              "meanProcessMs": 0.5066145843205353,
+              "medianProcessMs": 0.4725000113248825
+            }
+          ],
+          "startedAt": "2026-11-15T20:10:03.850Z",
+          "initMs": 66.59000000357628,
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "warmupFps": 105.10268039226065,
+          "medianFps": 104.34187179596788,
+          "minFps": 101.386673988527,
+          "maxFps": 106.39123158954068,
+          "endedAt": "2026-11-15T20:10:14.971Z"
+        },
+        {
+          "name": "longpipe-webgl-medium",
+          "label": "Longpipe medium — WebGL2 (f16)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 1974.5349999964237,
+              "fps": 97.23808390347487,
+              "meanProcessMs": 0.49205729210128385,
+              "medianProcessMs": 0.45750001072883606
+            },
+            {
+              "frames": 192,
+              "ms": 1948.9600000083447,
+              "fps": 98.51407930341205,
+              "meanProcessMs": 0.5114322922502955,
+              "medianProcessMs": 0.48000000417232513
+            },
+            {
+              "frames": 192,
+              "ms": 1910.3350000083447,
+              "fps": 100.50593220516889,
+              "meanProcessMs": 0.4946874996336798,
+              "medianProcessMs": 0.47749999165534973
+            },
+            {
+              "frames": 192,
+              "ms": 1934.6900000274181,
+              "fps": 99.24070522785512,
+              "meanProcessMs": 0.49859374994412065,
+              "medianProcessMs": 0.4649999886751175
+            },
+            {
+              "frames": 192,
+              "ms": 1881.7100000083447,
+              "fps": 102.03485127843746,
+              "meanProcessMs": 0.5004687503290673,
+              "medianProcessMs": 0.46000000834465027
+            }
+          ],
+          "startedAt": "2026-11-15T20:10:14.980Z",
+          "initMs": 94.3250000178814,
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "warmupFps": 100.80433458600866,
+          "medianFps": 99.24070522785512,
+          "minFps": 97.23808390347487,
+          "maxFps": 102.03485127843746,
+          "endedAt": "2026-11-15T20:10:26.630Z"
+        },
+        {
+          "name": "longpipe-webgl-large",
+          "label": "Longpipe large — WebGL2 (f32)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 2044.4850000143051,
+              "fps": 93.91118056559799,
+              "meanProcessMs": 0.5301302069177231,
+              "medianProcessMs": 0.5074999928474426
+            },
+            {
+              "frames": 192,
+              "ms": 2058.0199999809265,
+              "fps": 93.29355399936804,
+              "meanProcessMs": 0.4859114576441546,
+              "medianProcessMs": 0.45750001072883606
+            },
+            {
+              "frames": 192,
+              "ms": 2125.7599999904633,
+              "fps": 90.32063826624895,
+              "meanProcessMs": 0.5401562508195639,
+              "medianProcessMs": 0.5099999904632568
+            },
+            {
+              "frames": 192,
+              "ms": 2066.8400000035763,
+              "fps": 92.89543457629414,
+              "meanProcessMs": 0.5190104168529311,
+              "medianProcessMs": 0.5024999976158142
+            },
+            {
+              "frames": 192,
+              "ms": 2034.7249999940395,
+              "fps": 94.3616459229441,
+              "meanProcessMs": 0.4941666657105088,
+              "medianProcessMs": 0.4750000238418579
+            }
+          ],
+          "startedAt": "2026-11-15T20:10:26.635Z",
+          "initMs": 97.50999999046326,
+          "maskRes": "640x400",
+          "dtype": "f32",
+          "warmupFps": 94.90386041112022,
+          "medianFps": 93.29355399936804,
+          "minFps": 90.32063826624895,
+          "maxFps": 94.3616459229441,
+          "endedAt": "2026-11-15T20:10:39.086Z"
+        },
+        {
+          "name": "longpipe-webgl-xl",
+          "label": "Longpipe xl — WebGL2 (f32)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 3208.189999997616,
+              "fps": 59.846829520739945,
+              "meanProcessMs": 0.5231510408533117,
+              "medianProcessMs": 0.4975000023841858
+            },
+            {
+              "frames": 192,
+              "ms": 3268.3799999952316,
+              "fps": 58.744699208868035,
+              "meanProcessMs": 0.5134375003787378,
+              "medianProcessMs": 0.48749999701976776
+            },
+            {
+              "frames": 192,
+              "ms": 3190.360000014305,
+              "fps": 60.18129615439609,
+              "meanProcessMs": 0.49984374875202775,
+              "medianProcessMs": 0.4775000065565109
+            },
+            {
+              "frames": 192,
+              "ms": 3121.8049999773502,
+              "fps": 61.5028805455155,
+              "meanProcessMs": 0.49419270812844235,
+              "medianProcessMs": 0.44999998807907104
+            },
+            {
+              "frames": 192,
+              "ms": 3058.0250000059605,
+              "fps": 62.785621438551274,
+              "meanProcessMs": 0.4698697893569867,
+              "medianProcessMs": 0.45499998331069946
+            }
+          ],
+          "startedAt": "2026-11-15T20:10:39.094Z",
+          "initMs": 140.5949999988079,
+          "maskRes": "1280x768",
+          "dtype": "f32",
+          "warmupFps": 59.9091066524516,
+          "medianFps": 60.18129615439609,
+          "minFps": 58.744699208868035,
+          "maxFps": 62.785621438551274,
+          "endedAt": "2026-11-15T20:10:58.288Z"
+        },
+        {
+          "name": "mediapipe-gpu",
+          "label": "MediaPipe selfie (square) — GPU (WebGL)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 2017.1149999797344,
+              "fps": 95.18545050824022,
+              "meanProcessMs": 0.9253906247516474,
+              "medianProcessMs": 0.7400000095367432
+            },
+            {
+              "frames": 192,
+              "ms": 2102.4300000071526,
+              "fps": 91.3228977893898,
+              "meanProcessMs": 0.9151822910644114,
+              "medianProcessMs": 0.7000000029802322
+            },
+            {
+              "frames": 192,
+              "ms": 1988.4350000023842,
+              "fps": 96.55834865095906,
+              "meanProcessMs": 0.9581249997330209,
+              "medianProcessMs": 0.6799999922513962
+            },
+            {
+              "frames": 192,
+              "ms": 2049.844999998808,
+              "fps": 93.66561861999891,
+              "meanProcessMs": 0.9228124998820325,
+              "medianProcessMs": 0.6824999898672104
+            },
+            {
+              "frames": 192,
+              "ms": 1950.5200000107288,
+              "fps": 98.43528905058338,
+              "meanProcessMs": 0.8709895852953196,
+              "medianProcessMs": 0.6174999922513962
+            }
+          ],
+          "startedAt": "2026-11-15T20:10:58.299Z",
+          "initMs": 111.68999999761581,
+          "maskRes": "256x256",
+          "warmupFps": 92.32566918083091,
+          "medianFps": 95.18545050824022,
+          "minFps": 91.3228977893898,
+          "maxFps": 98.43528905058338,
+          "deliveredMaskRes": "1280x720",
+          "endedAt": "2026-11-15T20:11:10.599Z"
+        },
+        {
+          "name": "mediapipe-gpu-landscape",
+          "label": "MediaPipe selfie landscape — GPU (WebGL)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 1859.3149999976158,
+              "fps": 103.2638364130049,
+              "meanProcessMs": 0.7608593751986822,
+              "medianProcessMs": 0.6174999922513962
+            },
+            {
+              "frames": 192,
+              "ms": 1986.9850000143051,
+              "fps": 96.62881199335561,
+              "meanProcessMs": 0.8599999994039536,
+              "medianProcessMs": 0.6675000041723251
+            },
+            {
+              "frames": 192,
+              "ms": 1842.080000013113,
+              "fps": 104.23000086784137,
+              "meanProcessMs": 0.747760417095075,
+              "medianProcessMs": 0.5699999928474426
+            },
+            {
+              "frames": 192,
+              "ms": 1870.9149999916553,
+              "fps": 102.62358257903558,
+              "meanProcessMs": 0.7457812515397867,
+              "medianProcessMs": 0.5700000077486038
+            },
+            {
+              "frames": 192,
+              "ms": 1844.5349999964237,
+              "fps": 104.0912750369997,
+              "meanProcessMs": 0.7287239593764147,
+              "medianProcessMs": 0.5474999994039536
+            }
+          ],
+          "startedAt": "2026-11-15T20:11:10.608Z",
+          "initMs": 67.58000001311302,
+          "maskRes": "256x144",
+          "warmupFps": 104.00275173839857,
+          "medianFps": 103.2638364130049,
+          "minFps": 96.62881199335561,
+          "maxFps": 104.23000086784137,
+          "deliveredMaskRes": "1280x720",
+          "endedAt": "2026-11-15T20:11:21.926Z"
+        },
+        {
+          "name": "mediapipe-cpu",
+          "label": "MediaPipe selfie (square) — CPU (WASM)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 2289.030000001192,
+              "fps": 83.87832400619477,
+              "meanProcessMs": 8.63036458240822,
+              "medianProcessMs": 8.28499998152256
+            },
+            {
+              "frames": 192,
+              "ms": 2278.3450000286102,
+              "fps": 84.2716972177563,
+              "meanProcessMs": 8.750911459792405,
+              "medianProcessMs": 8.314999997615814
+            },
+            {
+              "frames": 192,
+              "ms": 2305.425000011921,
+              "fps": 83.28182439203496,
+              "meanProcessMs": 8.896119792790463,
+              "medianProcessMs": 8.500000014901161
+            },
+            {
+              "frames": 192,
+              "ms": 2306.274999976158,
+              "fps": 83.25113006991138,
+              "meanProcessMs": 8.9611197913376,
+              "medianProcessMs": 8.502499997615814
+            },
+            {
+              "frames": 192,
+              "ms": 2324.330000013113,
+              "fps": 82.6044494537853,
+              "meanProcessMs": 9.080390624701977,
+              "medianProcessMs": 8.634999990463257
+            }
+          ],
+          "startedAt": "2026-11-15T20:11:21.929Z",
+          "initMs": 59.974999994039536,
+          "maskRes": "256x256",
+          "warmupFps": 83.78864314805233,
+          "medianFps": 83.28182439203496,
+          "minFps": 82.6044494537853,
+          "maxFps": 84.2716972177563,
+          "deliveredMaskRes": "1280x720",
+          "endedAt": "2026-11-15T20:11:35.785Z"
+        },
+        {
+          "name": "mediapipe-cpu-landscape",
+          "label": "MediaPipe selfie landscape — CPU (WASM)",
+          "runs": [
+            {
+              "frames": 192,
+              "ms": 2212.9249999821186,
+              "fps": 86.7629946796893,
+              "meanProcessMs": 7.3496874997702735,
+              "medianProcessMs": 6.870000019669533
+            },
+            {
+              "frames": 192,
+              "ms": 2182.1649999916553,
+              "fps": 87.98601389021188,
+              "meanProcessMs": 7.412265624695768,
+              "medianProcessMs": 7.030000001192093
+            },
+            {
+              "frames": 192,
+              "ms": 2210.274999976158,
+              "fps": 86.86701881081362,
+              "meanProcessMs": 7.273880206979811,
+              "medianProcessMs": 6.907499998807907
+            },
+            {
+              "frames": 192,
+              "ms": 2209.015000015497,
+              "fps": 86.91656688553633,
+              "meanProcessMs": 7.279270833358169,
+              "medianProcessMs": 6.909999996423721
+            },
+            {
+              "frames": 192,
+              "ms": 2214.9300000071526,
+              "fps": 86.68445503893125,
+              "meanProcessMs": 7.247630207644154,
+              "medianProcessMs": 6.870000004768372
+            }
+          ],
+          "startedAt": "2026-11-15T20:11:35.788Z",
+          "initMs": 59.03999999165535,
+          "maskRes": "256x144",
+          "warmupFps": 86.53618632229629,
+          "medianFps": 86.86701881081362,
+          "minFps": 86.68445503893125,
+          "maxFps": 87.98601389021188,
+          "deliveredMaskRes": "1280x720",
+          "endedAt": "2026-11-15T20:11:49.096Z"
+        }
+      ]
+    }
+  ]
+}
