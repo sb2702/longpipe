@@ -14,3 +14,6 @@ test-results/
 playwright-report/
 coverage/
 demo/public
+
+# Staged third-party weights (scripts/convert_mediapipe_selfie.py) — uploaded to the CDN, not committed
+dist-weights/
