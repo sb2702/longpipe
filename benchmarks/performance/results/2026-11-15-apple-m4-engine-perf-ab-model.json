@@ -1,0 +1,2309 @@
+{
+  "host": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "cpus": 10,
+    "memoryGB": 16,
+    "loadavgAtStart": [
+      4.67529296875,
+      4.32421875,
+      4.0234375
+    ],
+    "chrome": "157.0.8103.51",
+    "headless": true,
+    "macos": "26.5.1",
+    "model": "Mac16,1",
+    "chip": "Apple M4",
+    "power": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=7274595)\t100%; charged; 0:00 remaining present: true",
+    "lowPowerMode": "lowpowermode         0",
+    "thermalAtStart": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded",
+    "loadavgAtEnd": [
+      3.72998046875,
+      4.1279296875,
+      3.982421875
+    ],
+    "thermalAtEnd": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded"
+  },
+  "versions": {
+    "longpipe": "0.0.17",
+    "@mediapipe/tasks-vision": "1.1.1",
+    "@litertjs/core": "2.5.3",
+    "webcodecs-utils": "0.2.6",
+    "vite": "8.3.2",
+    "playwright-core": "1.64.1"
+  },
+  "sdkSource": {
+    "commit": null,
+    "srcClean": false,
+    "srcVersion": "0.0.17"
+  },
+  "args": {
+    "headless": true,
+    "samples": "360p,720p",
+    "modes": "model",
+    "runs": "3",
+    "pipelines": "litert-webgpu,litert-webgpu-landscape,lp-mediapipe-webgpu-square,lp-mediapipe-webgpu-square@base,lp-mediapipe-webgpu-landscape,lp-mediapipe-webgpu-landscape@base,lp-mediapipe-webgl-square,lp-mediapipe-webgl-square@base,lp-mediapipe-webgl-landscape,lp-mediapipe-webgl-landscape@base,longpipe-webgpu-xs,longpipe-webgpu-xs@base,longpipe-webgpu-small,longpipe-webgpu-small@base,longpipe-webgpu-medium,longpipe-webgpu-medium@base,longpipe-webgpu-large,longpipe-webgpu-large@base,longpipe-webgpu-xl,longpipe-webgpu-xl@base",
+    "busy-cmd": "pgrep -f \"[u]pscale_native\"",
+    "out": "../../../final_model.json",
+    "output": "readback"
+  },
+  "reports": [
+    {
+      "config": {
+        "sample": "360p",
+        "mode": "model",
+        "rounds": 3,
+        "order": "interleaved, rotated per round",
+        "startedAt": "2026-11-16T02:01:30.587Z",
+        "endedAt": "2026-11-16T02:02:36.812Z"
+      },
+      "environment": {
+        "date": "2026-11-16T02:02:36.811Z",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+        "platform": {
+          "platform": "macOS",
+          "platformVersion": "26.5.1",
+          "architecture": "arm",
+          "model": "",
+          "browsers": [
+            {
+              "brand": "Not-A.Brand",
+              "version": "99.0.0.0"
+            },
+            {
+              "brand": "Google Chrome",
+              "version": "157.0.8103.51"
+            },
+            {
+              "brand": "Chromium",
+              "version": "157.0.8103.51"
+            }
+          ]
+        },
+        "hardwareConcurrency": 10,
+        "deviceMemoryGB": 16,
+        "crossOriginIsolated": true,
+        "webgpu": {
+          "vendor": "apple",
+          "architecture": "metal-3",
+          "device": "",
+          "description": "",
+          "features": [
+            "atomic-vec2u-min-max",
+            "bgra8unorm-storage",
+            "chromium-experimental-subgroup-matrix",
+            "clip-distances",
+            "core-features-and-limits",
+            "depth-clip-control",
+            "depth32float-stencil8",
+            "dual-source-blending",
+            "float32-blendable",
+            "float32-filterable",
+            "indirect-first-instance",
+            "primitive-index",
+            "rg11b10ufloat-renderable",
+            "shader-f16",
+            "subgroup-size-control",
+            "subgroups",
+            "texture-component-swizzle",
+            "texture-compression-astc",
+            "texture-compression-astc-sliced-3d",
+            "texture-compression-bc",
+            "texture-compression-bc-sliced-3d",
+            "texture-compression-etc2",
+            "texture-compression-unaligned",
+            "texture-formats-tier1",
+            "texture-formats-tier2",
+            "timestamp-query"
+          ]
+        },
+        "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+      },
+      "results": [
+        {
+          "name": "litert-webgpu",
+          "runs": [
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 206.97499999403954,
+              "maskRes": "256x256",
+              "t0": 1794794493331,
+              "iterations": 200,
+              "medianMs": 1.8550000041723251,
+              "p90Ms": 3.3400000035762787,
+              "meanMs": 2.052074999511242,
+              "t1": 1794794493742,
+              "round": 0
+            },
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 14.775000005960464,
+              "maskRes": "256x256",
+              "t0": 1794794535416,
+              "iterations": 200,
+              "medianMs": 0.9749999940395355,
+              "p90Ms": 1.8149999976158142,
+              "meanMs": 1.164924999922514,
+              "t1": 1794794535649,
+              "round": 1
+            },
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 151.15000000596046,
+              "maskRes": "256x256",
+              "t0": 1794794556071,
+              "iterations": 200,
+              "medianMs": 0.9849999994039536,
+              "p90Ms": 1.475000023841858,
+              "meanMs": 1.1270749996602536,
+              "t1": 1794794556296,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+          "maskRes": "256x256",
+          "medianMs": 0.9849999994039536,
+          "minMs": 0.9749999940395355,
+          "maxMs": 1.8550000041723251
+        },
+        {
+          "name": "litert-webgpu-landscape",
+          "runs": [
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 21.27999997138977,
+              "maskRes": "256x144",
+              "t0": 1794794494067,
+              "iterations": 200,
+              "medianMs": 0.8999999910593033,
+              "p90Ms": 1.8949999809265137,
+              "meanMs": 1.1209000001847744,
+              "t1": 1794794494291,
+              "round": 0
+            },
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 62.75999999046326,
+              "maskRes": "256x144",
+              "t0": 1794794514885,
+              "iterations": 200,
+              "medianMs": 0.7824999988079071,
+              "p90Ms": 1.3100000023841858,
+              "meanMs": 0.923575000166893,
+              "t1": 1794794515070,
+              "round": 1
+            },
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 15.300000011920929,
+              "maskRes": "256x144",
+              "t0": 1794794556579,
+              "iterations": 200,
+              "medianMs": 0.864999994635582,
+              "p90Ms": 2.1449999809265137,
+              "meanMs": 1.131499999910593,
+              "t1": 1794794556805,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+          "maskRes": "256x144",
+          "medianMs": 0.864999994635582,
+          "minMs": 0.7824999988079071,
+          "maxMs": 0.8999999910593033
+        },
+        {
+          "name": "lp-mediapipe-webgpu-square",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 5.780000001192093,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794494601,
+              "iterations": 200,
+              "medianMs": 1.5600000023841858,
+              "p90Ms": 2.8799999952316284,
+              "meanMs": 1.8214750000834465,
+              "t1": 1794794494966,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 2.6299999952316284,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794515458,
+              "iterations": 200,
+              "medianMs": 1.2150000035762787,
+              "p90Ms": 2.9099999964237213,
+              "meanMs": 1.5679249995946885,
+              "t1": 1794794515772,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 3.2600000202655792,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794536067,
+              "iterations": 200,
+              "medianMs": 1.1699999868869781,
+              "p90Ms": 2.280000001192093,
+              "meanMs": 1.4217249998450279,
+              "t1": 1794794536352,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianMs": 1.2150000035762787,
+          "minMs": 1.1699999868869781,
+          "maxMs": 1.5600000023841858
+        },
+        {
+          "name": "lp-mediapipe-webgpu-square@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 5.030000001192093,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794495298,
+              "iterations": 200,
+              "medianMs": 2.8499999940395355,
+              "p90Ms": 4.490000009536743,
+              "meanMs": 3.1538999997079373,
+              "t1": 1794794495929,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.2450000047683716,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794516087,
+              "iterations": 200,
+              "medianMs": 2.7674999982118607,
+              "p90Ms": 4.760000020265579,
+              "meanMs": 3.1443500001728535,
+              "t1": 1794794516716,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.334999978542328,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794536664,
+              "iterations": 200,
+              "medianMs": 2.9749999940395355,
+              "p90Ms": 4.844999998807907,
+              "meanMs": 3.339025000035763,
+              "t1": 1794794537332,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianMs": 2.8499999940395355,
+          "minMs": 2.7674999982118607,
+          "maxMs": 2.9749999940395355
+        },
+        {
+          "name": "lp-mediapipe-webgpu-landscape",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 5.105000019073486,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794496227,
+              "iterations": 200,
+              "medianMs": 0.9399999976158142,
+              "p90Ms": 1.7450000047683716,
+              "meanMs": 1.1097250002622605,
+              "t1": 1794794496449,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 6.520000010728836,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794516950,
+              "iterations": 200,
+              "medianMs": 0.8674999922513962,
+              "p90Ms": 1.5,
+              "meanMs": 1.0320999997854232,
+              "t1": 1794794517157,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 6.980000019073486,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794537574,
+              "iterations": 200,
+              "medianMs": 0.882500022649765,
+              "p90Ms": 1.5349999964237213,
+              "meanMs": 1.0921000002324581,
+              "t1": 1794794537793,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianMs": 0.882500022649765,
+          "minMs": 0.8674999922513962,
+          "maxMs": 0.9399999976158142
+        },
+        {
+          "name": "lp-mediapipe-webgpu-landscape@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.064999997615814,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794496801,
+              "iterations": 200,
+              "medianMs": 2.4425000101327896,
+              "p90Ms": 3.6749999821186066,
+              "meanMs": 2.705225000232458,
+              "t1": 1794794497342,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.4200000166893005,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794517506,
+              "iterations": 200,
+              "medianMs": 2.520000010728836,
+              "p90Ms": 4.379999995231628,
+              "meanMs": 2.817874999940395,
+              "t1": 1794794518070,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.375,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794538054,
+              "iterations": 200,
+              "medianMs": 2.5974999964237213,
+              "p90Ms": 4.570000022649765,
+              "meanMs": 2.945075000077486,
+              "t1": 1794794538643,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianMs": 2.520000010728836,
+          "minMs": 2.4425000101327896,
+          "maxMs": 2.5974999964237213
+        },
+        {
+          "name": "lp-mediapipe-webgl-square",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 81.34999999403954,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794497846,
+              "iterations": 200,
+              "medianMs": 5.834999993443489,
+              "p90Ms": 7.890000015497208,
+              "meanMs": 6.176074999570846,
+              "t1": 1794794499082,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 77.50499999523163,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794518533,
+              "iterations": 200,
+              "medianMs": 5.662500008940697,
+              "p90Ms": 8.054999977350235,
+              "meanMs": 6.117600000202656,
+              "t1": 1794794519757,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 73.71500000357628,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794539205,
+              "iterations": 200,
+              "medianMs": 5.524999991059303,
+              "p90Ms": 7.544999986886978,
+              "meanMs": 5.946524999886751,
+              "t1": 1794794540394,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianMs": 5.662500008940697,
+          "minMs": 5.524999991059303,
+          "maxMs": 5.834999993443489
+        },
+        {
+          "name": "lp-mediapipe-webgl-square@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 79.31499999761581,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794499594,
+              "iterations": 200,
+              "medianMs": 6.677499994635582,
+              "p90Ms": 9.0450000166893,
+              "meanMs": 7.152824999839067,
+              "t1": 1794794501025,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 74.92500001192093,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794520321,
+              "iterations": 200,
+              "medianMs": 6.6099999994039536,
+              "p90Ms": 8.575000017881393,
+              "meanMs": 6.849574999958277,
+              "t1": 1794794521691,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 83.78500002622604,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794541000,
+              "iterations": 200,
+              "medianMs": 6.302499994635582,
+              "p90Ms": 8.544999986886978,
+              "meanMs": 6.692125000059605,
+              "t1": 1794794542338,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianMs": 6.6099999994039536,
+          "minMs": 6.302499994635582,
+          "maxMs": 6.677499994635582
+        },
+        {
+          "name": "lp-mediapipe-webgl-landscape",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 71.49500000476837,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794501556,
+              "iterations": 200,
+              "medianMs": 5.269999995827675,
+              "p90Ms": 7.384999990463257,
+              "meanMs": 5.563725000023842,
+              "t1": 1794794502669,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 74.81499999761581,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794522207,
+              "iterations": 200,
+              "medianMs": 5.267499998211861,
+              "p90Ms": 7.259999990463257,
+              "meanMs": 5.589000000208617,
+              "t1": 1794794523325,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 76.80000001192093,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794542794,
+              "iterations": 200,
+              "medianMs": 5.31750001013279,
+              "p90Ms": 7.734999984502792,
+              "meanMs": 5.7999249999225135,
+              "t1": 1794794543954,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianMs": 5.269999995827675,
+          "minMs": 5.267499998211861,
+          "maxMs": 5.31750001013279
+        },
+        {
+          "name": "lp-mediapipe-webgl-landscape@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 83.21499997377396,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794503159,
+              "iterations": 200,
+              "medianMs": 6.190000012516975,
+              "p90Ms": 8.25,
+              "meanMs": 6.484024999886751,
+              "t1": 1794794504456,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 90.25999999046326,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794523846,
+              "iterations": 200,
+              "medianMs": 6.439999997615814,
+              "p90Ms": 8.590000003576279,
+              "meanMs": 6.792349999845028,
+              "t1": 1794794525205,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 81.375,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794544520,
+              "iterations": 200,
+              "medianMs": 6.5274999886751175,
+              "p90Ms": 8.569999992847443,
+              "meanMs": 6.768449999988079,
+              "t1": 1794794545874,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianMs": 6.439999997615814,
+          "minMs": 6.190000012516975,
+          "maxMs": 6.5274999886751175
+        },
+        {
+          "name": "longpipe-webgpu-xs",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-xs",
+              "label": "Longpipe xs — network every frame, WebGPU (f16)",
+              "initMs": 21.354999989271164,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794504706,
+              "iterations": 200,
+              "medianMs": 1.157499998807907,
+              "p90Ms": 2.0900000035762787,
+              "meanMs": 1.3374250000715255,
+              "t1": 1794794504973,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-xs",
+              "label": "Longpipe xs — network every frame, WebGPU (f16)",
+              "initMs": 9.125,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794525504,
+              "iterations": 200,
+              "medianMs": 1.1800000071525574,
+              "p90Ms": 2.4850000143051147,
+              "meanMs": 1.448449999988079,
+              "t1": 1794794525794,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-xs",
+              "label": "Longpipe xs — network every frame, WebGPU (f16)",
+              "initMs": 13.370000004768372,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794546275,
+              "iterations": 200,
+              "medianMs": 1.2524999976158142,
+              "p90Ms": 3.189999997615814,
+              "meanMs": 1.6705749994516372,
+              "t1": 1794794546609,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — network every frame, WebGPU (f16)",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "medianMs": 1.1800000071525574,
+          "minMs": 1.157499998807907,
+          "maxMs": 1.2524999976158142
+        },
+        {
+          "name": "longpipe-webgpu-xs@base",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-xs@base",
+              "label": "Longpipe xs — network every frame, WebGPU (f16) [base]",
+              "initMs": 5.069999992847443,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794505274,
+              "iterations": 200,
+              "medianMs": 1.6899999976158142,
+              "p90Ms": 3.0699999928474426,
+              "meanMs": 1.9345500001311302,
+              "t1": 1794794505661,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-xs@base",
+              "label": "Longpipe xs — network every frame, WebGPU (f16) [base]",
+              "initMs": 5.185000002384186,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794526172,
+              "iterations": 200,
+              "medianMs": 1.625,
+              "p90Ms": 3.314999997615814,
+              "meanMs": 1.9399750000238418,
+              "t1": 1794794526560,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-xs@base",
+              "label": "Longpipe xs — network every frame, WebGPU (f16) [base]",
+              "initMs": 4.469999998807907,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794546920,
+              "iterations": 200,
+              "medianMs": 1.6900000125169754,
+              "p90Ms": 3.7649999856948853,
+              "meanMs": 2.0379750002920627,
+              "t1": 1794794547328,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — network every frame, WebGPU (f16) [base]",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "medianMs": 1.6899999976158142,
+          "minMs": 1.625,
+          "maxMs": 1.6900000125169754
+        },
+        {
+          "name": "longpipe-webgpu-small",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-small",
+              "label": "Longpipe small — network every frame, WebGPU (f16)",
+              "initMs": 9.909999996423721,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794506010,
+              "iterations": 200,
+              "medianMs": 1.3600000143051147,
+              "p90Ms": 2.1599999964237213,
+              "meanMs": 1.557850000113249,
+              "t1": 1794794506322,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-small",
+              "label": "Longpipe small — network every frame, WebGPU (f16)",
+              "initMs": 7.254999995231628,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794526859,
+              "iterations": 200,
+              "medianMs": 1.3550000041723251,
+              "p90Ms": 2.1299999952316284,
+              "meanMs": 1.5310000002384185,
+              "t1": 1794794527165,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-small",
+              "label": "Longpipe small — network every frame, WebGPU (f16)",
+              "initMs": 7.659999996423721,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794547632,
+              "iterations": 200,
+              "medianMs": 1.3599999845027924,
+              "p90Ms": 2.115000009536743,
+              "meanMs": 1.5414499999582767,
+              "t1": 1794794547941,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — network every frame, WebGPU (f16)",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "medianMs": 1.3599999845027924,
+          "minMs": 1.3550000041723251,
+          "maxMs": 1.3600000143051147
+        },
+        {
+          "name": "longpipe-webgpu-small@base",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-small@base",
+              "label": "Longpipe small — network every frame, WebGPU (f16) [base]",
+              "initMs": 5.96000000834465,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794506600,
+              "iterations": 200,
+              "medianMs": 1.9075000137090683,
+              "p90Ms": 3.6949999928474426,
+              "meanMs": 2.2112999999523164,
+              "t1": 1794794507043,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-small@base",
+              "label": "Longpipe small — network every frame, WebGPU (f16) [base]",
+              "initMs": 4.234999984502792,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794527479,
+              "iterations": 200,
+              "medianMs": 1.8050000071525574,
+              "p90Ms": 3.479999989271164,
+              "meanMs": 2.14565000012517,
+              "t1": 1794794527908,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-small@base",
+              "label": "Longpipe small — network every frame, WebGPU (f16) [base]",
+              "initMs": 3.9950000047683716,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794548202,
+              "iterations": 200,
+              "medianMs": 1.6850000023841858,
+              "p90Ms": 2.6400000154972076,
+              "meanMs": 1.9123499999940394,
+              "t1": 1794794548585,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — network every frame, WebGPU (f16) [base]",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "medianMs": 1.8050000071525574,
+          "minMs": 1.6850000023841858,
+          "maxMs": 1.9075000137090683
+        },
+        {
+          "name": "longpipe-webgpu-medium",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-medium",
+              "label": "Longpipe medium — network every frame, WebGPU (f16)",
+              "initMs": 16.680000007152557,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794507339,
+              "iterations": 200,
+              "medianMs": 2.292500004172325,
+              "p90Ms": 3.4449999928474426,
+              "meanMs": 2.5541499999165533,
+              "t1": 1794794507850,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-medium",
+              "label": "Longpipe medium — network every frame, WebGPU (f16)",
+              "initMs": 13.419999986886978,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794528303,
+              "iterations": 200,
+              "medianMs": 2.3075000047683716,
+              "p90Ms": 3.0899999737739563,
+              "meanMs": 2.460625,
+              "t1": 1794794528795,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-medium",
+              "label": "Longpipe medium — network every frame, WebGPU (f16)",
+              "initMs": 15.96000000834465,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794548831,
+              "iterations": 200,
+              "medianMs": 2.207500010728836,
+              "p90Ms": 3.1800000071525574,
+              "meanMs": 2.3907999996840954,
+              "t1": 1794794549310,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — network every frame, WebGPU (f16)",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "medianMs": 2.292500004172325,
+          "minMs": 2.207500010728836,
+          "maxMs": 2.3075000047683716
+        },
+        {
+          "name": "longpipe-webgpu-medium@base",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-medium@base",
+              "label": "Longpipe medium — network every frame, WebGPU (f16) [base]",
+              "initMs": 13.905000001192093,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794508168,
+              "iterations": 200,
+              "medianMs": 2.719999998807907,
+              "p90Ms": 4.0950000286102295,
+              "meanMs": 2.9997749999165535,
+              "t1": 1794794508768,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-medium@base",
+              "label": "Longpipe medium — network every frame, WebGPU (f16) [base]",
+              "initMs": 11.830000013113022,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794529154,
+              "iterations": 200,
+              "medianMs": 2.5824999809265137,
+              "p90Ms": 3.5250000059604645,
+              "meanMs": 2.7184500002861025,
+              "t1": 1794794529698,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-medium@base",
+              "label": "Longpipe medium — network every frame, WebGPU (f16) [base]",
+              "initMs": 12.490000009536743,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794549570,
+              "iterations": 200,
+              "medianMs": 2.5450000017881393,
+              "p90Ms": 4.395000010728836,
+              "meanMs": 2.863799999654293,
+              "t1": 1794794550143,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — network every frame, WebGPU (f16) [base]",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "medianMs": 2.5824999809265137,
+          "minMs": 2.5450000017881393,
+          "maxMs": 2.719999998807907
+        },
+        {
+          "name": "longpipe-webgpu-large",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-large",
+              "label": "Longpipe large — network every frame, WebGPU (f16)",
+              "initMs": 14.655000001192093,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794509111,
+              "iterations": 200,
+              "medianMs": 2.6949999928474426,
+              "p90Ms": 4.064999997615814,
+              "meanMs": 2.9314249999821187,
+              "t1": 1794794509697,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-large",
+              "label": "Longpipe large — network every frame, WebGPU (f16)",
+              "initMs": 20.700000017881393,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794530072,
+              "iterations": 200,
+              "medianMs": 2.614999994635582,
+              "p90Ms": 3.5349999964237213,
+              "meanMs": 2.7581499998271464,
+              "t1": 1794794530624,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-large",
+              "label": "Longpipe large — network every frame, WebGPU (f16)",
+              "initMs": 15.050000011920929,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794550493,
+              "iterations": 200,
+              "medianMs": 2.5150000005960464,
+              "p90Ms": 3.6649999916553497,
+              "meanMs": 2.7383499999344347,
+              "t1": 1794794551041,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — network every frame, WebGPU (f16)",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "medianMs": 2.614999994635582,
+          "minMs": 2.5150000005960464,
+          "maxMs": 2.6949999928474426
+        },
+        {
+          "name": "longpipe-webgpu-large@base",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-large@base",
+              "label": "Longpipe large — network every frame, WebGPU (f16) [base]",
+              "initMs": 11.910000026226044,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794510018,
+              "iterations": 200,
+              "medianMs": 3.1824999898672104,
+              "p90Ms": 4.91499999165535,
+              "meanMs": 3.5419499999284745,
+              "t1": 1794794510727,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-large@base",
+              "label": "Longpipe large — network every frame, WebGPU (f16) [base]",
+              "initMs": 12.784999996423721,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794530938,
+              "iterations": 200,
+              "medianMs": 2.929999992251396,
+              "p90Ms": 4.344999998807907,
+              "meanMs": 3.1812249998748303,
+              "t1": 1794794531574,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-large@base",
+              "label": "Longpipe large — network every frame, WebGPU (f16) [base]",
+              "initMs": 10.88500002026558,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794551366,
+              "iterations": 200,
+              "medianMs": 2.9099999964237213,
+              "p90Ms": 4.369999974966049,
+              "meanMs": 3.144474999755621,
+              "t1": 1794794551995,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — network every frame, WebGPU (f16) [base]",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "medianMs": 2.929999992251396,
+          "minMs": 2.9099999964237213,
+          "maxMs": 3.1824999898672104
+        },
+        {
+          "name": "longpipe-webgpu-xl",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-xl",
+              "label": "Longpipe xl — network every frame, WebGPU (f16)",
+              "initMs": 27.5450000166893,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794511160,
+              "iterations": 200,
+              "medianMs": 6.450000002980232,
+              "p90Ms": 8.094999998807907,
+              "meanMs": 6.623099999576807,
+              "t1": 1794794512484,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-xl",
+              "label": "Longpipe xl — network every frame, WebGPU (f16)",
+              "initMs": 26.84000000357628,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794532040,
+              "iterations": 200,
+              "medianMs": 6.367500007152557,
+              "p90Ms": 7.46000000834465,
+              "meanMs": 6.397925000339747,
+              "t1": 1794794533320,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-xl",
+              "label": "Longpipe xl — network every frame, WebGPU (f16)",
+              "initMs": 24.71500000357628,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794552483,
+              "iterations": 200,
+              "medianMs": 6.200000002980232,
+              "p90Ms": 7.709999978542328,
+              "meanMs": 6.364124999642372,
+              "t1": 1794794553756,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — network every frame, WebGPU (f16)",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "medianMs": 6.367500007152557,
+          "minMs": 6.200000002980232,
+          "maxMs": 6.450000002980232
+        },
+        {
+          "name": "longpipe-webgpu-xl@base",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-xl@base",
+              "label": "Longpipe xl — network every frame, WebGPU (f16) [base]",
+              "initMs": 24.895000010728836,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794512922,
+              "iterations": 200,
+              "medianMs": 6.6500000059604645,
+              "p90Ms": 8.850000023841858,
+              "meanMs": 6.929475000053644,
+              "t1": 1794794514308,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-xl@base",
+              "label": "Longpipe xl — network every frame, WebGPU (f16) [base]",
+              "initMs": 33.49500000476837,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794533807,
+              "iterations": 200,
+              "medianMs": 6.242500007152557,
+              "p90Ms": 8.129999995231628,
+              "meanMs": 6.542424999922514,
+              "t1": 1794794535116,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-xl@base",
+              "label": "Longpipe xl — network every frame, WebGPU (f16) [base]",
+              "initMs": 41.31999999284744,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794554210,
+              "iterations": 200,
+              "medianMs": 6.56750001013279,
+              "p90Ms": 8.434999972581863,
+              "meanMs": 6.729299999922514,
+              "t1": 1794794555556,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — network every frame, WebGPU (f16) [base]",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "medianMs": 6.56750001013279,
+          "minMs": 6.242500007152557,
+          "maxMs": 6.6500000059604645
+        }
+      ]
+    },
+    {
+      "config": {
+        "sample": "720p",
+        "mode": "model",
+        "rounds": 3,
+        "order": "interleaved, rotated per round",
+        "startedAt": "2026-11-16T02:02:36.813Z",
+        "endedAt": "2026-11-16T02:03:38.277Z"
+      },
+      "environment": {
+        "date": "2026-11-16T02:03:38.276Z",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+        "platform": {
+          "platform": "macOS",
+          "platformVersion": "26.5.1",
+          "architecture": "arm",
+          "model": "",
+          "browsers": [
+            {
+              "brand": "Not-A.Brand",
+              "version": "99.0.0.0"
+            },
+            {
+              "brand": "Google Chrome",
+              "version": "157.0.8103.51"
+            },
+            {
+              "brand": "Chromium",
+              "version": "157.0.8103.51"
+            }
+          ]
+        },
+        "hardwareConcurrency": 10,
+        "deviceMemoryGB": 16,
+        "crossOriginIsolated": true,
+        "webgpu": {
+          "vendor": "apple",
+          "architecture": "metal-3",
+          "device": "",
+          "description": "",
+          "features": [
+            "atomic-vec2u-min-max",
+            "bgra8unorm-storage",
+            "chromium-experimental-subgroup-matrix",
+            "clip-distances",
+            "core-features-and-limits",
+            "depth-clip-control",
+            "depth32float-stencil8",
+            "dual-source-blending",
+            "float32-blendable",
+            "float32-filterable",
+            "indirect-first-instance",
+            "primitive-index",
+            "rg11b10ufloat-renderable",
+            "shader-f16",
+            "subgroup-size-control",
+            "subgroups",
+            "texture-component-swizzle",
+            "texture-compression-astc",
+            "texture-compression-astc-sliced-3d",
+            "texture-compression-bc",
+            "texture-compression-bc-sliced-3d",
+            "texture-compression-etc2",
+            "texture-compression-unaligned",
+            "texture-formats-tier1",
+            "texture-formats-tier2",
+            "timestamp-query"
+          ]
+        },
+        "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+      },
+      "results": [
+        {
+          "name": "litert-webgpu",
+          "runs": [
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 52.54999998211861,
+              "maskRes": "256x256",
+              "t0": 1794794557298,
+              "iterations": 200,
+              "medianMs": 1.1749999970197678,
+              "p90Ms": 2.179999977350235,
+              "meanMs": 1.3820999996364116,
+              "t1": 1794794557574,
+              "round": 0
+            },
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 14.565000027418137,
+              "maskRes": "256x256",
+              "t0": 1794794597594,
+              "iterations": 200,
+              "medianMs": 1,
+              "p90Ms": 1.395000010728836,
+              "meanMs": 1.0773499999940395,
+              "t1": 1794794597810,
+              "round": 1
+            },
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 149.09000000357628,
+              "maskRes": "256x256",
+              "t0": 1794794617595,
+              "iterations": 200,
+              "medianMs": 1.0099999904632568,
+              "p90Ms": 1.7399999797344208,
+              "meanMs": 1.1789500001072883,
+              "t1": 1794794617831,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+          "maskRes": "256x256",
+          "medianMs": 1.0099999904632568,
+          "minMs": 1,
+          "maxMs": 1.1749999970197678
+        },
+        {
+          "name": "litert-webgpu-landscape",
+          "runs": [
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 15.229999989271164,
+              "maskRes": "256x144",
+              "t0": 1794794557791,
+              "iterations": 200,
+              "medianMs": 0.8825000077486038,
+              "p90Ms": 1.5499999821186066,
+              "meanMs": 1.0667499999701977,
+              "t1": 1794794558005,
+              "round": 0
+            },
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 61.91500002145767,
+              "maskRes": "256x144",
+              "t0": 1794794578123,
+              "iterations": 200,
+              "medianMs": 0.929999977350235,
+              "p90Ms": 1.5050000250339508,
+              "meanMs": 1.0761000001430512,
+              "t1": 1794794578338,
+              "round": 1
+            },
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 16.730000019073486,
+              "maskRes": "256x144",
+              "t0": 1794794618066,
+              "iterations": 200,
+              "medianMs": 0.7600000202655792,
+              "p90Ms": 1.850000023841858,
+              "meanMs": 1.0180500002205373,
+              "t1": 1794794618269,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+          "maskRes": "256x144",
+          "medianMs": 0.8825000077486038,
+          "minMs": 0.7600000202655792,
+          "maxMs": 0.929999977350235
+        },
+        {
+          "name": "lp-mediapipe-webgpu-square",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 3.3350000083446503,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794558246,
+              "iterations": 200,
+              "medianMs": 1.145000010728836,
+              "p90Ms": 2.1649999916553497,
+              "meanMs": 1.4009250000119209,
+              "t1": 1794794558526,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 3.0499999821186066,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794578581,
+              "iterations": 200,
+              "medianMs": 1.125,
+              "p90Ms": 2.225000023841858,
+              "meanMs": 1.3677749997377395,
+              "t1": 1794794578854,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 3.469999998807907,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794598227,
+              "iterations": 200,
+              "medianMs": 1.1124999970197678,
+              "p90Ms": 1.6850000023841858,
+              "meanMs": 1.2578250001370908,
+              "t1": 1794794598479,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianMs": 1.125,
+          "minMs": 1.1124999970197678,
+          "maxMs": 1.145000010728836
+        },
+        {
+          "name": "lp-mediapipe-webgpu-square@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.334999978542328,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794558835,
+              "iterations": 200,
+              "medianMs": 2.877499997615814,
+              "p90Ms": 4.769999980926514,
+              "meanMs": 3.237599999755621,
+              "t1": 1794794559482,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 2.665000021457672,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794579154,
+              "iterations": 200,
+              "medianMs": 2.667499989271164,
+              "p90Ms": 4.360000014305115,
+              "meanMs": 2.9817249999940394,
+              "t1": 1794794579750,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.199999988079071,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794598803,
+              "iterations": 200,
+              "medianMs": 2.8675000071525574,
+              "p90Ms": 4.819999992847443,
+              "meanMs": 3.1797500006854533,
+              "t1": 1794794599440,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianMs": 2.8675000071525574,
+          "minMs": 2.667499989271164,
+          "maxMs": 2.877499997615814
+        },
+        {
+          "name": "lp-mediapipe-webgpu-landscape",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 6.365000009536743,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794559717,
+              "iterations": 200,
+              "medianMs": 0.9000000059604645,
+              "p90Ms": 1.4000000059604645,
+              "meanMs": 1.039399999976158,
+              "t1": 1794794559925,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 6.935000002384186,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794579971,
+              "iterations": 200,
+              "medianMs": 0.8899999856948853,
+              "p90Ms": 1.354999989271164,
+              "meanMs": 0.9900749999284745,
+              "t1": 1794794580169,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 8.200000017881393,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794599678,
+              "iterations": 200,
+              "medianMs": 0.9000000059604645,
+              "p90Ms": 1.3050000071525574,
+              "meanMs": 1.02125,
+              "t1": 1794794599883,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianMs": 0.9000000059604645,
+          "minMs": 0.8899999856948853,
+          "maxMs": 0.9000000059604645
+        },
+        {
+          "name": "lp-mediapipe-webgpu-landscape@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.125,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794560271,
+              "iterations": 200,
+              "medianMs": 2.757500007748604,
+              "p90Ms": 4.715000003576279,
+              "meanMs": 3.080575000345707,
+              "t1": 1794794560887,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 2.9500000178813934,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794580461,
+              "iterations": 200,
+              "medianMs": 2.540000006556511,
+              "p90Ms": 4.310000002384186,
+              "meanMs": 2.8723250000178813,
+              "t1": 1794794581036,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 2.7149999737739563,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794600155,
+              "iterations": 200,
+              "medianMs": 2.709999993443489,
+              "p90Ms": 4.629999995231628,
+              "meanMs": 3.0232249996066094,
+              "t1": 1794794600760,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianMs": 2.709999993443489,
+          "minMs": 2.540000006556511,
+          "maxMs": 2.757500007748604
+        },
+        {
+          "name": "lp-mediapipe-webgl-square",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 79.0300000011921,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794561363,
+              "iterations": 200,
+              "medianMs": 6.004999995231628,
+              "p90Ms": 8.245000004768372,
+              "meanMs": 6.337125000208617,
+              "t1": 1794794562631,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 72.65000000596046,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794581491,
+              "iterations": 200,
+              "medianMs": 5.594999998807907,
+              "p90Ms": 7.969999998807907,
+              "meanMs": 6.0630249996483325,
+              "t1": 1794794582704,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 83.21000000834465,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794601262,
+              "iterations": 200,
+              "medianMs": 5.5999999940395355,
+              "p90Ms": 7.705000013113022,
+              "meanMs": 5.968425000458955,
+              "t1": 1794794602456,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianMs": 5.5999999940395355,
+          "minMs": 5.594999998807907,
+          "maxMs": 6.004999995231628
+        },
+        {
+          "name": "lp-mediapipe-webgl-square@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 76.125,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794563148,
+              "iterations": 200,
+              "medianMs": 6.579999998211861,
+              "p90Ms": 9.060000002384186,
+              "meanMs": 6.969450000077486,
+              "t1": 1794794564542,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 75.98499998450279,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794583259,
+              "iterations": 200,
+              "medianMs": 6.427499994635582,
+              "p90Ms": 8.560000002384186,
+              "meanMs": 6.808225000202656,
+              "t1": 1794794584621,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 77.48000001907349,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "t0": 1794794602929,
+              "iterations": 200,
+              "medianMs": 6.49499998986721,
+              "p90Ms": 8.674999982118607,
+              "meanMs": 6.80734999909997,
+              "t1": 1794794604290,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianMs": 6.49499998986721,
+          "minMs": 6.427499994635582,
+          "maxMs": 6.579999998211861
+        },
+        {
+          "name": "lp-mediapipe-webgl-landscape",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 75.26499998569489,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794565057,
+              "iterations": 200,
+              "medianMs": 5.627500012516975,
+              "p90Ms": 7.800000011920929,
+              "meanMs": 5.949924999922514,
+              "t1": 1794794566248,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 82.12999999523163,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794585161,
+              "iterations": 200,
+              "medianMs": 5.495000004768372,
+              "p90Ms": 7.475000023841858,
+              "meanMs": 5.830475000143051,
+              "t1": 1794794586327,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 85.3250000178814,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794604740,
+              "iterations": 200,
+              "medianMs": 5.454999998211861,
+              "p90Ms": 7.340000003576279,
+              "meanMs": 5.789950000047684,
+              "t1": 1794794605898,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianMs": 5.495000004768372,
+          "minMs": 5.454999998211861,
+          "maxMs": 5.627500012516975
+        },
+        {
+          "name": "lp-mediapipe-webgl-landscape@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 86.63500002026558,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794566735,
+              "iterations": 200,
+              "medianMs": 6.6400000005960464,
+              "p90Ms": 8.889999985694885,
+              "meanMs": 7.00835000038147,
+              "t1": 1794794568137,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 94.61999997496605,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794586894,
+              "iterations": 200,
+              "medianMs": 6.5150000005960464,
+              "p90Ms": 8.520000010728836,
+              "meanMs": 6.750075000077486,
+              "t1": 1794794588245,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 91.73999997973442,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "t0": 1794794606460,
+              "iterations": 200,
+              "medianMs": 6.554999992251396,
+              "p90Ms": 8.465000003576279,
+              "meanMs": 6.799375,
+              "t1": 1794794607820,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianMs": 6.554999992251396,
+          "minMs": 6.5150000005960464,
+          "maxMs": 6.6400000005960464
+        },
+        {
+          "name": "longpipe-webgpu-xs",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-xs",
+              "label": "Longpipe xs — network every frame, WebGPU (f16)",
+              "initMs": 20.66499999165535,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794568395,
+              "iterations": 200,
+              "medianMs": 1.1449999809265137,
+              "p90Ms": 1.7249999940395355,
+              "meanMs": 1.2722999997437001,
+              "t1": 1794794568649,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-xs",
+              "label": "Longpipe xs — network every frame, WebGPU (f16)",
+              "initMs": 11.13000002503395,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794588480,
+              "iterations": 200,
+              "medianMs": 1.1500000059604645,
+              "p90Ms": 2.189999997615814,
+              "meanMs": 1.3822249999642373,
+              "t1": 1794794588757,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-xs",
+              "label": "Longpipe xs — network every frame, WebGPU (f16)",
+              "initMs": 9.8299999833107,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794608086,
+              "iterations": 200,
+              "medianMs": 1.25,
+              "p90Ms": 2.509999990463257,
+              "meanMs": 1.5486999998986721,
+              "t1": 1794794608396,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — network every frame, WebGPU (f16)",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "medianMs": 1.1500000059604645,
+          "minMs": 1.1449999809265137,
+          "maxMs": 1.25
+        },
+        {
+          "name": "longpipe-webgpu-xs@base",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-xs@base",
+              "label": "Longpipe xs — network every frame, WebGPU (f16) [base]",
+              "initMs": 4.6500000059604645,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794568880,
+              "iterations": 200,
+              "medianMs": 1.510000005364418,
+              "p90Ms": 2.314999997615814,
+              "meanMs": 1.6996749997138978,
+              "t1": 1794794569220,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-xs@base",
+              "label": "Longpipe xs — network every frame, WebGPU (f16) [base]",
+              "initMs": 4.945000022649765,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794588991,
+              "iterations": 200,
+              "medianMs": 1.5549999922513962,
+              "p90Ms": 2.7849999964237213,
+              "meanMs": 1.831950000077486,
+              "t1": 1794794589357,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-xs@base",
+              "label": "Longpipe xs — network every frame, WebGPU (f16) [base]",
+              "initMs": 4.96000000834465,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "t0": 1794794608645,
+              "iterations": 200,
+              "medianMs": 1.8050000071525574,
+              "p90Ms": 2.8700000047683716,
+              "meanMs": 2.009375,
+              "t1": 1794794609047,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — network every frame, WebGPU (f16) [base]",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "medianMs": 1.5549999922513962,
+          "minMs": 1.510000005364418,
+          "maxMs": 1.8050000071525574
+        },
+        {
+          "name": "longpipe-webgpu-small",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-small",
+              "label": "Longpipe small — network every frame, WebGPU (f16)",
+              "initMs": 5.935000002384186,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794569500,
+              "iterations": 200,
+              "medianMs": 1.362500011920929,
+              "p90Ms": 2.4149999916553497,
+              "meanMs": 1.6070750001072884,
+              "t1": 1794794569821,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-small",
+              "label": "Longpipe small — network every frame, WebGPU (f16)",
+              "initMs": 6.280000001192093,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794589559,
+              "iterations": 200,
+              "medianMs": 1.3175000101327896,
+              "p90Ms": 2.1200000047683716,
+              "meanMs": 1.4861499997973442,
+              "t1": 1794794589856,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-small",
+              "label": "Longpipe small — network every frame, WebGPU (f16)",
+              "initMs": 6.064999997615814,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794609329,
+              "iterations": 200,
+              "medianMs": 1.3774999976158142,
+              "p90Ms": 2.25,
+              "meanMs": 1.563575000166893,
+              "t1": 1794794609642,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — network every frame, WebGPU (f16)",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "medianMs": 1.362500011920929,
+          "minMs": 1.3175000101327896,
+          "maxMs": 1.3774999976158142
+        },
+        {
+          "name": "longpipe-webgpu-small@base",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-small@base",
+              "label": "Longpipe small — network every frame, WebGPU (f16) [base]",
+              "initMs": 4.389999985694885,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794570122,
+              "iterations": 200,
+              "medianMs": 1.989999994635582,
+              "p90Ms": 4.28999999165535,
+              "meanMs": 2.556324999779463,
+              "t1": 1794794570634,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-small@base",
+              "label": "Longpipe small — network every frame, WebGPU (f16) [base]",
+              "initMs": 4.129999995231628,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794590108,
+              "iterations": 200,
+              "medianMs": 1.6500000059604645,
+              "p90Ms": 2.4850000143051147,
+              "meanMs": 1.8543999996781348,
+              "t1": 1794794590479,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-small@base",
+              "label": "Longpipe small — network every frame, WebGPU (f16) [base]",
+              "initMs": 4.28999999165535,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "t0": 1794794609847,
+              "iterations": 200,
+              "medianMs": 1.8275000005960464,
+              "p90Ms": 3.050000011920929,
+              "meanMs": 2.057150000035763,
+              "t1": 1794794610259,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — network every frame, WebGPU (f16) [base]",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "medianMs": 1.8275000005960464,
+          "minMs": 1.6500000059604645,
+          "maxMs": 1.989999994635582
+        },
+        {
+          "name": "longpipe-webgpu-medium",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-medium",
+              "label": "Longpipe medium — network every frame, WebGPU (f16)",
+              "initMs": 15.715000003576279,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794570887,
+              "iterations": 200,
+              "medianMs": 2.2999999970197678,
+              "p90Ms": 3.3299999833106995,
+              "meanMs": 2.497900000214577,
+              "t1": 1794794571387,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-medium",
+              "label": "Longpipe medium — network every frame, WebGPU (f16)",
+              "initMs": 21.03999999165535,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794590736,
+              "iterations": 200,
+              "medianMs": 2.2149999886751175,
+              "p90Ms": 3.259999990463257,
+              "meanMs": 2.495074999779463,
+              "t1": 1794794591235,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-medium",
+              "label": "Longpipe medium — network every frame, WebGPU (f16)",
+              "initMs": 14.759999990463257,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794610531,
+              "iterations": 200,
+              "medianMs": 2.310000002384186,
+              "p90Ms": 3.2049999833106995,
+              "meanMs": 2.4798750001192094,
+              "t1": 1794794611027,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — network every frame, WebGPU (f16)",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "medianMs": 2.2999999970197678,
+          "minMs": 2.2149999886751175,
+          "maxMs": 2.310000002384186
+        },
+        {
+          "name": "longpipe-webgpu-medium@base",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-medium@base",
+              "label": "Longpipe medium — network every frame, WebGPU (f16) [base]",
+              "initMs": 11.075000017881393,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794571649,
+              "iterations": 200,
+              "medianMs": 2.6200000196695328,
+              "p90Ms": 4.334999978542328,
+              "meanMs": 2.909424999952316,
+              "t1": 1794794572231,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-medium@base",
+              "label": "Longpipe medium — network every frame, WebGPU (f16) [base]",
+              "initMs": 11.844999998807907,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794591516,
+              "iterations": 200,
+              "medianMs": 2.467500001192093,
+              "p90Ms": 4.160000026226044,
+              "meanMs": 2.865725000202656,
+              "t1": 1794794592089,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-medium@base",
+              "label": "Longpipe medium — network every frame, WebGPU (f16) [base]",
+              "initMs": 12.240000009536743,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "t0": 1794794611318,
+              "iterations": 200,
+              "medianMs": 2.614999994635582,
+              "p90Ms": 4.205000013113022,
+              "meanMs": 2.9017000003159046,
+              "t1": 1794794611899,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — network every frame, WebGPU (f16) [base]",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "medianMs": 2.614999994635582,
+          "minMs": 2.467500001192093,
+          "maxMs": 2.6200000196695328
+        },
+        {
+          "name": "longpipe-webgpu-large",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-large",
+              "label": "Longpipe large — network every frame, WebGPU (f16)",
+              "initMs": 14.604999989271164,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794572511,
+              "iterations": 200,
+              "medianMs": 2.719999998807907,
+              "p90Ms": 4.055000007152557,
+              "meanMs": 2.930149999856949,
+              "t1": 1794794573097,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-large",
+              "label": "Longpipe large — network every frame, WebGPU (f16)",
+              "initMs": 22.349999994039536,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794592363,
+              "iterations": 200,
+              "medianMs": 2.572499990463257,
+              "p90Ms": 3.665000021457672,
+              "meanMs": 2.860075000077486,
+              "t1": 1794794592935,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-large",
+              "label": "Longpipe large — network every frame, WebGPU (f16)",
+              "initMs": 15.685000002384186,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794612216,
+              "iterations": 200,
+              "medianMs": 2.6724999845027924,
+              "p90Ms": 3.9300000071525574,
+              "meanMs": 2.9146750001609325,
+              "t1": 1794794612799,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — network every frame, WebGPU (f16)",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "medianMs": 2.6724999845027924,
+          "minMs": 2.572499990463257,
+          "maxMs": 2.719999998807907
+        },
+        {
+          "name": "longpipe-webgpu-large@base",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-large@base",
+              "label": "Longpipe large — network every frame, WebGPU (f16) [base]",
+              "initMs": 11.74499997496605,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794573409,
+              "iterations": 200,
+              "medianMs": 3.1825000047683716,
+              "p90Ms": 5.0250000059604645,
+              "meanMs": 3.5470250000059607,
+              "t1": 1794794574119,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-large@base",
+              "label": "Longpipe large — network every frame, WebGPU (f16) [base]",
+              "initMs": 12.734999984502792,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794593239,
+              "iterations": 200,
+              "medianMs": 3.1774999797344208,
+              "p90Ms": 5.014999985694885,
+              "meanMs": 3.4053249999880792,
+              "t1": 1794794593920,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-large@base",
+              "label": "Longpipe large — network every frame, WebGPU (f16) [base]",
+              "initMs": 12.394999980926514,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "t0": 1794794613114,
+              "iterations": 200,
+              "medianMs": 2.905000001192093,
+              "p90Ms": 4.594999998807907,
+              "meanMs": 3.2398749996721743,
+              "t1": 1794794613762,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — network every frame, WebGPU (f16) [base]",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "medianMs": 3.1774999797344208,
+          "minMs": 2.905000001192093,
+          "maxMs": 3.1825000047683716
+        },
+        {
+          "name": "longpipe-webgpu-xl",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-xl",
+              "label": "Longpipe xl — network every frame, WebGPU (f16)",
+              "initMs": 32.71500000357628,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794574521,
+              "iterations": 200,
+              "medianMs": 6.319999992847443,
+              "p90Ms": 7.814999997615814,
+              "meanMs": 6.45107499986887,
+              "t1": 1794794575811,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-xl",
+              "label": "Longpipe xl — network every frame, WebGPU (f16)",
+              "initMs": 26.099999994039536,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794594328,
+              "iterations": 200,
+              "medianMs": 6.495000004768372,
+              "p90Ms": 8.215000003576279,
+              "meanMs": 6.6165749995410446,
+              "t1": 1794794595651,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-xl",
+              "label": "Longpipe xl — network every frame, WebGPU (f16)",
+              "initMs": 35.28999999165535,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794614222,
+              "iterations": 200,
+              "medianMs": 6.072500005364418,
+              "p90Ms": 7.495000004768372,
+              "meanMs": 6.286000000089407,
+              "t1": 1794794615480,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — network every frame, WebGPU (f16)",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "medianMs": 6.319999992847443,
+          "minMs": 6.072500005364418,
+          "maxMs": 6.495000004768372
+        },
+        {
+          "name": "longpipe-webgpu-xl@base",
+          "runs": [
+            {
+              "name": "longpipe-webgpu-xl@base",
+              "label": "Longpipe xl — network every frame, WebGPU (f16) [base]",
+              "initMs": 24.480000019073486,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794576222,
+              "iterations": 200,
+              "medianMs": 6.962499991059303,
+              "p90Ms": 9.129999995231628,
+              "meanMs": 7.110750000029802,
+              "t1": 1794794577644,
+              "round": 0
+            },
+            {
+              "name": "longpipe-webgpu-xl@base",
+              "label": "Longpipe xl — network every frame, WebGPU (f16) [base]",
+              "initMs": 27.78499999642372,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794596042,
+              "iterations": 200,
+              "medianMs": 6.3924999833106995,
+              "p90Ms": 8.2950000166893,
+              "meanMs": 6.592775000333786,
+              "t1": 1794794597360,
+              "round": 1
+            },
+            {
+              "name": "longpipe-webgpu-xl@base",
+              "label": "Longpipe xl — network every frame, WebGPU (f16) [base]",
+              "initMs": 29.875,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "t0": 1794794615887,
+              "iterations": 200,
+              "medianMs": 6.392500013113022,
+              "p90Ms": 8.365000009536743,
+              "meanMs": 6.62327500000596,
+              "t1": 1794794617212,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — network every frame, WebGPU (f16) [base]",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "medianMs": 6.392500013113022,
+          "minMs": 6.3924999833106995,
+          "maxMs": 6.962499991059303
+        }
+      ]
+    }
+  ],
+  "discarded": [],
+  "busyCmd": "pgrep -f \"[u]pscale_native\"",
+  "busySamples": []
+}

@@ -1,0 +1,5291 @@
+{
+  "host": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "cpus": 10,
+    "memoryGB": 16,
+    "loadavgAtStart": [
+      4.12841796875,
+      3.91748046875,
+      3.78955078125
+    ],
+    "chrome": "157.0.8103.51",
+    "headless": true,
+    "macos": "26.5.1",
+    "model": "Mac16,1",
+    "chip": "Apple M4",
+    "power": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=7274595)\t100%; charged; 0:00 remaining present: true",
+    "lowPowerMode": "lowpowermode         0",
+    "thermalAtStart": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded",
+    "loadavgAtEnd": [
+      4.93115234375,
+      4.34375,
+      4.02490234375
+    ],
+    "thermalAtEnd": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded"
+  },
+  "versions": {
+    "longpipe": "0.0.17",
+    "@mediapipe/tasks-vision": "1.1.1",
+    "@litertjs/core": "2.5.3",
+    "webcodecs-utils": "0.2.6",
+    "vite": "8.3.2",
+    "playwright-core": "1.64.1"
+  },
+  "sdkSource": {
+    "commit": null,
+    "srcClean": false,
+    "srcVersion": "0.0.17"
+  },
+  "args": {
+    "headless": true,
+    "samples": "360p,720p",
+    "modes": "transcode",
+    "runs": "3",
+    "pipelines": "litert-webgpu,litert-webgpu-landscape,lp-mediapipe-webgpu-square,lp-mediapipe-webgpu-square@base,lp-mediapipe-webgpu-landscape,lp-mediapipe-webgpu-landscape@base,shipped-webgpu-xs,shipped-webgpu-xs@base,shipped-webgpu-small,shipped-webgpu-small@base,shipped-webgpu-medium,shipped-webgpu-medium@base,shipped-webgpu-large,shipped-webgpu-large@base,shipped-webgpu-xl,shipped-webgpu-xl@base,lp-mediapipe-webgl-square,lp-mediapipe-webgl-square@base,lp-mediapipe-webgl-landscape,lp-mediapipe-webgl-landscape@base,shipped-webgl-xs,shipped-webgl-xs@base,shipped-webgl-small,shipped-webgl-small@base,shipped-webgl-medium,shipped-webgl-medium@base,shipped-webgl-large,shipped-webgl-large@base,shipped-webgl-xl,shipped-webgl-xl@base",
+    "busy-cmd": "pgrep -f \"[u]pscale_native\"",
+    "out": "../../../final_transcode.json",
+    "output": "readback"
+  },
+  "reports": [
+    {
+      "config": {
+        "sample": "360p",
+        "mode": "transcode",
+        "output": "readback",
+        "rounds": 3,
+        "order": "interleaved, rotated per round",
+        "startedAt": "2026-11-16T01:51:36.879Z",
+        "endedAt": "2026-11-16T01:55:41.689Z"
+      },
+      "environment": {
+        "date": "2026-11-16T01:55:41.688Z",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+        "platform": {
+          "platform": "macOS",
+          "platformVersion": "26.5.1",
+          "architecture": "arm",
+          "model": "",
+          "browsers": [
+            {
+              "brand": "Not-A.Brand",
+              "version": "99.0.0.0"
+            },
+            {
+              "brand": "Google Chrome",
+              "version": "157.0.8103.51"
+            },
+            {
+              "brand": "Chromium",
+              "version": "157.0.8103.51"
+            }
+          ]
+        },
+        "hardwareConcurrency": 10,
+        "deviceMemoryGB": 16,
+        "crossOriginIsolated": true,
+        "webgpu": {
+          "vendor": "apple",
+          "architecture": "metal-3",
+          "device": "",
+          "description": "",
+          "features": [
+            "atomic-vec2u-min-max",
+            "bgra8unorm-storage",
+            "chromium-experimental-subgroup-matrix",
+            "clip-distances",
+            "core-features-and-limits",
+            "depth-clip-control",
+            "depth32float-stencil8",
+            "dual-source-blending",
+            "float32-blendable",
+            "float32-filterable",
+            "indirect-first-instance",
+            "primitive-index",
+            "rg11b10ufloat-renderable",
+            "shader-f16",
+            "subgroup-size-control",
+            "subgroups",
+            "texture-component-swizzle",
+            "texture-compression-astc",
+            "texture-compression-astc-sliced-3d",
+            "texture-compression-bc",
+            "texture-compression-bc-sliced-3d",
+            "texture-compression-etc2",
+            "texture-compression-unaligned",
+            "texture-formats-tier1",
+            "texture-formats-tier2",
+            "timestamp-query"
+          ]
+        },
+        "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+      },
+      "results": [
+        {
+          "name": "litert-webgpu",
+          "runs": [
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 208.8250000178814,
+              "maskRes": "256x256",
+              "warmupFps": 280.66072211909494,
+              "t0": 1794793900967,
+              "frames": 192,
+              "ms": 565.5500000119209,
+              "fps": 339.492529389007,
+              "meanProcessMs": 0.32796875123555463,
+              "medianProcessMs": 0.2850000113248825,
+              "t1": 1794793901533,
+              "round": 0
+            },
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 17.84000000357628,
+              "maskRes": "256x256",
+              "warmupFps": 366.8708022440978,
+              "t0": 1794794060085,
+              "frames": 192,
+              "ms": 503.60000002384186,
+              "fps": 381.2549642392974,
+              "meanProcessMs": 0.21692708351959786,
+              "medianProcessMs": 0.18000000715255737,
+              "t1": 1794794060589,
+              "round": 1
+            },
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 186.73999997973442,
+              "maskRes": "256x256",
+              "warmupFps": 328.1911029576936,
+              "t0": 1794794139856,
+              "frames": 192,
+              "ms": 473.11500000953674,
+              "fps": 405.8209948873525,
+              "meanProcessMs": 0.22591145910943547,
+              "medianProcessMs": 0.1850000023841858,
+              "t1": 1794794140329,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+          "maskRes": "256x256",
+          "medianFps": 381.2549642392974,
+          "minFps": 339.492529389007,
+          "maxFps": 405.8209948873525
+        },
+        {
+          "name": "litert-webgpu-landscape",
+          "runs": [
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 19.125,
+              "maskRes": "256x144",
+              "warmupFps": 373.4173522254661,
+              "t0": 1794793902069,
+              "frames": 192,
+              "ms": 441.9950000047684,
+              "fps": 434.3940542266963,
+              "meanProcessMs": 0.2525781253352761,
+              "medianProcessMs": 0.1875,
+              "t1": 1794793902511,
+              "round": 0
+            },
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 61.139999985694885,
+              "maskRes": "256x144",
+              "warmupFps": 358.5400696570707,
+              "t0": 1794793980710,
+              "frames": 192,
+              "ms": 443.19999998807907,
+              "fps": 433.212996401544,
+              "meanProcessMs": 0.2285156256208817,
+              "medianProcessMs": 0.20499998331069946,
+              "t1": 1794793981153,
+              "round": 1
+            },
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 21.950000017881393,
+              "maskRes": "256x144",
+              "warmupFps": 253.33993072736268,
+              "t0": 1794794141112,
+              "frames": 192,
+              "ms": 570.6999999880791,
+              "fps": 336.42894691433423,
+              "meanProcessMs": 0.3356510413189729,
+              "medianProcessMs": 0.2875000089406967,
+              "t1": 1794794141683,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+          "maskRes": "256x144",
+          "medianFps": 433.212996401544,
+          "minFps": 336.42894691433423,
+          "maxFps": 434.3940542266963
+        },
+        {
+          "name": "lp-mediapipe-webgpu-square",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 5,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 344.8090081272175,
+              "t0": 1794793903075,
+              "frames": 192,
+              "ms": 555.4150000214577,
+              "fps": 345.6874589137534,
+              "meanProcessMs": 0.10309895935157935,
+              "medianProcessMs": 0.08000001311302185,
+              "t1": 1794793903630,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 3.6599999964237213,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 335.7964234148021,
+              "t0": 1794793981731,
+              "frames": 192,
+              "ms": 563.5400000214577,
+              "fps": 340.7034105701269,
+              "meanProcessMs": 0.09638020986070235,
+              "medianProcessMs": 0.08500000834465027,
+              "t1": 1794793982294,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 3.7650000154972076,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 335.5147617785775,
+              "t0": 1794794061364,
+              "frames": 192,
+              "ms": 576.7700000107288,
+              "fps": 332.8883263630711,
+              "meanProcessMs": 0.08799479156732559,
+              "medianProcessMs": 0.07500001788139343,
+              "t1": 1794794061941,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianFps": 340.7034105701269,
+          "minFps": 332.8883263630711,
+          "maxFps": 345.6874589137534
+        },
+        {
+          "name": "lp-mediapipe-webgpu-square@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 4.03999999165535,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 196.5803214871351,
+              "t0": 1794793904613,
+              "frames": 192,
+              "ms": 932.3100000023842,
+              "fps": 205.94008430619536,
+              "meanProcessMs": 0.3801302088735004,
+              "medianProcessMs": 0.32999998331069946,
+              "t1": 1794793905545,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 4.064999997615814,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 192.91635267520724,
+              "t0": 1794793983294,
+              "frames": 192,
+              "ms": 980.7399999797344,
+              "fps": 195.7705406162361,
+              "meanProcessMs": 0.36661458186184365,
+              "medianProcessMs": 0.32999998331069946,
+              "t1": 1794793984275,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 4.504999995231628,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 190.58017767856657,
+              "t0": 1794794062954,
+              "frames": 192,
+              "ms": 965.2349999845028,
+              "fps": 198.91529006209123,
+              "meanProcessMs": 0.37635416568567354,
+              "medianProcessMs": 0.33250001072883606,
+              "t1": 1794794063919,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianFps": 198.91529006209123,
+          "minFps": 195.7705406162361,
+          "maxFps": 205.94008430619536
+        },
+        {
+          "name": "lp-mediapipe-webgpu-landscape",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 4.475000023841858,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 361.9090703387566,
+              "t0": 1794793906081,
+              "frames": 192,
+              "ms": 529.6549999713898,
+              "fps": 362.50011802092155,
+              "meanProcessMs": 0.12020833293596904,
+              "medianProcessMs": 0.09000000357627869,
+              "t1": 1794793906611,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 6.659999996423721,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 357.26247628425585,
+              "t0": 1794793984820,
+              "frames": 192,
+              "ms": 497.9399999976158,
+              "fps": 385.58862513740473,
+              "meanProcessMs": 0.07671874963367979,
+              "medianProcessMs": 0.05500000715255737,
+              "t1": 1794793985318,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 7.574999988079071,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 358.8114370985709,
+              "t0": 1794794064463,
+              "frames": 192,
+              "ms": 506.69500002264977,
+              "fps": 378.92617845334456,
+              "meanProcessMs": 0.08994791656732559,
+              "medianProcessMs": 0.06999999284744263,
+              "t1": 1794794064970,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianFps": 378.92617845334456,
+          "minFps": 362.50011802092155,
+          "maxFps": 385.58862513740473
+        },
+        {
+          "name": "lp-mediapipe-webgpu-landscape@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.4099999964237213,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 216.75811149466188,
+              "t0": 1794793907501,
+              "frames": 192,
+              "ms": 955.75,
+              "fps": 200.88935391054147,
+              "meanProcessMs": 0.3719010412072142,
+              "medianProcessMs": 0.32500000298023224,
+              "t1": 1794793908457,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.7799999713897705,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 207.9542500647172,
+              "t0": 1794793986247,
+              "frames": 192,
+              "ms": 978.4449999928474,
+              "fps": 196.2297318719024,
+              "meanProcessMs": 0.3505208333954215,
+              "medianProcessMs": 0.3050000071525574,
+              "t1": 1794793987226,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.530000001192093,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 196.93519601254388,
+              "t0": 1794794065949,
+              "frames": 192,
+              "ms": 971.6850000023842,
+              "fps": 197.59489958116973,
+              "meanProcessMs": 0.3860156233422458,
+              "medianProcessMs": 0.33000001311302185,
+              "t1": 1794794066921,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianFps": 197.59489958116973,
+          "minFps": 196.2297318719024,
+          "maxFps": 200.88935391054147
+        },
+        {
+          "name": "shipped-webgpu-xs",
+          "runs": [
+            {
+              "name": "shipped-webgpu-xs",
+              "label": "Longpipe xs — as shipped, WebGPU (f16)",
+              "initMs": 13.144999980926514,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 324.9610723859631,
+              "t0": 1794793909063,
+              "frames": 192,
+              "ms": 557.8549999892712,
+              "fps": 344.17545778686684,
+              "meanProcessMs": 0.08703125113000472,
+              "medianProcessMs": 0.06499999761581421,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794793909621,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-xs",
+              "label": "Longpipe xs — as shipped, WebGPU (f16)",
+              "initMs": 16.509999990463257,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 245.53685610255138,
+              "t0": 1794793988026,
+              "frames": 192,
+              "ms": 532.1649999916553,
+              "fps": 360.79035638009015,
+              "meanProcessMs": 0.08617187555258472,
+              "medianProcessMs": 0.07499998807907104,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794793988558,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-xs",
+              "label": "Longpipe xs — as shipped, WebGPU (f16)",
+              "initMs": 13.620000004768372,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 313.1140990923084,
+              "t0": 1794794067549,
+              "frames": 192,
+              "ms": 570.619999974966,
+              "fps": 336.47611371564847,
+              "meanProcessMs": 0.10929687678193052,
+              "medianProcessMs": 0.08500000834465027,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794068120,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — as shipped, WebGPU (f16)",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "preset": {
+            "model": "xs",
+            "dtype": "f16",
+            "skipFrames": 2,
+            "flowWired": true
+          },
+          "medianFps": 344.17545778686684,
+          "minFps": 336.47611371564847,
+          "maxFps": 360.79035638009015
+        },
+        {
+          "name": "shipped-webgpu-xs@base",
+          "runs": [
+            {
+              "name": "shipped-webgpu-xs@base",
+              "label": "Longpipe xs — as shipped, WebGPU (f16) [base]",
+              "initMs": 10.825000017881393,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 279.4658127530483,
+              "t0": 1794793910320,
+              "frames": 192,
+              "ms": 672.9499999880791,
+              "fps": 285.31094435456004,
+              "meanProcessMs": 0.24429687516142926,
+              "medianProcessMs": 0.19999998807907104,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794793910993,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-xs@base",
+              "label": "Longpipe xs — as shipped, WebGPU (f16) [base]",
+              "initMs": 11.03999999165535,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 291.37263829345693,
+              "t0": 1794793989229,
+              "frames": 192,
+              "ms": 680.9449999928474,
+              "fps": 281.9610981826972,
+              "meanProcessMs": 0.25531250052154064,
+              "medianProcessMs": 0.20499999821186066,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794793989910,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-xs@base",
+              "label": "Longpipe xs — as shipped, WebGPU (f16) [base]",
+              "initMs": 11.159999996423721,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 254.8650011934698,
+              "t0": 1794794068886,
+              "frames": 192,
+              "ms": 695.7249999940395,
+              "fps": 275.97110927686214,
+              "meanProcessMs": 0.23718750026697913,
+              "medianProcessMs": 0.21000000834465027,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794069581,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — as shipped, WebGPU (f16) [base]",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "preset": {
+            "model": "xs",
+            "dtype": "f16",
+            "skipFrames": 2,
+            "flowWired": true
+          },
+          "medianFps": 281.9610981826972,
+          "minFps": 275.97110927686214,
+          "maxFps": 285.31094435456004
+        },
+        {
+          "name": "shipped-webgpu-small",
+          "runs": [
+            {
+              "name": "shipped-webgpu-small",
+              "label": "Longpipe small — as shipped, WebGPU (f16)",
+              "initMs": 10.765000015497208,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 329.98478976427293,
+              "t0": 1794793911587,
+              "frames": 192,
+              "ms": 577.8299999833107,
+              "fps": 332.2776595288328,
+              "meanProcessMs": 0.09976562671363354,
+              "medianProcessMs": 0.08500000834465027,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793912165,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-small",
+              "label": "Longpipe small — as shipped, WebGPU (f16)",
+              "initMs": 11.765000015497208,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 305.287677989152,
+              "t0": 1794793990552,
+              "frames": 192,
+              "ms": 516.9300000071526,
+              "fps": 371.423597000258,
+              "meanProcessMs": 0.08020833538224299,
+              "medianProcessMs": 0.06499999761581421,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793991069,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-small",
+              "label": "Longpipe small — as shipped, WebGPU (f16)",
+              "initMs": 12.479999989271164,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 323.1262464219343,
+              "t0": 1794794070190,
+              "frames": 192,
+              "ms": 594.6100000143051,
+              "fps": 322.900724837088,
+              "meanProcessMs": 0.1271875003973643,
+              "medianProcessMs": 0.0949999988079071,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794070784,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — as shipped, WebGPU (f16)",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "preset": {
+            "model": "small",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 332.2776595288328,
+          "minFps": 322.900724837088,
+          "maxFps": 371.423597000258
+        },
+        {
+          "name": "shipped-webgpu-small@base",
+          "runs": [
+            {
+              "name": "shipped-webgpu-small@base",
+              "label": "Longpipe small — as shipped, WebGPU (f16) [base]",
+              "initMs": 8.375,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 284.50556045825016,
+              "t0": 1794793912849,
+              "frames": 192,
+              "ms": 726.7000000178814,
+              "fps": 264.2080638437809,
+              "meanProcessMs": 0.2467187501800557,
+              "medianProcessMs": 0.20999999344348907,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793913576,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-small@base",
+              "label": "Longpipe small — as shipped, WebGPU (f16) [base]",
+              "initMs": 8.754999995231628,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 279.4719145320523,
+              "t0": 1794793991766,
+              "frames": 192,
+              "ms": 685.7700000107288,
+              "fps": 279.9772518439071,
+              "meanProcessMs": 0.2193750001800557,
+              "medianProcessMs": 0.19750000536441803,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793992452,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-small@base",
+              "label": "Longpipe small — as shipped, WebGPU (f16) [base]",
+              "initMs": 8.850000023841858,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 276.05641903442466,
+              "t0": 1794794071490,
+              "frames": 192,
+              "ms": 700.0099999904633,
+              "fps": 274.28179597807997,
+              "meanProcessMs": 0.24781249975785613,
+              "medianProcessMs": 0.23000001907348633,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794072190,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — as shipped, WebGPU (f16) [base]",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "preset": {
+            "model": "small",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 274.28179597807997,
+          "minFps": 264.2080638437809,
+          "maxFps": 279.9772518439071
+        },
+        {
+          "name": "shipped-webgpu-medium",
+          "runs": [
+            {
+              "name": "shipped-webgpu-medium",
+              "label": "Longpipe medium — as shipped, WebGPU (f16)",
+              "initMs": 21.61999997496605,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 253.58418797566745,
+              "t0": 1794793914356,
+              "frames": 192,
+              "ms": 745.3250000178814,
+              "fps": 257.60574245516204,
+              "meanProcessMs": 0.11239583247030775,
+              "medianProcessMs": 0.08999998867511749,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793915102,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-medium",
+              "label": "Longpipe medium — as shipped, WebGPU (f16)",
+              "initMs": 25.939999997615814,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 256.32638892953304,
+              "t0": 1794793993228,
+              "frames": 192,
+              "ms": 773.7349999845028,
+              "fps": 248.1469753905996,
+              "meanProcessMs": 0.13208333573614559,
+              "medianProcessMs": 0.10999998450279236,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793994002,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-medium",
+              "label": "Longpipe medium — as shipped, WebGPU (f16)",
+              "initMs": 22.479999989271164,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 241.38191143794663,
+              "t0": 1794794073009,
+              "frames": 192,
+              "ms": 769,
+              "fps": 249.67490247074122,
+              "meanProcessMs": 0.10932291749243934,
+              "medianProcessMs": 0.09749999642372131,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794073778,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — as shipped, WebGPU (f16)",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "preset": {
+            "model": "medium",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 249.67490247074122,
+          "minFps": 248.1469753905996,
+          "maxFps": 257.60574245516204
+        },
+        {
+          "name": "shipped-webgpu-medium@base",
+          "runs": [
+            {
+              "name": "shipped-webgpu-medium@base",
+              "label": "Longpipe medium — as shipped, WebGPU (f16) [base]",
+              "initMs": 21.740000009536743,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 226.63023271102992,
+              "t0": 1794793915972,
+              "frames": 192,
+              "ms": 852.3350000083447,
+              "fps": 225.2635407417509,
+              "meanProcessMs": 0.29661458435778815,
+              "medianProcessMs": 0.2549999952316284,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793916825,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-medium@base",
+              "label": "Longpipe medium — as shipped, WebGPU (f16) [base]",
+              "initMs": 18.435000002384186,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 202.40567579172892,
+              "t0": 1794793994970,
+              "frames": 192,
+              "ms": 834.4399999976158,
+              "fps": 230.09443459152075,
+              "meanProcessMs": 0.27083333441987634,
+              "medianProcessMs": 0.24500000476837158,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793995805,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-medium@base",
+              "label": "Longpipe medium — as shipped, WebGPU (f16) [base]",
+              "initMs": 18.444999992847443,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 213.04335765349367,
+              "t0": 1794794074699,
+              "frames": 192,
+              "ms": 880.8799999952316,
+              "fps": 217.96385432867058,
+              "meanProcessMs": 0.25783854133139056,
+              "medianProcessMs": 0.24000000953674316,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794075580,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — as shipped, WebGPU (f16) [base]",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "preset": {
+            "model": "medium",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 225.2635407417509,
+          "minFps": 217.96385432867058,
+          "maxFps": 230.09443459152075
+        },
+        {
+          "name": "shipped-webgpu-large",
+          "runs": [
+            {
+              "name": "shipped-webgpu-large",
+              "label": "Longpipe large — as shipped, WebGPU (f16)",
+              "initMs": 23.21500000357628,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 160.91250801516176,
+              "t0": 1794793918043,
+              "frames": 192,
+              "ms": 1182.594999998808,
+              "fps": 162.35482138872018,
+              "meanProcessMs": 0.14080729226892194,
+              "medianProcessMs": 0.12999999523162842,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794793919225,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-large",
+              "label": "Longpipe large — as shipped, WebGPU (f16)",
+              "initMs": 30.96500000357628,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 146.2940739490759,
+              "t0": 1794793997150,
+              "frames": 192,
+              "ms": 1240.3100000023842,
+              "fps": 154.80000967470303,
+              "meanProcessMs": 0.14447916578501463,
+              "medianProcessMs": 0.13499999046325684,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794793998390,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-large",
+              "label": "Longpipe large — as shipped, WebGPU (f16)",
+              "initMs": 24.580000013113022,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 152.22510287187743,
+              "t0": 1794794076868,
+              "frames": 192,
+              "ms": 1218.9000000059605,
+              "fps": 157.5190745746666,
+              "meanProcessMs": 0.1440885423993071,
+              "medianProcessMs": 0.125,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794078087,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — as shipped, WebGPU (f16)",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "preset": {
+            "model": "large",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 157.5190745746666,
+          "minFps": 154.80000967470303,
+          "maxFps": 162.35482138872018
+        },
+        {
+          "name": "shipped-webgpu-large@base",
+          "runs": [
+            {
+              "name": "shipped-webgpu-large@base",
+              "label": "Longpipe large — as shipped, WebGPU (f16) [base]",
+              "initMs": 17.790000021457672,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 146.11371756820807,
+              "t0": 1794793920559,
+              "frames": 192,
+              "ms": 1314.824999988079,
+              "fps": 146.02703782004508,
+              "meanProcessMs": 0.46075520835195977,
+              "medianProcessMs": 0.4074999988079071,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794793921874,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-large@base",
+              "label": "Longpipe large — as shipped, WebGPU (f16) [base]",
+              "initMs": 22.12000000476837,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 151.58453206113688,
+              "t0": 1794793999680,
+              "frames": 192,
+              "ms": 1438.719999998808,
+              "fps": 133.45195729548425,
+              "meanProcessMs": 0.4568229156235854,
+              "medianProcessMs": 0.4050000011920929,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794001119,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-large@base",
+              "label": "Longpipe large — as shipped, WebGPU (f16) [base]",
+              "initMs": 17.084999978542328,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 135.08902155477833,
+              "t0": 1794794079527,
+              "frames": 192,
+              "ms": 1422.4000000059605,
+              "fps": 134.98312710854572,
+              "meanProcessMs": 0.44864583341404796,
+              "medianProcessMs": 0.4099999964237213,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794080949,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — as shipped, WebGPU (f16) [base]",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "preset": {
+            "model": "large",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 134.98312710854572,
+          "minFps": 133.45195729548425,
+          "maxFps": 146.02703782004508
+        },
+        {
+          "name": "shipped-webgpu-xl",
+          "runs": [
+            {
+              "name": "shipped-webgpu-xl",
+              "label": "Longpipe xl — as shipped, WebGPU (f16)",
+              "initMs": 51.96500000357628,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 84.22105394740079,
+              "t0": 1794793924207,
+              "frames": 192,
+              "ms": 2312.689999997616,
+              "fps": 83.02020590749211,
+              "meanProcessMs": 0.19723958258206645,
+              "medianProcessMs": 0.17500001192092896,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794793926520,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-xl",
+              "label": "Longpipe xl — as shipped, WebGPU (f16)",
+              "initMs": 62.09499999880791,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 82.56430985667826,
+              "t0": 1794794003507,
+              "frames": 192,
+              "ms": 2354.4950000047684,
+              "fps": 81.54614896171415,
+              "meanProcessMs": 0.2000000000310441,
+              "medianProcessMs": 0.16999998688697815,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794005862,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-xl",
+              "label": "Longpipe xl — as shipped, WebGPU (f16)",
+              "initMs": 63.189999997615814,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 81.33577058200459,
+              "t0": 1794794083374,
+              "frames": 192,
+              "ms": 2325.1649999916553,
+              "fps": 82.57478501555333,
+              "meanProcessMs": 0.19559896007801095,
+              "medianProcessMs": 0.17000000178813934,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794085700,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — as shipped, WebGPU (f16)",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "preset": {
+            "model": "xl",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 82.57478501555333,
+          "minFps": 81.54614896171415,
+          "maxFps": 83.02020590749211
+        },
+        {
+          "name": "shipped-webgpu-xl@base",
+          "runs": [
+            {
+              "name": "shipped-webgpu-xl@base",
+              "label": "Longpipe xl — as shipped, WebGPU (f16) [base]",
+              "initMs": 59.64000001549721,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 84.10318409411705,
+              "t0": 1794793928864,
+              "frames": 192,
+              "ms": 2327.185000002384,
+              "fps": 82.50310998042842,
+              "meanProcessMs": 0.5040104164121052,
+              "medianProcessMs": 0.4675000011920929,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794793931191,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-xl@base",
+              "label": "Longpipe xl — as shipped, WebGPU (f16) [base]",
+              "initMs": 59.87999999523163,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 82.23138283634027,
+              "t0": 1794794008258,
+              "frames": 192,
+              "ms": 2427.890000015497,
+              "fps": 79.08101273071452,
+              "meanProcessMs": 0.5308072902262211,
+              "medianProcessMs": 0.4625000059604645,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794010686,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-xl@base",
+              "label": "Longpipe xl — as shipped, WebGPU (f16) [base]",
+              "initMs": 56.54000002145767,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 84.10373670344197,
+              "t0": 1794794088041,
+              "frames": 192,
+              "ms": 2325.1349999904633,
+              "fps": 82.57585043482959,
+              "meanProcessMs": 0.5055208336561918,
+              "medianProcessMs": 0.44999998807907104,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794090366,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — as shipped, WebGPU (f16) [base]",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "preset": {
+            "model": "xl",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 82.50310998042842,
+          "minFps": 79.08101273071452,
+          "maxFps": 82.57585043482959
+        },
+        {
+          "name": "lp-mediapipe-webgl-square",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 78.7199999988079,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 127.32982071193858,
+              "t0": 1794793932780,
+              "frames": 192,
+              "ms": 1583.050000011921,
+              "fps": 121.28486150061853,
+              "meanProcessMs": 0.29981770863135654,
+              "medianProcessMs": 0.2549999952316284,
+              "t1": 1794793934363,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 80.81499999761581,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 122.65470783227936,
+              "t0": 1794794012334,
+              "frames": 192,
+              "ms": 1593.9799999892712,
+              "fps": 120.45320518531746,
+              "meanProcessMs": 0.29979166729996604,
+              "medianProcessMs": 0.25999999046325684,
+              "t1": 1794794013928,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 80.09000000357628,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 123.6734891065796,
+              "t0": 1794794092000,
+              "frames": 192,
+              "ms": 1542.050000011921,
+              "fps": 124.50958140041875,
+              "meanProcessMs": 0.2905989584202568,
+              "medianProcessMs": 0.25,
+              "t1": 1794794093542,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianFps": 121.28486150061853,
+          "minFps": 120.45320518531746,
+          "maxFps": 124.50958140041875
+        },
+        {
+          "name": "lp-mediapipe-webgl-square@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 77.1550000011921,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 117.03035474868801,
+              "t0": 1794793936084,
+              "frames": 192,
+              "ms": 1652.6200000047684,
+              "fps": 116.17915794280961,
+              "meanProcessMs": 0.45583333385487396,
+              "medianProcessMs": 0.41999998688697815,
+              "t1": 1794793937737,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 74.57499998807907,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 120.10208677259342,
+              "t0": 1794794015605,
+              "frames": 192,
+              "ms": 1624.2649999856949,
+              "fps": 118.20731223149608,
+              "meanProcessMs": 0.48338541605820257,
+              "medianProcessMs": 0.4449999928474426,
+              "t1": 1794794017229,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 77.66499999165535,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 110.32295320762924,
+              "t0": 1794794095365,
+              "frames": 192,
+              "ms": 1574.4900000095367,
+              "fps": 121.94424861309824,
+              "meanProcessMs": 0.4412500006146729,
+              "medianProcessMs": 0.4000000059604645,
+              "t1": 1794794096940,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianFps": 118.20731223149608,
+          "minFps": 116.17915794280961,
+          "maxFps": 121.94424861309824
+        },
+        {
+          "name": "lp-mediapipe-webgl-landscape",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 69.34999999403954,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 122.46694349214877,
+              "t0": 1794793939378,
+              "frames": 192,
+              "ms": 1515.9000000059605,
+              "fps": 126.65743122847488,
+              "meanProcessMs": 0.287239583209157,
+              "medianProcessMs": 0.25,
+              "t1": 1794793940894,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 72.85999998450279,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 119.05906135493096,
+              "t0": 1794794018918,
+              "frames": 192,
+              "ms": 1560.9900000095367,
+              "fps": 122.99886610345165,
+              "meanProcessMs": 0.2982812486588955,
+              "medianProcessMs": 0.2574999928474426,
+              "t1": 1794794020479,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 70.45999997854233,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 125.86284882701727,
+              "t0": 1794794098540,
+              "frames": 192,
+              "ms": 1512.5250000059605,
+              "fps": 126.94005057717617,
+              "meanProcessMs": 0.33500000027318794,
+              "medianProcessMs": 0.29999999701976776,
+              "t1": 1794794100052,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianFps": 126.65743122847488,
+          "minFps": 122.99886610345165,
+          "maxFps": 126.94005057717617
+        },
+        {
+          "name": "lp-mediapipe-webgl-landscape@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 77.7000000178814,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 114.45603576751118,
+              "t0": 1794793942654,
+              "frames": 192,
+              "ms": 1654.7599999904633,
+              "fps": 116.02891053754414,
+              "meanProcessMs": 0.4499479153503974,
+              "medianProcessMs": 0.4099999964237213,
+              "t1": 1794793944308,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 74.12999999523163,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 112.16755027861869,
+              "t0": 1794794022268,
+              "frames": 192,
+              "ms": 1594.1049999892712,
+              "fps": 120.4437599789802,
+              "meanProcessMs": 0.4602083330973983,
+              "medianProcessMs": 0.42499999701976776,
+              "t1": 1794794023863,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 75.34999999403954,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 122.5212577582187,
+              "t0": 1794794101699,
+              "frames": 192,
+              "ms": 1611.280000001192,
+              "fps": 119.15992254596219,
+              "meanProcessMs": 0.46606770902872086,
+              "medianProcessMs": 0.42000001668930054,
+              "t1": 1794794103310,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianFps": 119.15992254596219,
+          "minFps": 116.02891053754414,
+          "maxFps": 120.4437599789802
+        },
+        {
+          "name": "shipped-webgl-xs",
+          "runs": [
+            {
+              "name": "shipped-webgl-xs",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16)",
+              "initMs": 82.62000000476837,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 189.15417543308956,
+              "t0": 1794793945411,
+              "frames": 192,
+              "ms": 1069.9000000059605,
+              "fps": 179.4560239264701,
+              "meanProcessMs": 0.30882812368993956,
+              "medianProcessMs": 0.2824999988079071,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794793946481,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-xs",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16)",
+              "initMs": 76.60499998927116,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 177.49920263658396,
+              "t0": 1794794025024,
+              "frames": 192,
+              "ms": 1005.6750000119209,
+              "fps": 190.916548584507,
+              "meanProcessMs": 0.3009895843764146,
+              "medianProcessMs": 0.26500000059604645,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794026030,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-xs",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16)",
+              "initMs": 75.78499999642372,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 198.28360752189613,
+              "t0": 1794794104358,
+              "frames": 192,
+              "ms": 1055.464999973774,
+              "fps": 181.91034283919484,
+              "meanProcessMs": 0.31820312545945245,
+              "medianProcessMs": 0.29500000178813934,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794105414,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — as shipped, WebGL2 (f16)",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "preset": {
+            "model": "xs",
+            "dtype": "f16",
+            "skipFrames": 2,
+            "flowWired": true
+          },
+          "medianFps": 181.91034283919484,
+          "minFps": 179.4560239264701,
+          "maxFps": 190.916548584507
+        },
+        {
+          "name": "shipped-webgl-xs@base",
+          "runs": [
+            {
+              "name": "shipped-webgl-xs@base",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16) [base]",
+              "initMs": 78.02000001072884,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 196.7404614176231,
+              "t0": 1794793947538,
+              "frames": 192,
+              "ms": 1018.8100000023842,
+              "fps": 188.45515846875344,
+              "meanProcessMs": 0.38825520779937506,
+              "medianProcessMs": 0.3499999940395355,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794793948557,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-xs@base",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16) [base]",
+              "initMs": 79.43000000715256,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 177.00909937440377,
+              "t0": 1794794027198,
+              "frames": 192,
+              "ms": 1021.7800000011921,
+              "fps": 187.90737732170916,
+              "meanProcessMs": 0.3862760410023232,
+              "medianProcessMs": 0.35999999940395355,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794028220,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-xs@base",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16) [base]",
+              "initMs": 87.03999999165535,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 183.23670459926367,
+              "t0": 1794794106554,
+              "frames": 192,
+              "ms": 1000.8499999940395,
+              "fps": 191.8369386033306,
+              "meanProcessMs": 0.3871093752483527,
+              "medianProcessMs": 0.35999999940395355,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794107555,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — as shipped, WebGL2 (f16) [base]",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "preset": {
+            "model": "xs",
+            "dtype": "f16",
+            "skipFrames": 2,
+            "flowWired": true
+          },
+          "medianFps": 188.45515846875344,
+          "minFps": 187.90737732170916,
+          "maxFps": 191.8369386033306
+        },
+        {
+          "name": "shipped-webgl-small",
+          "runs": [
+            {
+              "name": "shipped-webgl-small",
+              "label": "Longpipe small — as shipped, WebGL2 (f16)",
+              "initMs": 70.2000000178814,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 182.16578034544523,
+              "t0": 1794793949686,
+              "frames": 192,
+              "ms": 1023.3899999856949,
+              "fps": 187.61176091488466,
+              "meanProcessMs": 0.30695312439153594,
+              "medianProcessMs": 0.2724999934434891,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793950710,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-small",
+              "label": "Longpipe small — as shipped, WebGL2 (f16)",
+              "initMs": 71.2999999821186,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 185.90600127788917,
+              "t0": 1794794029329,
+              "frames": 192,
+              "ms": 1031.2600000202656,
+              "fps": 186.1800127962172,
+              "meanProcessMs": 0.32479166813815635,
+              "medianProcessMs": 0.3050000071525574,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794030360,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-small",
+              "label": "Longpipe small — as shipped, WebGL2 (f16)",
+              "initMs": 73.11500000953674,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 191.31127939531717,
+              "t0": 1794794108635,
+              "frames": 192,
+              "ms": 1008.4250000119209,
+              "fps": 190.3959144187523,
+              "meanProcessMs": 0.3357812510803342,
+              "medianProcessMs": 0.3100000023841858,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794109644,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — as shipped, WebGL2 (f16)",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "preset": {
+            "model": "small",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 187.61176091488466,
+          "minFps": 186.1800127962172,
+          "maxFps": 190.3959144187523
+        },
+        {
+          "name": "shipped-webgl-small@base",
+          "runs": [
+            {
+              "name": "shipped-webgl-small@base",
+              "label": "Longpipe small — as shipped, WebGL2 (f16) [base]",
+              "initMs": 72.30000001192093,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 175.28563799122713,
+              "t0": 1794793951881,
+              "frames": 192,
+              "ms": 1035.0100000202656,
+              "fps": 185.50545404995182,
+              "meanProcessMs": 0.39328125041599077,
+              "medianProcessMs": 0.3699999898672104,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793952916,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-small@base",
+              "label": "Longpipe small — as shipped, WebGL2 (f16) [base]",
+              "initMs": 71.89500001072884,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 183.58185408299394,
+              "t0": 1794794031481,
+              "frames": 192,
+              "ms": 1016.1800000071526,
+              "fps": 188.9429038149231,
+              "meanProcessMs": 0.3915104167535901,
+              "medianProcessMs": 0.36500000953674316,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794032497,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-small@base",
+              "label": "Longpipe small — as shipped, WebGL2 (f16) [base]",
+              "initMs": 73.13499999046326,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 186.60252204755014,
+              "t0": 1794794110751,
+              "frames": 192,
+              "ms": 1063.5399999916553,
+              "fps": 180.52917614899906,
+              "meanProcessMs": 0.43052083315948647,
+              "medianProcessMs": 0.4099999964237213,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794111814,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — as shipped, WebGL2 (f16) [base]",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "preset": {
+            "model": "small",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 185.50545404995182,
+          "minFps": 180.52917614899906,
+          "maxFps": 188.9429038149231
+        },
+        {
+          "name": "shipped-webgl-medium",
+          "runs": [
+            {
+              "name": "shipped-webgl-medium",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16)",
+              "initMs": 107.33500000834465,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 146.7985304864804,
+              "t0": 1794793954336,
+              "frames": 192,
+              "ms": 1250.2100000083447,
+              "fps": 153.57419953345317,
+              "meanProcessMs": 0.31617187537873787,
+              "medianProcessMs": 0.2849999964237213,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793955586,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-medium",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16)",
+              "initMs": 109.81499999761581,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 152.00215336556076,
+              "t0": 1794794033875,
+              "frames": 192,
+              "ms": 1254.7150000035763,
+              "fps": 153.0227980054855,
+              "meanProcessMs": 0.32007812631006044,
+              "medianProcessMs": 0.2875000089406967,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794035130,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-medium",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16)",
+              "initMs": 101.56999999284744,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 152.20458833314564,
+              "t0": 1794794113182,
+              "frames": 192,
+              "ms": 1319.4300000071526,
+              "fps": 145.51738250529334,
+              "meanProcessMs": 0.3217968746709327,
+              "medianProcessMs": 0.2850000113248825,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794114501,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — as shipped, WebGL2 (f16)",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "preset": {
+            "model": "medium",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 153.0227980054855,
+          "minFps": 145.51738250529334,
+          "maxFps": 153.57419953345317
+        },
+        {
+          "name": "shipped-webgl-medium@base",
+          "runs": [
+            {
+              "name": "shipped-webgl-medium@base",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16) [base]",
+              "initMs": 103.20999997854233,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 146.05925289210433,
+              "t0": 1794793957008,
+              "frames": 192,
+              "ms": 1243.5250000059605,
+              "fps": 154.39979091620972,
+              "meanProcessMs": 0.425520833581686,
+              "medianProcessMs": 0.4099999964237213,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794793958252,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-medium@base",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16) [base]",
+              "initMs": 106.89999997615814,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 152.98317185211354,
+              "t0": 1794794036496,
+              "frames": 192,
+              "ms": 1249.125,
+              "fps": 153.7075953167217,
+              "meanProcessMs": 0.40161458573614556,
+              "medianProcessMs": 0.375,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794037745,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-medium@base",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16) [base]",
+              "initMs": 102.04499998688698,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 137.6467425396541,
+              "t0": 1794794116002,
+              "frames": 192,
+              "ms": 1300.655000001192,
+              "fps": 147.61793096541666,
+              "meanProcessMs": 0.40536458355685073,
+              "medianProcessMs": 0.375,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794117303,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — as shipped, WebGL2 (f16) [base]",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "preset": {
+            "model": "medium",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 153.7075953167217,
+          "minFps": 147.61793096541666,
+          "maxFps": 154.39979091620972
+        },
+        {
+          "name": "shipped-webgl-large",
+          "runs": [
+            {
+              "name": "shipped-webgl-large",
+              "label": "Longpipe large — as shipped, WebGL2 (f16)",
+              "initMs": 109,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 92.30236717091316,
+              "t0": 1794793960445,
+              "frames": 192,
+              "ms": 2039.3799999952316,
+              "fps": 94.14626013810518,
+              "meanProcessMs": 0.419687498981754,
+              "medianProcessMs": 0.375,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794793962485,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-large",
+              "label": "Longpipe large — as shipped, WebGL2 (f16)",
+              "initMs": 106.55500000715256,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 98.66696814919023,
+              "t0": 1794794039802,
+              "frames": 192,
+              "ms": 1983.8199999928474,
+              "fps": 96.78297426212673,
+              "meanProcessMs": 0.40567708217228454,
+              "medianProcessMs": 0.3825000077486038,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794041786,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-large",
+              "label": "Longpipe large — as shipped, WebGL2 (f16)",
+              "initMs": 107.53499999642372,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 97.32261432761005,
+              "t0": 1794794119388,
+              "frames": 192,
+              "ms": 1969.9200000166893,
+              "fps": 97.46588693874541,
+              "meanProcessMs": 0.39367187519868213,
+              "medianProcessMs": 0.3725000023841858,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794121358,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — as shipped, WebGL2 (f16)",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "preset": {
+            "model": "large",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 96.78297426212673,
+          "minFps": 94.14626013810518,
+          "maxFps": 97.46588693874541
+        },
+        {
+          "name": "shipped-webgl-large@base",
+          "runs": [
+            {
+              "name": "shipped-webgl-large@base",
+              "label": "Longpipe large — as shipped, WebGL2 (f16) [base]",
+              "initMs": 105.01499998569489,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 97.83065615237668,
+              "t0": 1794793964557,
+              "frames": 192,
+              "ms": 2014.074999988079,
+              "fps": 95.32912130935362,
+              "meanProcessMs": 0.580755208308498,
+              "medianProcessMs": 0.5300000011920929,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794793966571,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-large@base",
+              "label": "Longpipe large — as shipped, WebGL2 (f16) [base]",
+              "initMs": 105.75499999523163,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 97.45203532547833,
+              "t0": 1794794043866,
+              "frames": 192,
+              "ms": 1954.0650000274181,
+              "fps": 98.25671100874638,
+              "meanProcessMs": 0.5953645827248693,
+              "medianProcessMs": 0.5499999970197678,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794045820,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-large@base",
+              "label": "Longpipe large — as shipped, WebGL2 (f16) [base]",
+              "initMs": 107.10999998450279,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 94.32618190170447,
+              "t0": 1794794123504,
+              "frames": 192,
+              "ms": 1975.5150000154972,
+              "fps": 97.18984669744033,
+              "meanProcessMs": 0.5710416653503975,
+              "medianProcessMs": 0.5250000059604645,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794125480,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — as shipped, WebGL2 (f16) [base]",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "preset": {
+            "model": "large",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 97.18984669744033,
+          "minFps": 95.32912130935362,
+          "maxFps": 98.25671100874638
+        },
+        {
+          "name": "shipped-webgl-xl",
+          "runs": [
+            {
+              "name": "shipped-webgl-xl",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16)",
+              "initMs": 162.48500001430511,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 58.34367768766671,
+              "t0": 1794793970028,
+              "frames": 192,
+              "ms": 3217.7000000178814,
+              "fps": 59.669950585490575,
+              "meanProcessMs": 0.491718749050051,
+              "medianProcessMs": 0.4450000077486038,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794793973246,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-xl",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16)",
+              "initMs": 161.17500001192093,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 57.42262152220007,
+              "t0": 1794794049329,
+              "frames": 192,
+              "ms": 3351.280000001192,
+              "fps": 57.29154233604226,
+              "meanProcessMs": 0.46914062509313226,
+              "medianProcessMs": 0.4325000047683716,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794052680,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-xl",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16)",
+              "initMs": 161.0750000178814,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 58.35813047295326,
+              "t0": 1794794128937,
+              "frames": 192,
+              "ms": 3263.774999976158,
+              "fps": 58.82758462253144,
+              "meanProcessMs": 0.48023437631006044,
+              "medianProcessMs": 0.4300000071525574,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794132201,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — as shipped, WebGL2 (f16)",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "preset": {
+            "model": "xl",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 58.82758462253144,
+          "minFps": 57.29154233604226,
+          "maxFps": 59.669950585490575
+        },
+        {
+          "name": "shipped-webgl-xl@base",
+          "runs": [
+            {
+              "name": "shipped-webgl-xl@base",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16) [base]",
+              "initMs": 163.37000000476837,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 59.82156349233353,
+              "t0": 1794793976625,
+              "frames": 192,
+              "ms": 3285.8799999952316,
+              "fps": 58.43183561185394,
+              "meanProcessMs": 0.7574479171695808,
+              "medianProcessMs": 0.7049999833106995,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794793979911,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-xl@base",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16) [base]",
+              "initMs": 161.03999999165535,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 56.95073316639395,
+              "t0": 1794794056218,
+              "frames": 192,
+              "ms": 3317.8250000178814,
+              "fps": 57.869236623078436,
+              "meanProcessMs": 0.7509895847178996,
+              "medianProcessMs": 0.7000000029802322,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794059536,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-xl@base",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16) [base]",
+              "initMs": 166.76499998569489,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 57.514303687300234,
+              "t0": 1794794135713,
+              "frames": 192,
+              "ms": 3365.234999984503,
+              "fps": 57.05396502796511,
+              "meanProcessMs": 0.7382552072716256,
+              "medianProcessMs": 0.6899999976158142,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794139078,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — as shipped, WebGL2 (f16) [base]",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "preset": {
+            "model": "xl",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 57.869236623078436,
+          "minFps": 57.05396502796511,
+          "maxFps": 58.43183561185394
+        }
+      ]
+    },
+    {
+      "config": {
+        "sample": "720p",
+        "mode": "transcode",
+        "output": "readback",
+        "rounds": 3,
+        "order": "interleaved, rotated per round",
+        "startedAt": "2026-11-16T01:55:41.689Z",
+        "endedAt": "2026-11-16T02:01:17.265Z"
+      },
+      "environment": {
+        "date": "2026-11-16T02:01:17.264Z",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+        "platform": {
+          "platform": "macOS",
+          "platformVersion": "26.5.1",
+          "architecture": "arm",
+          "model": "",
+          "browsers": [
+            {
+              "brand": "Not-A.Brand",
+              "version": "99.0.0.0"
+            },
+            {
+              "brand": "Google Chrome",
+              "version": "157.0.8103.51"
+            },
+            {
+              "brand": "Chromium",
+              "version": "157.0.8103.51"
+            }
+          ]
+        },
+        "hardwareConcurrency": 10,
+        "deviceMemoryGB": 16,
+        "crossOriginIsolated": true,
+        "webgpu": {
+          "vendor": "apple",
+          "architecture": "metal-3",
+          "device": "",
+          "description": "",
+          "features": [
+            "atomic-vec2u-min-max",
+            "bgra8unorm-storage",
+            "chromium-experimental-subgroup-matrix",
+            "clip-distances",
+            "core-features-and-limits",
+            "depth-clip-control",
+            "depth32float-stencil8",
+            "dual-source-blending",
+            "float32-blendable",
+            "float32-filterable",
+            "indirect-first-instance",
+            "primitive-index",
+            "rg11b10ufloat-renderable",
+            "shader-f16",
+            "subgroup-size-control",
+            "subgroups",
+            "texture-component-swizzle",
+            "texture-compression-astc",
+            "texture-compression-astc-sliced-3d",
+            "texture-compression-bc",
+            "texture-compression-bc-sliced-3d",
+            "texture-compression-etc2",
+            "texture-compression-unaligned",
+            "texture-formats-tier1",
+            "texture-formats-tier2",
+            "timestamp-query"
+          ]
+        },
+        "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+      },
+      "results": [
+        {
+          "name": "litert-webgpu",
+          "runs": [
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 60.31999999284744,
+              "maskRes": "256x256",
+              "warmupFps": 178.19438965707002,
+              "t0": 1794794143042,
+              "frames": 192,
+              "ms": 968.7650000154972,
+              "fps": 198.1904796281127,
+              "meanProcessMs": 0.3810937500869234,
+              "medianProcessMs": 0.32499998807907104,
+              "t1": 1794794144011,
+              "round": 0
+            },
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 15.435000002384186,
+              "maskRes": "256x256",
+              "warmupFps": 205.13477996115745,
+              "t0": 1794794364610,
+              "frames": 192,
+              "ms": 971.6299999952316,
+              "fps": 197.6060846216587,
+              "meanProcessMs": 0.38578125058362883,
+              "medianProcessMs": 0.3449999988079071,
+              "t1": 1794794365581,
+              "round": 1
+            },
+            {
+              "name": "litert-webgpu",
+              "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+              "initMs": 175.09999999403954,
+              "maskRes": "256x256",
+              "warmupFps": 192.82045101816286,
+              "t0": 1794794474234,
+              "frames": 192,
+              "ms": 1030.375,
+              "fps": 186.33992478466578,
+              "meanProcessMs": 0.43122395779937506,
+              "medianProcessMs": 0.375,
+              "t1": 1794794475264,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — LiteRT.js, WebGPU (fp32)",
+          "maskRes": "256x256",
+          "medianFps": 197.6060846216587,
+          "minFps": 186.33992478466578,
+          "maxFps": 198.1904796281127
+        },
+        {
+          "name": "litert-webgpu-landscape",
+          "runs": [
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 16.865000009536743,
+              "maskRes": "256x144",
+              "warmupFps": 191.90596607479318,
+              "t0": 1794794145031,
+              "frames": 192,
+              "ms": 947.7650000154972,
+              "fps": 202.5818636443217,
+              "meanProcessMs": 0.37223958410322666,
+              "medianProcessMs": 0.32999998331069946,
+              "t1": 1794794145979,
+              "round": 0
+            },
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 64.98999997973442,
+              "maskRes": "256x144",
+              "warmupFps": 188.87413310056303,
+              "t0": 1794794255316,
+              "frames": 192,
+              "ms": 984.5699999928474,
+              "fps": 195.00898869698935,
+              "meanProcessMs": 0.404036458581686,
+              "medianProcessMs": 0.3500000089406967,
+              "t1": 1794794256301,
+              "round": 1
+            },
+            {
+              "name": "litert-webgpu-landscape",
+              "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+              "initMs": 17.974999994039536,
+              "maskRes": "256x144",
+              "warmupFps": 191.9961600747386,
+              "t0": 1794794476285,
+              "frames": 192,
+              "ms": 974.6049999892712,
+              "fps": 197.00288835180777,
+              "meanProcessMs": 0.41393229163562256,
+              "medianProcessMs": 0.36000001430511475,
+              "t1": 1794794477260,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — LiteRT.js, WebGPU (fp32)",
+          "maskRes": "256x144",
+          "medianFps": 197.00288835180777,
+          "minFps": 195.00898869698935,
+          "maxFps": 202.5818636443217
+        },
+        {
+          "name": "lp-mediapipe-webgpu-square",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 3.7549999952316284,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 167.13528382808383,
+              "t0": 1794794147133,
+              "frames": 192,
+              "ms": 1063.8149999976158,
+              "fps": 180.4825087072755,
+              "meanProcessMs": 0.14007812660808364,
+              "medianProcessMs": 0.12000000476837158,
+              "t1": 1794794148197,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 3.800000011920929,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 176.7557042832484,
+              "t0": 1794794257393,
+              "frames": 192,
+              "ms": 1078.2349999845028,
+              "fps": 178.06878834647324,
+              "meanProcessMs": 0.1723958314396441,
+              "medianProcessMs": 0.14000001549720764,
+              "t1": 1794794258472,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+              "initMs": 2.9000000059604645,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 178.05970564150576,
+              "t0": 1794794366837,
+              "frames": 192,
+              "ms": 1283.9300000071526,
+              "fps": 149.54086281879106,
+              "meanProcessMs": 0.18481770933916172,
+              "medianProcessMs": 0.14000001549720764,
+              "t1": 1794794368121,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGPU (f16)",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianFps": 178.06878834647324,
+          "minFps": 149.54086281879106,
+          "maxFps": 180.4825087072755
+        },
+        {
+          "name": "lp-mediapipe-webgpu-square@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 2.905000001192093,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 131.16456370682485,
+              "t0": 1794794149666,
+              "frames": 192,
+              "ms": 1477.8050000071526,
+              "fps": 129.92241872173307,
+              "meanProcessMs": 0.4814843765149514,
+              "medianProcessMs": 0.39249999821186066,
+              "t1": 1794794151143,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 2.925000011920929,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 123.97494673046936,
+              "t0": 1794794260025,
+              "frames": 192,
+              "ms": 1499.5900000035763,
+              "fps": 128.03499623199815,
+              "meanProcessMs": 0.447968751968195,
+              "medianProcessMs": 0.38499999046325684,
+              "t1": 1794794261525,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.594999998807907,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 135.71302350238557,
+              "t0": 1794794369541,
+              "frames": 192,
+              "ms": 1462.8849999904633,
+              "fps": 131.24750065880207,
+              "meanProcessMs": 0.4551562482180695,
+              "medianProcessMs": 0.38999998569488525,
+              "t1": 1794794371004,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGPU (f16) [base]",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianFps": 129.92241872173307,
+          "minFps": 128.03499623199815,
+          "maxFps": 131.24750065880207
+        },
+        {
+          "name": "lp-mediapipe-webgpu-landscape",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 4.614999979734421,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 185.3040385627787,
+              "t0": 1794794152185,
+              "frames": 192,
+              "ms": 1026.6899999976158,
+              "fps": 187.00873681485731,
+              "meanProcessMs": 0.14846354179705182,
+              "medianProcessMs": 0.125,
+              "t1": 1794794153212,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 6.844999998807907,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 179.3512528889386,
+              "t0": 1794794262604,
+              "frames": 192,
+              "ms": 1263.5250000059605,
+              "fps": 151.95583783391248,
+              "meanProcessMs": 0.16010416811332107,
+              "medianProcessMs": 0.14499999582767487,
+              "t1": 1794794263868,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+              "initMs": 4.860000014305115,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 182.94600234233323,
+              "t0": 1794794372060,
+              "frames": 192,
+              "ms": 1009.455000013113,
+              "fps": 190.20164345860476,
+              "meanProcessMs": 0.14838541516413292,
+              "medianProcessMs": 0.125,
+              "t1": 1794794373070,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16)",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianFps": 187.00873681485731,
+          "minFps": 151.95583783391248,
+          "maxFps": 190.20164345860476
+        },
+        {
+          "name": "lp-mediapipe-webgpu-landscape@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 2.884999990463257,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 126.42141789362738,
+              "t0": 1794794154735,
+              "frames": 192,
+              "ms": 1451.1299999952316,
+              "fps": 132.3106820206535,
+              "meanProcessMs": 0.45778645668178797,
+              "medianProcessMs": 0.375,
+              "t1": 1794794156186,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 6.284999996423721,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 125.55009906844094,
+              "t0": 1794794265405,
+              "frames": 192,
+              "ms": 1597.050000011921,
+              "fps": 120.22165868229978,
+              "meanProcessMs": 0.5116927099103729,
+              "medianProcessMs": 0.41999998688697815,
+              "t1": 1794794267002,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgpu-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+              "initMs": 3.3599999845027924,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 133.3162059038819,
+              "t0": 1794794374514,
+              "frames": 192,
+              "ms": 1419.844999998808,
+              "fps": 135.2260281933318,
+              "meanProcessMs": 0.4524999995095034,
+              "medianProcessMs": 0.4000000059604645,
+              "t1": 1794794375934,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGPU (f16) [base]",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianFps": 132.3106820206535,
+          "minFps": 120.22165868229978,
+          "maxFps": 135.2260281933318
+        },
+        {
+          "name": "shipped-webgpu-xs",
+          "runs": [
+            {
+              "name": "shipped-webgpu-xs",
+              "label": "Longpipe xs — as shipped, WebGPU (f16)",
+              "initMs": 11.430000007152557,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 171.78594754903773,
+              "t0": 1794794157318,
+              "frames": 192,
+              "ms": 1079.5149999856949,
+              "fps": 177.85764903919286,
+              "meanProcessMs": 0.15218749890724817,
+              "medianProcessMs": 0.12000000476837158,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794158397,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-xs",
+              "label": "Longpipe xs — as shipped, WebGPU (f16)",
+              "initMs": 11.125,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 176.08136426354437,
+              "t0": 1794794268106,
+              "frames": 192,
+              "ms": 1096.4600000083447,
+              "fps": 175.10898710262003,
+              "meanProcessMs": 0.1551041662072142,
+              "medianProcessMs": 0.13750000298023224,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794269202,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-xs",
+              "label": "Longpipe xs — as shipped, WebGPU (f16)",
+              "initMs": 12.58500000834465,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 180.10834642614054,
+              "t0": 1794794377014,
+              "frames": 192,
+              "ms": 1091.175000011921,
+              "fps": 175.95711045240446,
+              "meanProcessMs": 0.14492187571401396,
+              "medianProcessMs": 0.12999999523162842,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794378106,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — as shipped, WebGPU (f16)",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "preset": {
+            "model": "xs",
+            "dtype": "f16",
+            "skipFrames": 2,
+            "flowWired": true
+          },
+          "medianFps": 175.95711045240446,
+          "minFps": 175.10898710262003,
+          "maxFps": 177.85764903919286
+        },
+        {
+          "name": "shipped-webgpu-xs@base",
+          "runs": [
+            {
+              "name": "shipped-webgpu-xs@base",
+              "label": "Longpipe xs — as shipped, WebGPU (f16) [base]",
+              "initMs": 8.725000023841858,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 156.535350899774,
+              "t0": 1794794159634,
+              "frames": 192,
+              "ms": 1171.669999986887,
+              "fps": 163.86866609382233,
+              "meanProcessMs": 0.3045312496833503,
+              "medianProcessMs": 0.2449999898672104,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794160806,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-xs@base",
+              "label": "Longpipe xs — as shipped, WebGPU (f16) [base]",
+              "initMs": 9.7049999833107,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 155.07757917392547,
+              "t0": 1794794270452,
+              "frames": 192,
+              "ms": 1214.6599999964237,
+              "fps": 158.06892463781247,
+              "meanProcessMs": 0.3216145837989946,
+              "medianProcessMs": 0.26749999821186066,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794271667,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-xs@base",
+              "label": "Longpipe xs — as shipped, WebGPU (f16) [base]",
+              "initMs": 10.450000017881393,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 151.80925799214555,
+              "t0": 1794794379383,
+              "frames": 192,
+              "ms": 1217.7750000059605,
+              "fps": 157.66459321226026,
+              "meanProcessMs": 0.3070312494722505,
+              "medianProcessMs": 0.26500001549720764,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794380601,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — as shipped, WebGPU (f16) [base]",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "preset": {
+            "model": "xs",
+            "dtype": "f16",
+            "skipFrames": 2,
+            "flowWired": true
+          },
+          "medianFps": 158.06892463781247,
+          "minFps": 157.66459321226026,
+          "maxFps": 163.86866609382233
+        },
+        {
+          "name": "shipped-webgpu-small",
+          "runs": [
+            {
+              "name": "shipped-webgpu-small",
+              "label": "Longpipe small — as shipped, WebGPU (f16)",
+              "initMs": 8.139999985694885,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 166.9746711599087,
+              "t0": 1794794161965,
+              "frames": 192,
+              "ms": 1106.5700000226498,
+              "fps": 173.50913181820405,
+              "meanProcessMs": 0.17002604187776646,
+              "medianProcessMs": 0.125,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794163072,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-small",
+              "label": "Longpipe small — as shipped, WebGPU (f16)",
+              "initMs": 9.259999990463257,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 175.9151942212072,
+              "t0": 1794794272771,
+              "frames": 192,
+              "ms": 1067.1849999725819,
+              "fps": 179.9125737383236,
+              "meanProcessMs": 0.14229166709507504,
+              "medianProcessMs": 0.13250000774860382,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794273838,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-small",
+              "label": "Longpipe small — as shipped, WebGPU (f16)",
+              "initMs": 8.435000002384186,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 165.28996767392854,
+              "t0": 1794794381772,
+              "frames": 192,
+              "ms": 1128.9950000047684,
+              "fps": 170.0627549273372,
+              "meanProcessMs": 0.14893229212611914,
+              "medianProcessMs": 0.12999999523162842,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794382901,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — as shipped, WebGPU (f16)",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "preset": {
+            "model": "small",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 173.50913181820405,
+          "minFps": 170.0627549273372,
+          "maxFps": 179.9125737383236
+        },
+        {
+          "name": "shipped-webgpu-small@base",
+          "runs": [
+            {
+              "name": "shipped-webgpu-small@base",
+              "label": "Longpipe small — as shipped, WebGPU (f16) [base]",
+              "initMs": 7.880000025033951,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 156.9088947748068,
+              "t0": 1794794164305,
+              "frames": 192,
+              "ms": 1288.1100000143051,
+              "fps": 149.05559307657555,
+              "meanProcessMs": 0.36109374975785613,
+              "medianProcessMs": 0.2750000059604645,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794165593,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-small@base",
+              "label": "Longpipe small — as shipped, WebGPU (f16) [base]",
+              "initMs": 7.53999999165535,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 155.29708656149975,
+              "t0": 1794794275084,
+              "frames": 192,
+              "ms": 1310.580000013113,
+              "fps": 146.50002288916278,
+              "meanProcessMs": 0.34039062665154535,
+              "medianProcessMs": 0.29250000417232513,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794276394,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-small@base",
+              "label": "Longpipe small — as shipped, WebGPU (f16) [base]",
+              "initMs": 7.7750000059604645,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 157.7209325245502,
+              "t0": 1794794384128,
+              "frames": 192,
+              "ms": 1224.2049999833107,
+              "fps": 156.83647755287512,
+              "meanProcessMs": 0.3241145828117927,
+              "medianProcessMs": 0.2549999952316284,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794385353,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — as shipped, WebGPU (f16) [base]",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "preset": {
+            "model": "small",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 149.05559307657555,
+          "minFps": 146.50002288916278,
+          "maxFps": 156.83647755287512
+        },
+        {
+          "name": "shipped-webgpu-medium",
+          "runs": [
+            {
+              "name": "shipped-webgpu-medium",
+              "label": "Longpipe medium — as shipped, WebGPU (f16)",
+              "initMs": 21.094999998807907,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 136.8320529076963,
+              "t0": 1794794167019,
+              "frames": 192,
+              "ms": 1340.294999986887,
+              "fps": 143.25204526009458,
+              "meanProcessMs": 0.17578124984477958,
+              "medianProcessMs": 0.1525000035762787,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794168359,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-medium",
+              "label": "Longpipe medium — as shipped, WebGPU (f16)",
+              "initMs": 22.394999980926514,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 145.12745894407672,
+              "t0": 1794794277742,
+              "frames": 192,
+              "ms": 1321.6350000202656,
+              "fps": 145.27460304626914,
+              "meanProcessMs": 0.15291666596507034,
+              "medianProcessMs": 0.14499999582767487,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794279063,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-medium",
+              "label": "Longpipe medium — as shipped, WebGPU (f16)",
+              "initMs": 21.080000013113022,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 134.96225274448304,
+              "t0": 1794794386798,
+              "frames": 192,
+              "ms": 1291.1049999892712,
+              "fps": 148.70982608044696,
+              "meanProcessMs": 0.15497395986070236,
+              "medianProcessMs": 0.14000001549720764,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794388089,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — as shipped, WebGPU (f16)",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "preset": {
+            "model": "medium",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 145.27460304626914,
+          "minFps": 143.25204526009458,
+          "maxFps": 148.70982608044696
+        },
+        {
+          "name": "shipped-webgpu-medium@base",
+          "runs": [
+            {
+              "name": "shipped-webgpu-medium@base",
+              "label": "Longpipe medium — as shipped, WebGPU (f16) [base]",
+              "initMs": 19.560000002384186,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 129.06912256628314,
+              "t0": 1794794169867,
+              "frames": 192,
+              "ms": 1383.594999998808,
+              "fps": 138.7689316600345,
+              "meanProcessMs": 0.3800781251241763,
+              "medianProcessMs": 0.3199999928474426,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794171251,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-medium@base",
+              "label": "Longpipe medium — as shipped, WebGPU (f16) [base]",
+              "initMs": 19.280000001192093,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 135.3103681561643,
+              "t0": 1794794280504,
+              "frames": 192,
+              "ms": 1362.6649999916553,
+              "fps": 140.9003680296887,
+              "meanProcessMs": 0.3442447915052374,
+              "medianProcessMs": 0.29500000178813934,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794281867,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-medium@base",
+              "label": "Longpipe medium — as shipped, WebGPU (f16) [base]",
+              "initMs": 17.725000023841858,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 134.0941312880984,
+              "t0": 1794794389540,
+              "frames": 192,
+              "ms": 1345.3850000202656,
+              "fps": 142.7100792688397,
+              "meanProcessMs": 0.37125000124797225,
+              "medianProcessMs": 0.3100000023841858,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794390886,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — as shipped, WebGPU (f16) [base]",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "preset": {
+            "model": "medium",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 140.9003680296887,
+          "minFps": 138.7689316600345,
+          "maxFps": 142.7100792688397
+        },
+        {
+          "name": "shipped-webgpu-large",
+          "runs": [
+            {
+              "name": "shipped-webgpu-large",
+              "label": "Longpipe large — as shipped, WebGPU (f16)",
+              "initMs": 31.09000000357628,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 107.94491436074551,
+              "t0": 1794794173066,
+              "frames": 192,
+              "ms": 1738.8900000154972,
+              "fps": 110.41526490938982,
+              "meanProcessMs": 0.2115104168963929,
+              "medianProcessMs": 0.17500001192092896,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794174805,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-large",
+              "label": "Longpipe large — as shipped, WebGPU (f16)",
+              "initMs": 20.594999998807907,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 108.36468101638225,
+              "t0": 1794794283661,
+              "frames": 192,
+              "ms": 1749.6400000154972,
+              "fps": 109.73686015311687,
+              "meanProcessMs": 0.1986197925483187,
+              "medianProcessMs": 0.1850000023841858,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794285411,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-large",
+              "label": "Longpipe large — as shipped, WebGPU (f16)",
+              "initMs": 19.53999999165535,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 115.10549838401546,
+              "t0": 1794794392575,
+              "frames": 192,
+              "ms": 1750.0100000202656,
+              "fps": 109.71365877782218,
+              "meanProcessMs": 0.20776041597127914,
+              "medianProcessMs": 0.1875,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794394325,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — as shipped, WebGPU (f16)",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "preset": {
+            "model": "large",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 109.73686015311687,
+          "minFps": 109.71365877782218,
+          "maxFps": 110.41526490938982
+        },
+        {
+          "name": "shipped-webgpu-large@base",
+          "runs": [
+            {
+              "name": "shipped-webgpu-large@base",
+              "label": "Longpipe large — as shipped, WebGPU (f16) [base]",
+              "initMs": 19.895000010728836,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 101.07630471309177,
+              "t0": 1794794176726,
+              "frames": 192,
+              "ms": 1744.6649999916553,
+              "fps": 110.04978033084765,
+              "meanProcessMs": 0.5492968743977448,
+              "medianProcessMs": 0.45250000059604645,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794178470,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-large@base",
+              "label": "Longpipe large — as shipped, WebGPU (f16) [base]",
+              "initMs": 17.594999998807907,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 106.42868031348648,
+              "t0": 1794794287234,
+              "frames": 192,
+              "ms": 1873.4099999964237,
+              "fps": 102.48690889894178,
+              "meanProcessMs": 0.5544010419398546,
+              "medianProcessMs": 0.47999998927116394,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794289107,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-large@base",
+              "label": "Longpipe large — as shipped, WebGPU (f16) [base]",
+              "initMs": 17.655000001192093,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 105.67420971370217,
+              "t0": 1794794396161,
+              "frames": 192,
+              "ms": 1755.5100000202656,
+              "fps": 109.36992668670845,
+              "meanProcessMs": 0.5363020837927858,
+              "medianProcessMs": 0.4749999940395355,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794397917,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — as shipped, WebGPU (f16) [base]",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "preset": {
+            "model": "large",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 109.36992668670845,
+          "minFps": 102.48690889894178,
+          "maxFps": 110.04978033084765
+        },
+        {
+          "name": "shipped-webgpu-xl",
+          "runs": [
+            {
+              "name": "shipped-webgpu-xl",
+              "label": "Longpipe xl — as shipped, WebGPU (f16)",
+              "initMs": 54.269999980926514,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 68.49559416302199,
+              "t0": 1794794181329,
+              "frames": 192,
+              "ms": 2841.9000000059605,
+              "fps": 67.5604349201581,
+              "meanProcessMs": 0.23361979254210988,
+              "medianProcessMs": 0.20000001788139343,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794184171,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-xl",
+              "label": "Longpipe xl — as shipped, WebGPU (f16)",
+              "initMs": 56.020000010728836,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 68.31281576901985,
+              "t0": 1794794291975,
+              "frames": 192,
+              "ms": 2830.4600000083447,
+              "fps": 67.83349702855152,
+              "meanProcessMs": 0.22718750142181912,
+              "medianProcessMs": 0.19999998807907104,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794294806,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-xl",
+              "label": "Longpipe xl — as shipped, WebGPU (f16)",
+              "initMs": 50.95000001788139,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 67.9416338905375,
+              "t0": 1794794400795,
+              "frames": 192,
+              "ms": 2936.080000013113,
+              "fps": 65.39331353339912,
+              "meanProcessMs": 0.23447916796430945,
+              "medianProcessMs": 0.20500001311302185,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794403732,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — as shipped, WebGPU (f16)",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "preset": {
+            "model": "xl",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 67.5604349201581,
+          "minFps": 65.39331353339912,
+          "maxFps": 67.83349702855152
+        },
+        {
+          "name": "shipped-webgpu-xl@base",
+          "runs": [
+            {
+              "name": "shipped-webgpu-xl@base",
+              "label": "Longpipe xl — as shipped, WebGPU (f16) [base]",
+              "initMs": 51.67499998211861,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 69.25457549046894,
+              "t0": 1794794186997,
+              "frames": 192,
+              "ms": 2818.594999998808,
+              "fps": 68.11904512712228,
+              "meanProcessMs": 0.6900781244039536,
+              "medianProcessMs": 0.5450000166893005,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794189816,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgpu-xl@base",
+              "label": "Longpipe xl — as shipped, WebGPU (f16) [base]",
+              "initMs": 49.76000002026558,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 69.16239654938158,
+              "t0": 1794794297634,
+              "frames": 192,
+              "ms": 2769.4950000047684,
+              "fps": 69.32671840883245,
+              "meanProcessMs": 0.6348437497702738,
+              "medianProcessMs": 0.5399999916553497,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794300404,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgpu-xl@base",
+              "label": "Longpipe xl — as shipped, WebGPU (f16) [base]",
+              "initMs": 51.01500001549721,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 69.10862472001519,
+              "t0": 1794794406562,
+              "frames": 192,
+              "ms": 2901.8050000071526,
+              "fps": 66.16571409847552,
+              "meanProcessMs": 0.6718749998447796,
+              "medianProcessMs": 0.5625,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794409464,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — as shipped, WebGPU (f16) [base]",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "preset": {
+            "model": "xl",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 68.11904512712228,
+          "minFps": 66.16571409847552,
+          "maxFps": 69.32671840883245
+        },
+        {
+          "name": "lp-mediapipe-webgl-square",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 71.37999999523163,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 93.13832496597554,
+              "t0": 1794794191950,
+              "frames": 192,
+              "ms": 2072.419999986887,
+              "fps": 92.64531320929872,
+              "meanProcessMs": 0.42591145836437744,
+              "medianProcessMs": 0.3499999940395355,
+              "t1": 1794794194023,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 72.64500001072884,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 95.07397944075704,
+              "t0": 1794794302498,
+              "frames": 192,
+              "ms": 2039.4399999976158,
+              "fps": 94.14349037001553,
+              "meanProcessMs": 0.3769010421819985,
+              "medianProcessMs": 0.3100000023841858,
+              "t1": 1794794304538,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-square",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+              "initMs": 72.0949999988079,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 89.29360388020467,
+              "t0": 1794794411688,
+              "frames": 192,
+              "ms": 2029.0250000059605,
+              "fps": 94.62672958659256,
+              "meanProcessMs": 0.4147916678339243,
+              "medianProcessMs": 0.33500000834465027,
+              "t1": 1794794413717,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGL2 (f16)",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianFps": 94.14349037001553,
+          "minFps": 92.64531320929872,
+          "maxFps": 94.62672958659256
+        },
+        {
+          "name": "lp-mediapipe-webgl-square@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 86.43000000715256,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 84.81520665958205,
+              "t0": 1794794196379,
+              "frames": 192,
+              "ms": 2218.169999986887,
+              "fps": 86.5578382185022,
+              "meanProcessMs": 0.6135677093019088,
+              "medianProcessMs": 0.5049999952316284,
+              "t1": 1794794198597,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 77.9699999988079,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 88.43911864953952,
+              "t0": 1794794306792,
+              "frames": 192,
+              "ms": 2150.0849999785423,
+              "fps": 89.29879516480332,
+              "meanProcessMs": 0.5771093744163712,
+              "medianProcessMs": 0.48000001907348633,
+              "t1": 1794794308942,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-square@base",
+              "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 78.25999999046326,
+              "maskRes": "256x256",
+              "dtype": "f16",
+              "warmupFps": 87.22356489940587,
+              "t0": 1794794416002,
+              "frames": 192,
+              "ms": 2197.1299999952316,
+              "fps": 87.3867272307131,
+              "meanProcessMs": 0.6196874988575777,
+              "medianProcessMs": 0.5250000059604645,
+              "t1": 1794794418199,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe square — Longpipe engine, WebGL2 (f16) [base]",
+          "maskRes": "256x256",
+          "dtype": "f16",
+          "medianFps": 87.3867272307131,
+          "minFps": 86.5578382185022,
+          "maxFps": 89.29879516480332
+        },
+        {
+          "name": "lp-mediapipe-webgl-landscape",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 74.16500002145767,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 87.63321846735191,
+              "t0": 1794794200866,
+              "frames": 192,
+              "ms": 2152.4000000059605,
+              "fps": 89.20275041789087,
+              "meanProcessMs": 0.41638020767519873,
+              "medianProcessMs": 0.3499999940395355,
+              "t1": 1794794203018,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 75.13999998569489,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 93.47318609694574,
+              "t0": 1794794311075,
+              "frames": 192,
+              "ms": 1981.824999988079,
+              "fps": 96.88040064140623,
+              "meanProcessMs": 0.37385416667287547,
+              "medianProcessMs": 0.30249999463558197,
+              "t1": 1794794313057,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+              "initMs": 70.64500001072884,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 92.25469021435275,
+              "t0": 1794794420355,
+              "frames": 192,
+              "ms": 2058.1800000071526,
+              "fps": 93.28630148934144,
+              "meanProcessMs": 0.4071093743356566,
+              "medianProcessMs": 0.32750000059604645,
+              "t1": 1794794422413,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16)",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianFps": 93.28630148934144,
+          "minFps": 89.20275041789087,
+          "maxFps": 96.88040064140623
+        },
+        {
+          "name": "lp-mediapipe-webgl-landscape@base",
+          "runs": [
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 85.875,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 89.79410492372655,
+              "t0": 1794794205247,
+              "frames": 192,
+              "ms": 2107,
+              "fps": 91.12482202183199,
+              "meanProcessMs": 0.5743749995405475,
+              "medianProcessMs": 0.46000000834465027,
+              "t1": 1794794207355,
+              "round": 0
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 76.30000001192093,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 89.53803967763892,
+              "t0": 1794794315281,
+              "frames": 192,
+              "ms": 2083.3799999952316,
+              "fps": 92.15793566245209,
+              "meanProcessMs": 0.5830468758940697,
+              "medianProcessMs": 0.4950000047683716,
+              "t1": 1794794317365,
+              "round": 1
+            },
+            {
+              "name": "lp-mediapipe-webgl-landscape@base",
+              "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+              "initMs": 78.10999998450279,
+              "maskRes": "256x144",
+              "dtype": "f16",
+              "warmupFps": 86.59590157862496,
+              "t0": 1794794424713,
+              "frames": 192,
+              "ms": 2060.8949999809265,
+              "fps": 93.16340716134347,
+              "meanProcessMs": 0.5643750002297262,
+              "medianProcessMs": 0.4750000089406967,
+              "t1": 1794794426774,
+              "round": 2
+            }
+          ],
+          "label": "MediaPipe landscape — Longpipe engine, WebGL2 (f16) [base]",
+          "maskRes": "256x144",
+          "dtype": "f16",
+          "medianFps": 92.15793566245209,
+          "minFps": 91.12482202183199,
+          "maxFps": 93.16340716134347
+        },
+        {
+          "name": "shipped-webgl-xs",
+          "runs": [
+            {
+              "name": "shipped-webgl-xs",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16)",
+              "initMs": 79.88000002503395,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 124.92923929766623,
+              "t0": 1794794208977,
+              "frames": 192,
+              "ms": 1480.0049999952316,
+              "fps": 129.7292914555144,
+              "meanProcessMs": 0.33583333420877653,
+              "medianProcessMs": 0.2849999964237213,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794210457,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-xs",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16)",
+              "initMs": 77.82499998807907,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 124.1320454625963,
+              "t0": 1794794318994,
+              "frames": 192,
+              "ms": 1516.255000025034,
+              "fps": 126.62777698792749,
+              "meanProcessMs": 0.354609376595666,
+              "medianProcessMs": 0.2824999988079071,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794320510,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-xs",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16)",
+              "initMs": 75.60999998450279,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 122.22565274471987,
+              "t0": 1794794428424,
+              "frames": 192,
+              "ms": 1505.2100000083447,
+              "fps": 127.55695218536655,
+              "meanProcessMs": 0.3410156255898376,
+              "medianProcessMs": 0.2900000214576721,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794429930,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — as shipped, WebGL2 (f16)",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "preset": {
+            "model": "xs",
+            "dtype": "f16",
+            "skipFrames": 2,
+            "flowWired": true
+          },
+          "medianFps": 127.55695218536655,
+          "minFps": 126.62777698792749,
+          "maxFps": 129.7292914555144
+        },
+        {
+          "name": "shipped-webgl-xs@base",
+          "runs": [
+            {
+              "name": "shipped-webgl-xs@base",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16) [base]",
+              "initMs": 72.9050000011921,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 122.30896391032195,
+              "t0": 1794794212104,
+              "frames": 192,
+              "ms": 1516.919999986887,
+              "fps": 126.57226485355835,
+              "meanProcessMs": 0.43138020889212686,
+              "medianProcessMs": 0.3699999898672104,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794213621,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-xs@base",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16) [base]",
+              "initMs": 75.31499999761581,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 122.6413889120485,
+              "t0": 1794794322155,
+              "frames": 192,
+              "ms": 1563.919999986887,
+              "fps": 122.76842805361518,
+              "meanProcessMs": 0.4454166671882073,
+              "medianProcessMs": 0.3799999952316284,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794323719,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-xs@base",
+              "label": "Longpipe xs — as shipped, WebGL2 (f16) [base]",
+              "initMs": 73.88999998569489,
+              "maskRes": "384x240",
+              "dtype": "f16",
+              "preset": {
+                "model": "xs",
+                "dtype": "f16",
+                "skipFrames": 2,
+                "flowWired": true
+              },
+              "warmupFps": 121.89392689014545,
+              "t0": 1794794431582,
+              "frames": 192,
+              "ms": 1555.6850000023842,
+              "fps": 123.41830126259863,
+              "meanProcessMs": 0.45617187411213916,
+              "medianProcessMs": 0.3824999928474426,
+              "counts": {
+                "frames": 192,
+                "network": 64,
+                "flow": 128
+              },
+              "t1": 1794794433138,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xs — as shipped, WebGL2 (f16) [base]",
+          "maskRes": "384x240",
+          "dtype": "f16",
+          "preset": {
+            "model": "xs",
+            "dtype": "f16",
+            "skipFrames": 2,
+            "flowWired": true
+          },
+          "medianFps": 123.41830126259863,
+          "minFps": 122.76842805361518,
+          "maxFps": 126.57226485355835
+        },
+        {
+          "name": "shipped-webgl-small",
+          "runs": [
+            {
+              "name": "shipped-webgl-small",
+              "label": "Longpipe small — as shipped, WebGL2 (f16)",
+              "initMs": 71.84999999403954,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 120.05965463991524,
+              "t0": 1794794215297,
+              "frames": 192,
+              "ms": 1574.9950000047684,
+              "fps": 121.90514890486554,
+              "meanProcessMs": 0.36408854167287547,
+              "medianProcessMs": 0.3374999910593033,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794216872,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-small",
+              "label": "Longpipe small — as shipped, WebGL2 (f16)",
+              "initMs": 72.86999997496605,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 118.8722000019501,
+              "t0": 1794794325411,
+              "frames": 192,
+              "ms": 1637.25,
+              "fps": 117.26981218506643,
+              "meanProcessMs": 0.41638020938262343,
+              "medianProcessMs": 0.3525000065565109,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794327048,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-small",
+              "label": "Longpipe small — as shipped, WebGL2 (f16)",
+              "initMs": 68.46499997377396,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 118.95210628875115,
+              "t0": 1794794434825,
+              "frames": 192,
+              "ms": 1524.2099999785423,
+              "fps": 125.9668943273584,
+              "meanProcessMs": 0.3473958340473473,
+              "medianProcessMs": 0.29499998688697815,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794436349,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — as shipped, WebGL2 (f16)",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "preset": {
+            "model": "small",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 121.90514890486554,
+          "minFps": 117.26981218506643,
+          "maxFps": 125.9668943273584
+        },
+        {
+          "name": "shipped-webgl-small@base",
+          "runs": [
+            {
+              "name": "shipped-webgl-small@base",
+              "label": "Longpipe small — as shipped, WebGL2 (f16) [base]",
+              "initMs": 77.01499998569489,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 123.19142792886429,
+              "t0": 1794794218512,
+              "frames": 192,
+              "ms": 1557.6349999904633,
+              "fps": 123.26379415021846,
+              "meanProcessMs": 0.4879947924055159,
+              "medianProcessMs": 0.4150000065565109,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794220070,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-small@base",
+              "label": "Longpipe small — as shipped, WebGL2 (f16) [base]",
+              "initMs": 80.02500000596046,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 121.90708394454836,
+              "t0": 1794794328708,
+              "frames": 192,
+              "ms": 1590.5049999952316,
+              "fps": 120.7163762456425,
+              "meanProcessMs": 0.47643229085952044,
+              "medianProcessMs": 0.41999998688697815,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794330299,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-small@base",
+              "label": "Longpipe small — as shipped, WebGL2 (f16) [base]",
+              "initMs": 71.21500000357628,
+              "maskRes": "384x224",
+              "dtype": "f16",
+              "preset": {
+                "model": "small",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 123.26458550678116,
+              "t0": 1794794437983,
+              "frames": 192,
+              "ms": 1595.8500000238419,
+              "fps": 120.31205940228188,
+              "meanProcessMs": 0.46937500157703954,
+              "medianProcessMs": 0.3974999934434891,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794439579,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe small — as shipped, WebGL2 (f16) [base]",
+          "maskRes": "384x224",
+          "dtype": "f16",
+          "preset": {
+            "model": "small",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 120.7163762456425,
+          "minFps": 120.31205940228188,
+          "maxFps": 123.26379415021846
+        },
+        {
+          "name": "shipped-webgl-medium",
+          "runs": [
+            {
+              "name": "shipped-webgl-medium",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16)",
+              "initMs": 98.11500000953674,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 101.58246432690333,
+              "t0": 1794794222062,
+              "frames": 192,
+              "ms": 1858.6799999773502,
+              "fps": 103.29911550258231,
+              "meanProcessMs": 0.3715104161140819,
+              "medianProcessMs": 0.33000001311302185,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794223921,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-medium",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16)",
+              "initMs": 114.2999999821186,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 101.29093182375338,
+              "t0": 1794794332313,
+              "frames": 192,
+              "ms": 1843.8100000023842,
+              "fps": 104.13220451117617,
+              "meanProcessMs": 0.4049739579980572,
+              "medianProcessMs": 0.35999998450279236,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794334157,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-medium",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16)",
+              "initMs": 106.97999998927116,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 104.60507498093055,
+              "t0": 1794794441526,
+              "frames": 192,
+              "ms": 1753.1450000107288,
+              "fps": 109.51746717973984,
+              "meanProcessMs": 0.37687500038494665,
+              "medianProcessMs": 0.33000001311302185,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794443279,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — as shipped, WebGL2 (f16)",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "preset": {
+            "model": "medium",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 104.13220451117617,
+          "minFps": 103.29911550258231,
+          "maxFps": 109.51746717973984
+        },
+        {
+          "name": "shipped-webgl-medium@base",
+          "runs": [
+            {
+              "name": "shipped-webgl-medium@base",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16) [base]",
+              "initMs": 104.7199999988079,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 105.44989207800471,
+              "t0": 1794794225852,
+              "frames": 192,
+              "ms": 1845.7599999904633,
+              "fps": 104.02219140136964,
+              "meanProcessMs": 0.5160937492425243,
+              "medianProcessMs": 0.4425000101327896,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794227698,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-medium@base",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16) [base]",
+              "initMs": 105.65999999642372,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 107.65077415944279,
+              "t0": 1794794336051,
+              "frames": 192,
+              "ms": 1822.294999986887,
+              "fps": 105.36164561796065,
+              "meanProcessMs": 0.5341406256581346,
+              "medianProcessMs": 0.4699999988079071,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794337874,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-medium@base",
+              "label": "Longpipe medium — as shipped, WebGL2 (f16) [base]",
+              "initMs": 106.97000002861023,
+              "maskRes": "512x320",
+              "dtype": "f16",
+              "preset": {
+                "model": "medium",
+                "dtype": "f16",
+                "skipFrames": 1,
+                "flowWired": true
+              },
+              "warmupFps": 107.2964371434247,
+              "t0": 1794794445180,
+              "frames": 192,
+              "ms": 1723.6599999964237,
+              "fps": 111.39087755148833,
+              "meanProcessMs": 0.5047135413624346,
+              "medianProcessMs": 0.44999998807907104,
+              "counts": {
+                "frames": 192,
+                "network": 96,
+                "flow": 96
+              },
+              "t1": 1794794446903,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe medium — as shipped, WebGL2 (f16) [base]",
+          "maskRes": "512x320",
+          "dtype": "f16",
+          "preset": {
+            "model": "medium",
+            "dtype": "f16",
+            "skipFrames": 1,
+            "flowWired": true
+          },
+          "medianFps": 105.36164561796065,
+          "minFps": 104.02219140136964,
+          "maxFps": 111.39087755148833
+        },
+        {
+          "name": "shipped-webgl-large",
+          "runs": [
+            {
+              "name": "shipped-webgl-large",
+              "label": "Longpipe large — as shipped, WebGL2 (f16)",
+              "initMs": 108.71500000357628,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 75.90252850380347,
+              "t0": 1794794230341,
+              "frames": 192,
+              "ms": 2531.4600000083447,
+              "fps": 75.84555947925983,
+              "meanProcessMs": 0.45494791710128385,
+              "medianProcessMs": 0.41750001907348633,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794232872,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-large",
+              "label": "Longpipe large — as shipped, WebGL2 (f16)",
+              "initMs": 101.62000000476837,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 76.91260004635784,
+              "t0": 1794794340478,
+              "frames": 192,
+              "ms": 2497.2249999940395,
+              "fps": 76.8853427306143,
+              "meanProcessMs": 0.45656249842916924,
+              "medianProcessMs": 0.4049999862909317,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794342975,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-large",
+              "label": "Longpipe large — as shipped, WebGL2 (f16)",
+              "initMs": 109.85500001907349,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 76.41076357084378,
+              "t0": 1794794449531,
+              "frames": 192,
+              "ms": 2501.5,
+              "fps": 76.75394763142114,
+              "meanProcessMs": 0.4787500005525847,
+              "medianProcessMs": 0.4399999976158142,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794452032,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — as shipped, WebGL2 (f16)",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "preset": {
+            "model": "large",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 76.75394763142114,
+          "minFps": 75.84555947925983,
+          "maxFps": 76.8853427306143
+        },
+        {
+          "name": "shipped-webgl-large@base",
+          "runs": [
+            {
+              "name": "shipped-webgl-large@base",
+              "label": "Longpipe large — as shipped, WebGL2 (f16) [base]",
+              "initMs": 109.02500000596046,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 69.9388581389829,
+              "t0": 1794794235732,
+              "frames": 192,
+              "ms": 2597.0349999964237,
+              "fps": 73.93046300887913,
+              "meanProcessMs": 0.7062500013659397,
+              "medianProcessMs": 0.6000000089406967,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794238329,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-large@base",
+              "label": "Longpipe large — as shipped, WebGL2 (f16) [base]",
+              "initMs": 106.64999997615814,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 75.75548339409526,
+              "t0": 1794794345621,
+              "frames": 192,
+              "ms": 2506.175000011921,
+              "fps": 76.6107713942908,
+              "meanProcessMs": 0.668671874795109,
+              "medianProcessMs": 0.5850000083446503,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794348128,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-large@base",
+              "label": "Longpipe large — as shipped, WebGL2 (f16) [base]",
+              "initMs": 107.0300000011921,
+              "maskRes": "640x400",
+              "dtype": "f16",
+              "preset": {
+                "model": "large",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 77.56713900457027,
+              "t0": 1794794454619,
+              "frames": 192,
+              "ms": 2592.6299999952316,
+              "fps": 74.05607433392082,
+              "meanProcessMs": 0.7202343745157123,
+              "medianProcessMs": 0.6350000202655792,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794457212,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe large — as shipped, WebGL2 (f16) [base]",
+          "maskRes": "640x400",
+          "dtype": "f16",
+          "preset": {
+            "model": "large",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 74.05607433392082,
+          "minFps": 73.93046300887913,
+          "maxFps": 76.6107713942908
+        },
+        {
+          "name": "shipped-webgl-xl",
+          "runs": [
+            {
+              "name": "shipped-webgl-xl",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16)",
+              "initMs": 167.68000000715256,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 49.99720067751967,
+              "t0": 1794794242343,
+              "frames": 192,
+              "ms": 3772.4950000047684,
+              "fps": 50.89469966156544,
+              "meanProcessMs": 0.5566145842894912,
+              "medianProcessMs": 0.4599999934434891,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794246115,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-xl",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16)",
+              "initMs": 156.84000000357628,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 50.43679048629722,
+              "t0": 1794794352096,
+              "frames": 192,
+              "ms": 3822.4800000190735,
+              "fps": 50.229170590569986,
+              "meanProcessMs": 0.5470572905614972,
+              "medianProcessMs": 0.4650000035762787,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794355918,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-xl",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16)",
+              "initMs": 161.1899999976158,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 49.47089333620724,
+              "t0": 1794794461259,
+              "frames": 192,
+              "ms": 3913.685000002384,
+              "fps": 49.058623777816315,
+              "meanProcessMs": 0.5743229161016643,
+              "medianProcessMs": 0.49000000953674316,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794465173,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — as shipped, WebGL2 (f16)",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "preset": {
+            "model": "xl",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 50.229170590569986,
+          "minFps": 49.058623777816315,
+          "maxFps": 50.89469966156544
+        },
+        {
+          "name": "shipped-webgl-xl@base",
+          "runs": [
+            {
+              "name": "shipped-webgl-xl@base",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16) [base]",
+              "initMs": 165.59000000357628,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 50.45905917510484,
+              "t0": 1794794250092,
+              "frames": 192,
+              "ms": 3963.830000013113,
+              "fps": 48.43800062045164,
+              "meanProcessMs": 0.8833854161202908,
+              "medianProcessMs": 0.7549999952316284,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794254056,
+              "round": 0
+            },
+            {
+              "name": "shipped-webgl-xl@base",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16) [base]",
+              "initMs": 159.61000001430511,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 50.114127094186884,
+              "t0": 1794794359915,
+              "frames": 192,
+              "ms": 3736.0250000059605,
+              "fps": 51.39151906095213,
+              "meanProcessMs": 0.8193489584761361,
+              "medianProcessMs": 0.7150000035762787,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794363651,
+              "round": 1
+            },
+            {
+              "name": "shipped-webgl-xl@base",
+              "label": "Longpipe xl — as shipped, WebGL2 (f16) [base]",
+              "initMs": 156.83500000834465,
+              "maskRes": "1280x768",
+              "dtype": "f16",
+              "preset": {
+                "model": "xl",
+                "dtype": "f16",
+                "skipFrames": 0,
+                "flowWired": true
+              },
+              "warmupFps": 49.69587161899832,
+              "t0": 1794794469199,
+              "frames": 192,
+              "ms": 3856.875,
+              "fps": 49.78123480797277,
+              "meanProcessMs": 0.8017187487954894,
+              "medianProcessMs": 0.7150000035762787,
+              "counts": {
+                "frames": 192,
+                "network": 192,
+                "flow": 192
+              },
+              "t1": 1794794473056,
+              "round": 2
+            }
+          ],
+          "label": "Longpipe xl — as shipped, WebGL2 (f16) [base]",
+          "maskRes": "1280x768",
+          "dtype": "f16",
+          "preset": {
+            "model": "xl",
+            "dtype": "f16",
+            "skipFrames": 0,
+            "flowWired": true
+          },
+          "medianFps": 49.78123480797277,
+          "minFps": 48.43800062045164,
+          "maxFps": 51.39151906095213
+        }
+      ]
+    }
+  ],
+  "discarded": [],
+  "busyCmd": "pgrep -f \"[u]pscale_native\"",
+  "busySamples": []
+}
