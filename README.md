@@ -62,6 +62,10 @@ In the speed table below, MediaPipe's model on other engines (LiteRT.js, Longpip
 
 **Speed**: background replacement on an Apple M4 MacBook Pro, Chrome 157: WebCodecs decode → effect → H.264 encode of a 192-frame webcam clip, frames per second, median of 5 runs, two sessions (s1 / s2). Longpipe "as shipped" is the SDK's own per-frame renderer: the full network on key frames (every 3rd frame for xs, every 2nd for small/medium, every frame for large/xl), a small learned optical-flow network on the frames between, and a temporal stabiliser on every frame.
 
+> **0.0.18 update:** WebGPU work is now batched into one command buffer per model run and frame. Same-session A/B at 360p
+> (WebGPU transcode): MediaPipe's model on Longpipe 198 → 379 fps (LiteRT.js 433); as shipped xs 282 → 344, small 274 → 332,
+> medium 225 → 250, large 135 → 158, xl 83 → 83; WebGL unchanged. See [`analysis/`](analysis/). The tables below are 0.0.17.
+
 | Longpipe model, as shipped | xs | small | medium | large | xl |
 |---|---:|---:|---:|---:|---:|
 | WebGPU, 360p | 308 / 288 | 291 / 298 | 241 / 237 | 150 / 157 | 91 / 88 |

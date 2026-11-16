@@ -51,6 +51,11 @@ frame). Headline metric: **transcode FPS**, WebCodecs decode → effect → H.26
 encode → MP4, the same output path for every pipeline. Full results and
 conditions: [`performance/results/2026-11-15-apple-m4-v2.md`](performance/results/2026-11-15-apple-m4-v2.md).
 
+> **Longpipe 0.0.18** batches GPU work into one command buffer per model run and frame. Same-session A/B
+> (3 rounds, [`engine-perf-ab-transcode.json`](performance/results/2026-11-15-apple-m4-engine-perf-ab-transcode.json)),
+> 360p WebGPU transcode: MediaPipe landscape on Longpipe 198 → 379 fps (LiteRT.js 433), shipped xs 282 → 344,
+> small 274 → 332, medium 225 → 250, large 135 → 158, xl 83 → 83; WebGL unchanged. The tables below are v2 (0.0.17).
+
 Transcode FPS, median of 5 interleaved runs, **session 1 / session 2**, **360p · 720p**:
 
 | Model | Engine | Pipeline | Mask | FPS (360p · 720p) |

@@ -20,20 +20,27 @@ the Longpipe SDK as shipped. They also include MediaPipe's model running on Long
 ## Performance
 
 Background replacement on a 192-frame webcam clip at **360p**, on an Apple M4 MacBook Pro with
-Chrome 157. Frames per second for the full transcode (WebCodecs decode → effect → H.264 encode),
-median of 5 interleaved runs. Higher is better.
+Chrome 157, Longpipe 0.0.18. Frames per second for the full transcode (WebCodecs decode → effect →
+H.264 encode), median of interleaved runs. Higher is better.
 
 | Model and engine | WebGPU | WebGL |
 |---|---:|---:|
-| MediaPipe selfie (landscape), tasks-vision GPU delegate | – | 123 |
-| MediaPipe selfie (landscape), Longpipe engine | 209 | 122 |
-| Longpipe xs | 308 | 205 |
-| Longpipe small | 291 | 195 |
-| Longpipe medium | 241 | 154 |
-| Longpipe large | 150 | 102 |
-| Longpipe xl | 91 | 63 |
+| MediaPipe selfie (landscape), tasks-vision GPU delegate | – | 123\* |
+| MediaPipe selfie (landscape), Longpipe engine | 379 | 127 |
+| Longpipe xs | 344 | 182 |
+| Longpipe small | 332 | 188 |
+| Longpipe medium | 250 | 153 |
+| Longpipe large | 158 | 97 |
+| Longpipe xl | 83 | 59 |
 
 MediaPipe's tasks-vision library has no WebGPU delegate. Its GPU delegate runs on WebGL.
+
+Longpipe rows are from the 0.0.18 A/B session (3 rounds,
+[`engine-perf-ab-transcode.json`](../benchmarks/performance/results/2026-11-15-apple-m4-engine-perf-ab-transcode.json));
+0.0.18 records each model run and frame into one GPU command buffer. \*tasks-vision is from the v2 session on
+the same machine and harness (5 rounds,
+[`2026-11-15-apple-m4-v2.md`](../benchmarks/performance/results/2026-11-15-apple-m4-v2.md)), which also has
+LiteRT.js: running MediaPipe's model, it is still the fastest engine tested (433 fps landscape at 360p).
 
 The Longpipe rows run the SDK's own renderer, exactly as shipped:
 - **xs:** the full network on every 3rd frame, the flow network on the other two.
