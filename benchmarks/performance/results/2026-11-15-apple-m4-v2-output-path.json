@@ -1,0 +1,1620 @@
+{
+ "what": "Output-path investigation (web/ceiling.html, tools/ceiling.mjs), Apple M4, Chrome 157.0.8103.51 headless, 2026-11-15 ~23:05-23:11 UTC. No model in any route. Files: a = routes, direct output; b = encoder-only by frame source x encoder option; c = encoder options on two routes; d = copyTo readback throughput; e1/e4 = routes with the readback output stage (1 / 4 copies in flight).",
+ "parts": {
+  "a": {
+   "chrome": "157.0.8103.51",
+   "headless": true,
+   "chromeArgs": [],
+   "environment": {
+    "date": "2026-11-15T23:05:36.869Z",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "platform": {
+     "platform": "macOS",
+     "platformVersion": "26.5.1",
+     "architecture": "arm",
+     "model": "",
+     "browsers": [
+      {
+       "brand": "Not-A.Brand",
+       "version": "99.0.0.0"
+      },
+      {
+       "brand": "Google Chrome",
+       "version": "157.0.8103.51"
+      },
+      {
+       "brand": "Chromium",
+       "version": "157.0.8103.51"
+      }
+     ]
+    },
+    "hardwareConcurrency": 10,
+    "deviceMemoryGB": 16,
+    "crossOriginIsolated": true,
+    "webgpu": {
+     "vendor": "apple",
+     "architecture": "metal-3",
+     "device": "",
+     "description": "",
+     "features": [
+      "atomic-vec2u-min-max",
+      "bgra8unorm-storage",
+      "chromium-experimental-subgroup-matrix",
+      "clip-distances",
+      "core-features-and-limits",
+      "depth-clip-control",
+      "depth32float-stencil8",
+      "dual-source-blending",
+      "float32-blendable",
+      "float32-filterable",
+      "indirect-first-instance",
+      "primitive-index",
+      "rg11b10ufloat-renderable",
+      "shader-f16",
+      "subgroup-size-control",
+      "subgroups",
+      "texture-component-swizzle",
+      "texture-compression-astc",
+      "texture-compression-astc-sliced-3d",
+      "texture-compression-bc",
+      "texture-compression-bc-sliced-3d",
+      "texture-compression-etc2",
+      "texture-compression-unaligned",
+      "texture-formats-tier1",
+      "texture-formats-tier2",
+      "timestamp-query"
+     ]
+    },
+    "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+   },
+   "results": [
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "passthrough",
+     "runs": [
+      {
+       "fps": 1061.2132099984854,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 1058.1135818033392,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 1047.5203230331233,
+       "frames": 192,
+       "medianProcessMs": 0
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "clone",
+     "runs": [
+      {
+       "fps": 1061.888169888105,
+       "frames": 192,
+       "medianProcessMs": 0.004999995231628418
+      },
+      {
+       "fps": 1054.1052457585477,
+       "frames": 192,
+       "medianProcessMs": 0.004999995231628418
+      },
+      {
+       "fps": 1034.5384988215972,
+       "frames": 192,
+       "medianProcessMs": 0.004999995231628418
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "webgpu-offscreen",
+     "runs": [
+      {
+       "fps": 100.0208376748261,
+       "frames": 192,
+       "medianProcessMs": 0.2199999988079071
+      },
+      {
+       "fps": 93.58184512172008,
+       "frames": 192,
+       "medianProcessMs": 0.2199999988079071
+      },
+      {
+       "fps": 95.99544021664693,
+       "frames": 192,
+       "medianProcessMs": 0.20500001311302185
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "webgpu-dom-canvas",
+     "runs": [
+      {
+       "fps": 99.84399375975039,
+       "frames": 192,
+       "medianProcessMs": 0.22499999403953552
+      },
+      {
+       "fps": 99.8769744554481,
+       "frames": 192,
+       "medianProcessMs": 0.2150000035762787
+      },
+      {
+       "fps": 104.64897626519127,
+       "frames": 192,
+       "medianProcessMs": 0.18000000715255737
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "webgpu-bitmap",
+     "runs": [
+      {
+       "fps": 95.24612690633118,
+       "frames": 192,
+       "medianProcessMs": 0.2449999749660492
+      },
+      {
+       "fps": 98.04997995580919,
+       "frames": 192,
+       "medianProcessMs": 0.2150000035762787
+      },
+      {
+       "fps": 97.69028617751816,
+       "frames": 192,
+       "medianProcessMs": 0.22999998927116394
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "webgl-offscreen",
+     "runs": [
+      {
+       "fps": 89.33889219877742,
+       "frames": 192,
+       "medianProcessMs": 0.39499998092651367
+      },
+      {
+       "fps": 90.1182097455908,
+       "frames": 192,
+       "medianProcessMs": 0.33000001311302185
+      },
+      {
+       "fps": 91.08029771867166,
+       "frames": 192,
+       "medianProcessMs": 0.3400000035762787
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "2d-offscreen",
+     "runs": [
+      {
+       "fps": 83.93460969296098,
+       "frames": 192,
+       "medianProcessMs": 0.3199999928474426
+      },
+      {
+       "fps": 83.5016776447725,
+       "frames": 192,
+       "medianProcessMs": 0.29999998211860657
+      },
+      {
+       "fps": 84.06820032808615,
+       "frames": 192,
+       "medianProcessMs": 0.29500001668930054
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "cpu-rgba",
+     "runs": [
+      {
+       "fps": 1036.8850244785608,
+       "frames": 192,
+       "medianProcessMs": 0.0350000262260437
+      },
+      {
+       "fps": 1103.0362221160476,
+       "frames": 192,
+       "medianProcessMs": 0.02000001072883606
+      },
+      {
+       "fps": 1122.0852084471346,
+       "frames": 192,
+       "medianProcessMs": 0.025000005960464478
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "cpu-nv12",
+     "runs": [
+      {
+       "fps": 1047.6918040488463,
+       "frames": 192,
+       "medianProcessMs": 0.014999985694885254
+      },
+      {
+       "fps": 1092.7717699513928,
+       "frames": 192,
+       "medianProcessMs": 0.014999985694885254
+      },
+      {
+       "fps": 1056.4833410454062,
+       "frames": 192,
+       "medianProcessMs": 0.015000015497207642
+      }
+     ]
+    }
+   ]
+  },
+  "b": {
+   "chrome": "157.0.8103.51",
+   "headless": true,
+   "chromeArgs": [],
+   "environment": {
+    "date": "2026-11-15T23:06:30.222Z",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "platform": {
+     "platform": "macOS",
+     "platformVersion": "26.5.1",
+     "architecture": "arm",
+     "model": "",
+     "browsers": [
+      {
+       "brand": "Not-A.Brand",
+       "version": "99.0.0.0"
+      },
+      {
+       "brand": "Google Chrome",
+       "version": "157.0.8103.51"
+      },
+      {
+       "brand": "Chromium",
+       "version": "157.0.8103.51"
+      }
+     ]
+    },
+    "hardwareConcurrency": 10,
+    "deviceMemoryGB": 16,
+    "crossOriginIsolated": true,
+    "webgpu": {
+     "vendor": "apple",
+     "architecture": "metal-3",
+     "device": "",
+     "description": "",
+     "features": [
+      "atomic-vec2u-min-max",
+      "bgra8unorm-storage",
+      "chromium-experimental-subgroup-matrix",
+      "clip-distances",
+      "core-features-and-limits",
+      "depth-clip-control",
+      "depth32float-stencil8",
+      "dual-source-blending",
+      "float32-blendable",
+      "float32-filterable",
+      "indirect-first-instance",
+      "primitive-index",
+      "rg11b10ufloat-renderable",
+      "shader-f16",
+      "subgroup-size-control",
+      "subgroups",
+      "texture-component-swizzle",
+      "texture-compression-astc",
+      "texture-compression-astc-sliced-3d",
+      "texture-compression-bc",
+      "texture-compression-bc-sliced-3d",
+      "texture-compression-etc2",
+      "texture-compression-unaligned",
+      "texture-formats-tier1",
+      "texture-formats-tier2",
+      "timestamp-query"
+     ]
+    },
+    "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+   },
+   "results": [
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "default",
+     "source": "decoded",
+     "runs": [
+      {
+       "fps": 1105.5768290054166,
+       "outputs": 192
+      },
+      {
+       "fps": 1058.2885489176476,
+       "outputs": 192
+      },
+      {
+       "fps": 1035.1799434218635,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "default",
+     "source": "webgpu-canvas",
+     "runs": [
+      {
+       "fps": 79.09681326350803,
+       "outputs": 192
+      },
+      {
+       "fps": 78.36015059860505,
+       "outputs": 192
+      },
+      {
+       "fps": 76.54769878451424,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "default",
+     "source": "cpu-rgba",
+     "runs": [
+      {
+       "fps": 1081.233281784538,
+       "outputs": 192
+      },
+      {
+       "fps": 1102.5295012097456,
+       "outputs": 192
+      },
+      {
+       "fps": 1037.8658882404989,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "default",
+     "source": "cpu-nv12",
+     "runs": [
+      {
+       "fps": 1124.6814866647794,
+       "outputs": 192
+      },
+      {
+       "fps": 1106.979157703697,
+       "outputs": 192
+      },
+      {
+       "fps": 1071.2791184621863,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "prefer-hardware",
+     "source": "decoded",
+     "runs": [
+      {
+       "fps": 1073.5853276457199,
+       "outputs": 192
+      },
+      {
+       "fps": 1055.3509592915048,
+       "outputs": 192
+      },
+      {
+       "fps": 1045.723155578848,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "prefer-hardware",
+     "source": "webgpu-canvas",
+     "runs": [
+      {
+       "fps": 81.09888995931121,
+       "outputs": 192
+      },
+      {
+       "fps": 75.87538258857163,
+       "outputs": 192
+      },
+      {
+       "fps": 74.89920790207542,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "prefer-hardware",
+     "source": "cpu-rgba",
+     "runs": [
+      {
+       "fps": 1101.6438592187496,
+       "outputs": 192
+      },
+      {
+       "fps": 1082.1778828877195,
+       "outputs": 192
+      },
+      {
+       "fps": 1054.2210020590253,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "prefer-hardware",
+     "source": "cpu-nv12",
+     "runs": [
+      {
+       "fps": 1098.4295890294559,
+       "outputs": 192
+      },
+      {
+       "fps": 1077.834226908126,
+       "outputs": 192
+      },
+      {
+       "fps": 1098.3981692614764,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "prefer-software",
+     "source": "decoded",
+     "runs": [
+      {
+       "fps": 1012.151084515011,
+       "outputs": 192
+      },
+      {
+       "fps": 949.2732127412883,
+       "outputs": 192
+      },
+      {
+       "fps": 990.6609565947995,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "prefer-software",
+     "source": "webgpu-canvas",
+     "runs": [
+      {
+       "fps": 73.18649023125235,
+       "outputs": 192
+      },
+      {
+       "fps": 74.92975335605423,
+       "outputs": 192
+      },
+      {
+       "fps": 79.19795570253476,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "prefer-software",
+     "source": "cpu-rgba",
+     "runs": [
+      {
+       "fps": 2821.869488882239,
+       "outputs": 192
+      },
+      {
+       "fps": 2903.8112520591885,
+       "outputs": 192
+      },
+      {
+       "fps": 3078.403078167725,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "prefer-software",
+     "source": "cpu-nv12",
+     "runs": [
+      {
+       "fps": 3362.5218917695656,
+       "outputs": 192
+      },
+      {
+       "fps": 3398.831651045959,
+       "outputs": 192
+      },
+      {
+       "fps": 3318.3546500419156,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "realtime",
+     "source": "decoded",
+     "runs": [
+      {
+       "fps": 601.4566528423055,
+       "outputs": 192
+      },
+      {
+       "fps": 362.0796952626136,
+       "outputs": 192
+      },
+      {
+       "fps": 488.3445881603781,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "realtime",
+     "source": "webgpu-canvas",
+     "runs": [
+      {
+       "fps": 80.39443519788931,
+       "outputs": 192
+      },
+      {
+       "fps": 75.75548339498606,
+       "outputs": 192
+      },
+      {
+       "fps": 79.56768225901463,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "realtime",
+     "source": "cpu-rgba",
+     "runs": [
+      {
+       "fps": 712.7081052491466,
+       "outputs": 192
+      },
+      {
+       "fps": 445.20190603542756,
+       "outputs": 192
+      },
+      {
+       "fps": 390.5336275971491,
+       "outputs": 192
+      }
+     ]
+    },
+    {
+     "kind": "encoder-only",
+     "sample": "360p",
+     "encoder": "realtime",
+     "source": "cpu-nv12",
+     "runs": [
+      {
+       "fps": 525.185661368134,
+       "outputs": 192
+      },
+      {
+       "fps": 404.35098507192146,
+       "outputs": 192
+      },
+      {
+       "fps": 533.0964016045826,
+       "outputs": 192
+      }
+     ]
+    }
+   ]
+  },
+  "c": {
+   "chrome": "157.0.8103.51",
+   "headless": true,
+   "chromeArgs": [],
+   "environment": {
+    "date": "2026-11-15T23:07:16.011Z",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "platform": {
+     "platform": "macOS",
+     "platformVersion": "26.5.1",
+     "architecture": "arm",
+     "model": "",
+     "browsers": [
+      {
+       "brand": "Not-A.Brand",
+       "version": "99.0.0.0"
+      },
+      {
+       "brand": "Google Chrome",
+       "version": "157.0.8103.51"
+      },
+      {
+       "brand": "Chromium",
+       "version": "157.0.8103.51"
+      }
+     ]
+    },
+    "hardwareConcurrency": 10,
+    "deviceMemoryGB": 16,
+    "crossOriginIsolated": true,
+    "webgpu": {
+     "vendor": "apple",
+     "architecture": "metal-3",
+     "device": "",
+     "description": "",
+     "features": [
+      "atomic-vec2u-min-max",
+      "bgra8unorm-storage",
+      "chromium-experimental-subgroup-matrix",
+      "clip-distances",
+      "core-features-and-limits",
+      "depth-clip-control",
+      "depth32float-stencil8",
+      "dual-source-blending",
+      "float32-blendable",
+      "float32-filterable",
+      "indirect-first-instance",
+      "primitive-index",
+      "rg11b10ufloat-renderable",
+      "shader-f16",
+      "subgroup-size-control",
+      "subgroups",
+      "texture-component-swizzle",
+      "texture-compression-astc",
+      "texture-compression-astc-sliced-3d",
+      "texture-compression-bc",
+      "texture-compression-bc-sliced-3d",
+      "texture-compression-etc2",
+      "texture-compression-unaligned",
+      "texture-formats-tier1",
+      "texture-formats-tier2",
+      "timestamp-query"
+     ]
+    },
+    "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+   },
+   "results": [
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "prefer-hardware",
+     "route": "passthrough",
+     "runs": [
+      {
+       "fps": 1050.6730875631636,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 1064.1540805726163,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 1055.6701030927834,
+       "frames": 192,
+       "medianProcessMs": 0
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "prefer-hardware",
+     "route": "webgpu-offscreen",
+     "runs": [
+      {
+       "fps": 95.3790821759442,
+       "frames": 192,
+       "medianProcessMs": 0.23500001430511475
+      },
+      {
+       "fps": 94.46192372702728,
+       "frames": 192,
+       "medianProcessMs": 0.24500000476837158
+      },
+      {
+       "fps": 95.15573077844141,
+       "frames": 192,
+       "medianProcessMs": 0.2199999988079071
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "prefer-software",
+     "route": "passthrough",
+     "runs": [
+      {
+       "fps": 773.3204446555427,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 729.1646886874597,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 752.3805791833294,
+       "frames": 192,
+       "medianProcessMs": 0
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "prefer-software",
+     "route": "webgpu-offscreen",
+     "runs": [
+      {
+       "fps": 99.3984324036436,
+       "frames": 192,
+       "medianProcessMs": 0.15000000596046448
+      },
+      {
+       "fps": 98.29670245226998,
+       "frames": 192,
+       "medianProcessMs": 0.14500001072883606
+      },
+      {
+       "fps": 94.02201192332248,
+       "frames": 192,
+       "medianProcessMs": 0.13500002026557922
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "realtime",
+     "route": "passthrough",
+     "runs": [
+      {
+       "fps": 623.7614112553615,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 637.979730877572,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 620.8569118835893,
+       "frames": 192,
+       "medianProcessMs": 0
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "realtime",
+     "route": "webgpu-offscreen",
+     "runs": [
+      {
+       "fps": 101.44479580265768,
+       "frames": 192,
+       "medianProcessMs": 0.2150000035762787
+      },
+      {
+       "fps": 98.18033989936859,
+       "frames": 192,
+       "medianProcessMs": 0.1899999976158142
+      },
+      {
+       "fps": 98.20946749520758,
+       "frames": 192,
+       "medianProcessMs": 0.17500001192092896
+      }
+     ]
+    }
+   ]
+  },
+  "d": {
+   "chrome": "157.0.8103.51",
+   "headless": true,
+   "chromeArgs": [],
+   "environment": {
+    "date": "2026-11-15T23:09:23.764Z",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "platform": {
+     "platform": "macOS",
+     "platformVersion": "26.5.1",
+     "architecture": "arm",
+     "model": "",
+     "browsers": [
+      {
+       "brand": "Not-A.Brand",
+       "version": "99.0.0.0"
+      },
+      {
+       "brand": "Google Chrome",
+       "version": "157.0.8103.51"
+      },
+      {
+       "brand": "Chromium",
+       "version": "157.0.8103.51"
+      }
+     ]
+    },
+    "hardwareConcurrency": 10,
+    "deviceMemoryGB": 16,
+    "crossOriginIsolated": true,
+    "webgpu": {
+     "vendor": "apple",
+     "architecture": "metal-3",
+     "device": "",
+     "description": "",
+     "features": [
+      "atomic-vec2u-min-max",
+      "bgra8unorm-storage",
+      "chromium-experimental-subgroup-matrix",
+      "clip-distances",
+      "core-features-and-limits",
+      "depth-clip-control",
+      "depth32float-stencil8",
+      "dual-source-blending",
+      "float32-blendable",
+      "float32-filterable",
+      "indirect-first-instance",
+      "primitive-index",
+      "rg11b10ufloat-renderable",
+      "shader-f16",
+      "subgroup-size-control",
+      "subgroups",
+      "texture-component-swizzle",
+      "texture-compression-astc",
+      "texture-compression-astc-sliced-3d",
+      "texture-compression-bc",
+      "texture-compression-bc-sliced-3d",
+      "texture-compression-etc2",
+      "texture-compression-unaligned",
+      "texture-formats-tier1",
+      "texture-formats-tier2",
+      "timestamp-query"
+     ]
+    },
+    "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+   },
+   "results": [
+    {
+     "kind": "readback",
+     "sample": "360p",
+     "depth": 1,
+     "runs": [
+      {
+       "fps": 662.8117717859624,
+       "depth": 1
+      },
+      {
+       "fps": 789.733465036896,
+       "depth": 1
+      },
+      {
+       "fps": 817.7172060913631,
+       "depth": 1
+      }
+     ]
+    },
+    {
+     "kind": "readback",
+     "sample": "360p",
+     "depth": 2,
+     "runs": [
+      {
+       "fps": 668.9312777493698,
+       "depth": 2
+      },
+      {
+       "fps": 761.7385095207522,
+       "depth": 2
+      },
+      {
+       "fps": 785.7420555544726,
+       "depth": 2
+      }
+     ]
+    },
+    {
+     "kind": "readback",
+     "sample": "360p",
+     "depth": 4,
+     "runs": [
+      {
+       "fps": 749.0198372978707,
+       "depth": 4
+      },
+      {
+       "fps": 825.8064516129032,
+       "depth": 4
+      },
+      {
+       "fps": 799.0677542827011,
+       "depth": 4
+      }
+     ]
+    },
+    {
+     "kind": "readback",
+     "sample": "360p",
+     "depth": 8,
+     "runs": [
+      {
+       "fps": 748.9614012132998,
+       "depth": 8
+      },
+      {
+       "fps": 757.4860930323233,
+       "depth": 8
+      },
+      {
+       "fps": 838.8125559361301,
+       "depth": 8
+      }
+     ]
+    },
+    {
+     "kind": "readback",
+     "sample": "720p",
+     "depth": 1,
+     "runs": [
+      {
+       "fps": 292.7007744470405,
+       "depth": 1
+      },
+      {
+       "fps": 300.35432423963863,
+       "depth": 1
+      },
+      {
+       "fps": 294.58696453113015,
+       "depth": 1
+      }
+     ]
+    },
+    {
+     "kind": "readback",
+     "sample": "720p",
+     "depth": 2,
+     "runs": [
+      {
+       "fps": 307.59618387368215,
+       "depth": 2
+      },
+      {
+       "fps": 310.32309158961465,
+       "depth": 2
+      },
+      {
+       "fps": 321.8182732361113,
+       "depth": 2
+      }
+     ]
+    },
+    {
+     "kind": "readback",
+     "sample": "720p",
+     "depth": 4,
+     "runs": [
+      {
+       "fps": 320,
+       "depth": 4
+      },
+      {
+       "fps": 307.6232896536043,
+       "depth": 4
+      },
+      {
+       "fps": 309.4129212119175,
+       "depth": 4
+      }
+     ]
+    },
+    {
+     "kind": "readback",
+     "sample": "720p",
+     "depth": 8,
+     "runs": [
+      {
+       "fps": 321.4841853119706,
+       "depth": 8
+      },
+      {
+       "fps": 295.455070055709,
+       "depth": 8
+      },
+      {
+       "fps": 294.7135752489131,
+       "depth": 8
+      }
+     ]
+    }
+   ]
+  },
+  "e1": {
+   "chrome": "157.0.8103.51",
+   "headless": true,
+   "chromeArgs": [],
+   "environment": {
+    "date": "2026-11-15T23:10:18.400Z",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "platform": {
+     "platform": "macOS",
+     "platformVersion": "26.5.1",
+     "architecture": "arm",
+     "model": "",
+     "browsers": [
+      {
+       "brand": "Not-A.Brand",
+       "version": "99.0.0.0"
+      },
+      {
+       "brand": "Google Chrome",
+       "version": "157.0.8103.51"
+      },
+      {
+       "brand": "Chromium",
+       "version": "157.0.8103.51"
+      }
+     ]
+    },
+    "hardwareConcurrency": 10,
+    "deviceMemoryGB": 16,
+    "crossOriginIsolated": true,
+    "webgpu": {
+     "vendor": "apple",
+     "architecture": "metal-3",
+     "device": "",
+     "description": "",
+     "features": [
+      "atomic-vec2u-min-max",
+      "bgra8unorm-storage",
+      "chromium-experimental-subgroup-matrix",
+      "clip-distances",
+      "core-features-and-limits",
+      "depth-clip-control",
+      "depth32float-stencil8",
+      "dual-source-blending",
+      "float32-blendable",
+      "float32-filterable",
+      "indirect-first-instance",
+      "primitive-index",
+      "rg11b10ufloat-renderable",
+      "shader-f16",
+      "subgroup-size-control",
+      "subgroups",
+      "texture-component-swizzle",
+      "texture-compression-astc",
+      "texture-compression-astc-sliced-3d",
+      "texture-compression-bc",
+      "texture-compression-bc-sliced-3d",
+      "texture-compression-etc2",
+      "texture-compression-unaligned",
+      "texture-formats-tier1",
+      "texture-formats-tier2",
+      "timestamp-query"
+     ]
+    },
+    "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+   },
+   "results": [
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "passthrough",
+     "readbackDepth": 1,
+     "runs": [
+      {
+       "fps": 752.8673659269192,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 749.9560572168731,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 724.1320787260244,
+       "frames": 192,
+       "medianProcessMs": 0
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "webgpu-offscreen",
+     "readbackDepth": 1,
+     "runs": [
+      {
+       "fps": 571.8029662258573,
+       "frames": 192,
+       "medianProcessMs": 0.034999996423721313
+      },
+      {
+       "fps": 531.2378949891155,
+       "frames": 192,
+       "medianProcessMs": 0.054999977350234985
+      },
+      {
+       "fps": 540.2895614223331,
+       "frames": 192,
+       "medianProcessMs": 0.04000002145767212
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "webgl-offscreen",
+     "readbackDepth": 1,
+     "runs": [
+      {
+       "fps": 420.05316297077087,
+       "frames": 192,
+       "medianProcessMs": 0.10999998450279236
+      },
+      {
+       "fps": 477.23205409478385,
+       "frames": 192,
+       "medianProcessMs": 0.07999998331069946
+      },
+      {
+       "fps": 435.94255547437854,
+       "frames": 192,
+       "medianProcessMs": 0.09000000357627869
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "2d-offscreen",
+     "readbackDepth": 1,
+     "runs": [
+      {
+       "fps": 662.5144494229078,
+       "frames": 192,
+       "medianProcessMs": 0.06999999284744263
+      },
+      {
+       "fps": 673.7787759488264,
+       "frames": 192,
+       "medianProcessMs": 0.06999999284744263
+      },
+      {
+       "fps": 655.1782971922528,
+       "frames": 192,
+       "medianProcessMs": 0.07499998807907104
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "720p",
+     "encoder": "default",
+     "route": "passthrough",
+     "readbackDepth": 1,
+     "runs": [
+      {
+       "fps": 271.6353295764659,
+       "frames": 192,
+       "medianProcessMs": 0.004999995231628418
+      },
+      {
+       "fps": 267.4392689931143,
+       "frames": 192,
+       "medianProcessMs": 0.004999995231628418
+      },
+      {
+       "fps": 265.3436338244739,
+       "frames": 192,
+       "medianProcessMs": 0.004999995231628418
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "720p",
+     "encoder": "default",
+     "route": "webgpu-offscreen",
+     "readbackDepth": 1,
+     "runs": [
+      {
+       "fps": 234.79489076979542,
+       "frames": 192,
+       "medianProcessMs": 0.08500000834465027
+      },
+      {
+       "fps": 234.63851004511938,
+       "frames": 192,
+       "medianProcessMs": 0.08499997854232788
+      },
+      {
+       "fps": 232.11392925160158,
+       "frames": 192,
+       "medianProcessMs": 0.08499997854232788
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "720p",
+     "encoder": "default",
+     "route": "webgl-offscreen",
+     "readbackDepth": 1,
+     "runs": [
+      {
+       "fps": 191.80723373101495,
+       "frames": 192,
+       "medianProcessMs": 0.15000000596046448
+      },
+      {
+       "fps": 203.43831951985413,
+       "frames": 192,
+       "medianProcessMs": 0.14000001549720764
+      },
+      {
+       "fps": 198.55838340407323,
+       "frames": 192,
+       "medianProcessMs": 0.14499998092651367
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "720p",
+     "encoder": "default",
+     "route": "2d-offscreen",
+     "readbackDepth": 1,
+     "runs": [
+      {
+       "fps": 247.98992541118943,
+       "frames": 192,
+       "medianProcessMs": 0.10000002384185791
+      },
+      {
+       "fps": 250.08955029664352,
+       "frames": 192,
+       "medianProcessMs": 0.0949999988079071
+      },
+      {
+       "fps": 250.45492789987946,
+       "frames": 192,
+       "medianProcessMs": 0.0949999988079071
+      }
+     ]
+    }
+   ]
+  },
+  "e4": {
+   "chrome": "157.0.8103.51",
+   "headless": true,
+   "chromeArgs": [],
+   "environment": {
+    "date": "2026-11-15T23:10:37.996Z",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+    "platform": {
+     "platform": "macOS",
+     "platformVersion": "26.5.1",
+     "architecture": "arm",
+     "model": "",
+     "browsers": [
+      {
+       "brand": "Not-A.Brand",
+       "version": "99.0.0.0"
+      },
+      {
+       "brand": "Google Chrome",
+       "version": "157.0.8103.51"
+      },
+      {
+       "brand": "Chromium",
+       "version": "157.0.8103.51"
+      }
+     ]
+    },
+    "hardwareConcurrency": 10,
+    "deviceMemoryGB": 16,
+    "crossOriginIsolated": true,
+    "webgpu": {
+     "vendor": "apple",
+     "architecture": "metal-3",
+     "device": "",
+     "description": "",
+     "features": [
+      "atomic-vec2u-min-max",
+      "bgra8unorm-storage",
+      "chromium-experimental-subgroup-matrix",
+      "clip-distances",
+      "core-features-and-limits",
+      "depth-clip-control",
+      "depth32float-stencil8",
+      "dual-source-blending",
+      "float32-blendable",
+      "float32-filterable",
+      "indirect-first-instance",
+      "primitive-index",
+      "rg11b10ufloat-renderable",
+      "shader-f16",
+      "subgroup-size-control",
+      "subgroups",
+      "texture-component-swizzle",
+      "texture-compression-astc",
+      "texture-compression-astc-sliced-3d",
+      "texture-compression-bc",
+      "texture-compression-bc-sliced-3d",
+      "texture-compression-etc2",
+      "texture-compression-unaligned",
+      "texture-formats-tier1",
+      "texture-formats-tier2",
+      "timestamp-query"
+     ]
+    },
+    "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+   },
+   "results": [
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "passthrough",
+     "readbackDepth": 4,
+     "runs": [
+      {
+       "fps": 707.9384978212179,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 642.8176841772014,
+       "frames": 192,
+       "medianProcessMs": 0
+      },
+      {
+       "fps": 753.3991249618322,
+       "frames": 192,
+       "medianProcessMs": 0
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "webgpu-offscreen",
+     "readbackDepth": 4,
+     "runs": [
+      {
+       "fps": 561.6580614040561,
+       "frames": 192,
+       "medianProcessMs": 0.03999999165534973
+      },
+      {
+       "fps": 462.09942357380123,
+       "frames": 192,
+       "medianProcessMs": 0.050000011920928955
+      },
+      {
+       "fps": 509.98725033327554,
+       "frames": 192,
+       "medianProcessMs": 0.03999999165534973
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "webgl-offscreen",
+     "readbackDepth": 4,
+     "runs": [
+      {
+       "fps": 436.59681876967375,
+       "frames": 192,
+       "medianProcessMs": 0.09000000357627869
+      },
+      {
+       "fps": 464.2503082992494,
+       "frames": 192,
+       "medianProcessMs": 0.07500001788139343
+      },
+      {
+       "fps": 399.80842513855754,
+       "frames": 192,
+       "medianProcessMs": 0.0949999988079071
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "360p",
+     "encoder": "default",
+     "route": "2d-offscreen",
+     "readbackDepth": 4,
+     "runs": [
+      {
+       "fps": 585.9464408118257,
+       "frames": 192,
+       "medianProcessMs": 0.08500000834465027
+      },
+      {
+       "fps": 634.9941295915341,
+       "frames": 192,
+       "medianProcessMs": 0.06499999761581421
+      },
+      {
+       "fps": 702.7818448330081,
+       "frames": 192,
+       "medianProcessMs": 0.06000000238418579
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "720p",
+     "encoder": "default",
+     "route": "passthrough",
+     "readbackDepth": 4,
+     "runs": [
+      {
+       "fps": 272.46216394467086,
+       "frames": 192,
+       "medianProcessMs": 0.004999995231628418
+      },
+      {
+       "fps": 263.0857769208876,
+       "frames": 192,
+       "medianProcessMs": 0.004999995231628418
+      },
+      {
+       "fps": 267.36106276199973,
+       "frames": 192,
+       "medianProcessMs": 0
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "720p",
+     "encoder": "default",
+     "route": "webgpu-offscreen",
+     "readbackDepth": 4,
+     "runs": [
+      {
+       "fps": 230.3028122208202,
+       "frames": 192,
+       "medianProcessMs": 0.09000000357627869
+      },
+      {
+       "fps": 241.07126041562728,
+       "frames": 192,
+       "medianProcessMs": 0.07499998807907104
+      },
+      {
+       "fps": 221.94992254811322,
+       "frames": 192,
+       "medianProcessMs": 0.09000000357627869
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "720p",
+     "encoder": "default",
+     "route": "webgl-offscreen",
+     "readbackDepth": 4,
+     "runs": [
+      {
+       "fps": 193.53960757502932,
+       "frames": 192,
+       "medianProcessMs": 0.15000000596046448
+      },
+      {
+       "fps": 196.46365422372892,
+       "frames": 192,
+       "medianProcessMs": 0.14499998092651367
+      },
+      {
+       "fps": 199.58316225066574,
+       "frames": 192,
+       "medianProcessMs": 0.12999999523162842
+      }
+     ]
+    },
+    {
+     "kind": "transcode",
+     "sample": "720p",
+     "encoder": "default",
+     "route": "2d-offscreen",
+     "readbackDepth": 4,
+     "runs": [
+      {
+       "fps": 248.69177763079017,
+       "frames": 192,
+       "medianProcessMs": 0.09999999403953552
+      },
+      {
+       "fps": 250.8705338157886,
+       "frames": 192,
+       "medianProcessMs": 0.09999999403953552
+      },
+      {
+       "fps": 255.72722430017683,
+       "frames": 192,
+       "medianProcessMs": 0.09000000357627869
+      }
+     ]
+    }
+   ]
+  }
+ }
+}
