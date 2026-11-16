@@ -35,7 +35,7 @@ await pipeline.ready                  // optional — resolves once the effect i
 ## Why Longpipe
 
 - **One model, many effects.** Backgrounds, touch-up, and auto-reframe all run off a single shared encoder pass — enabling another effect doesn't cost another inference. Audio denoise runs in a parallel `AudioWorklet`, off the GPU entirely. ([Architecture](https://longpipe.dev/docs/architecture))
-- **Lower matting error than MediaPipe's selfie segmenter at every preset, and faster than it on WebGPU at xs–large.** Custom-trained models running as pure WebGPU/WebGL shaders in a zero-copy, fully-GPU pipeline — no general-purpose runtime, no CPU↔GPU round trips. Numbers, caveats and where MediaPipe wins: [benchmarks](#benchmarks-vs-mediapipe).
+- **Lower matting error than MediaPipe's selfie segmenter at every preset, and faster than MediaPipe Tasks on WebGPU at xs–medium.** Custom-trained models running as pure WebGPU/WebGL shaders in a zero-copy, fully-GPU pipeline — no general-purpose runtime, no CPU↔GPU round trips. Numbers, caveats and where MediaPipe wins (its model on LiteRT.js is faster): [benchmarks](#benchmarks-vs-mediapipe).
 - **Works everywhere.** Chromium, Firefox, and Safari (desktop + iOS). WebGPU when available, WebGL2 fallback, per-browser frame transport handled internally.
 - **Adapts to the device.** Five model presets (`xs`–`xl`); autotune benchmarks the actual device at init and an adaptive controller swaps presets at runtime to hold 30 fps — on 10-year-old netbooks and the latest MacBook Pro alike.
 - **Production pedigree.** Built by the founder of [Vectorly](https://www.crunchbase.com/organization/vectorly), a commercial effects SDK acquired in 2021 — a ground-up redesign for the WebGPU era.
@@ -58,19 +58,26 @@ Reproducible benchmarks against Google's MediaPipe selfie segmenter, with code, 
 
 Every preset has lower alpha error than MediaPipe, but MediaPipe's square model beats **xs** on IoU on P3M-500-NP and ties it on P3M-500-P. Longpipe trains on P3M-10k's training split and MediaPipe doesn't, so P3M-500-NP (un-blurred faces, not used for model selection) is the fairer of the two sets. MediaPipe is a segmentation model scored on a matting task; part of the gap is mask resolution.
 
-**Speed**: background replacement on an Apple M4 MacBook Pro, Chrome 157, 360p webcam clip, network run on every frame. Per-frame effect throughput without the video encoder; two sessions.
+In the speed table below, MediaPipe's model on other engines (LiteRT.js, Longpipe's) has the MediaPipe scores above: same weights. Longpipe's port reproduces the TFLite output to a max abs error of 1.4e-5 in f32 (mean ~5e-5 in its default f16).
 
-| Longpipe, FPS (session 1 / 2) | xs | small | medium | large | xl |
+**Speed**: background replacement on an Apple M4 MacBook Pro, Chrome 157: WebCodecs decode → effect → H.264 encode of a 192-frame webcam clip, frames per second, median of 5 runs, two sessions (s1 / s2). Longpipe "as shipped" is the SDK's own per-frame renderer: the full network on key frames (every 3rd frame for xs, every 2nd for small/medium, every frame for large/xl), a small learned optical-flow network on the frames between, and a temporal stabiliser on every frame.
+
+| Longpipe model, as shipped | xs | small | medium | large | xl |
 |---|---:|---:|---:|---:|---:|
-| WebGPU | 449 / 332 | 421 / 307 | 336 / 246 | 236 / 185 | 108 / 90 |
-| WebGL2 | 284 / 194 | 275 / 227 | 219 / 183 | 177 / 145 | 86 / 73 |
+| WebGPU, 360p | 308 / 288 | 291 / 298 | 241 / 237 | 150 / 157 | 91 / 88 |
+| WebGPU, 720p | 159 / 161 | 155 / 162 | 140 / 146 | 104 / 108 | 69 / 69 |
+| WebGL2, 360p | 205 / 192 | 195 / 189 | 154 / 159 | 102 / 101 | 63 / 60 |
+| WebGL2, 720p | 122 / 129 | 121 / 125 | 104 / 105 | 76 / 78 | 49 / 52 |
 
-| MediaPipe, FPS (session 1 / 2) | square model | landscape model |
+| MediaPipe selfie model: square s1 / s2 · landscape s1 / s2 | 360p | 720p |
 |---|---:|---:|
-| GPU delegate (WebGL) | 166 / 147 | 175 / 136 |
-| CPU delegate (WASM) | 151 / 133 | 209 / 180 |
+| MediaPipe Tasks, GPU delegate | 118 / 114 · 123 / 120 | 93 / 94 · 93 / 97 |
+| MediaPipe Tasks, CPU delegate | 117 / 114 · 150 / 153 | 69 / 70 · 81 / 82 |
+| LiteRT.js, WebGPU | 380 / 381 · 414 / 411 | 201 / 196 · 196 / 204 |
+| Longpipe engine (`model: 'mediapipe-selfie'`), WebGPU | 206 / 192 · 209 / 205 | 132 / 130 · 130 / 132 |
+| Longpipe engine, WebGL2 | 125 / 123 · 122 / 123 | 90 / 90 · 88 / 92 |
 
-On this machine, xl is slower than MediaPipe, and on WebGL2 only xs and small are clearly faster. With the H.264 encoder in the loop, which caps every pipeline at ~100–150 fps here, the gaps shrink. Full tables (720p, end-to-end transcode, model-only latency): [`benchmarks/performance/results`](benchmarks/performance/results/2026-11-15-apple-m4.md). It's one machine; run [the benchmark](benchmarks/README.md) on yours.
+On this machine, Longpipe xs–medium on WebGPU are faster than MediaPipe Tasks in every configuration, large is level with its best (360p) or faster (720p), and xl is slower than its best; on WebGL2, xs–small are faster, medium level, and large and xl slower than its best. **MediaPipe's model running on LiteRT.js is faster than every Longpipe preset.** The flow schedule is 0–14% faster than running the network on every frame for xs–medium, and 18–27% slower for large/xl. Full tables, the network-every-frame rows and what each pipeline runs: [`benchmarks/`](benchmarks/README.md#performance-apple-m4-macbook-pro-chrome-157-v2). It's one machine, in use while measured; run [the benchmark](benchmarks/README.md) on yours.
 
 ## Models
 
@@ -85,7 +92,7 @@ Longpipe runs one of two segmentation models through the same GPU pipeline (WebG
 const pipeline = new EffectsPipeline(stream, { model: 'mediapipe-selfie', background: 'blur' })
 ```
 
-Use `'mediapipe-selfie'` if you specifically want MediaPipe's model, e.g. to match an existing MediaPipe deployment while getting Longpipe's pipeline. Longpipe's own models drive every effect from one encoder pass, and are more accurate (lower error on P3M-10k, even at `xs`) and faster (`xs`: ~1.7 ms/frame vs ~2.6–3.1 ms for MediaPipe's model on the same WebGPU backend, Apple M4). The MediaPipe weights are Apache-2.0 (© Google) and are converted by [`scripts/convert_mediapipe_selfie.py`](scripts/convert_mediapipe_selfie.py); see [`third_party/mediapipe/NOTICE.md`](third_party/mediapipe/NOTICE.md). They are served from `cdn.longpipe.dev/models/mediapipe/selfie/v1/`, or from your `weightsBaseUrl` if you self-host.
+Use `'mediapipe-selfie'` if you specifically want MediaPipe's model, e.g. to match an existing MediaPipe deployment while getting Longpipe's pipeline. Longpipe's own models drive every effect from one encoder pass, and are more accurate (lower error on P3M-10k, even at `xs`) and faster on the same engine (`xs` network: 1.6 ms/frame vs 2.6–2.7 ms for MediaPipe's model on the WebGPU backend, Apple M4; [benchmarks](benchmarks/README.md)). The MediaPipe weights are Apache-2.0 (© Google) and are converted by [`scripts/convert_mediapipe_selfie.py`](scripts/convert_mediapipe_selfie.py); see [`third_party/mediapipe/NOTICE.md`](third_party/mediapipe/NOTICE.md). They are served from `cdn.longpipe.dev/models/mediapipe/selfie/v1/`, or from your `weightsBaseUrl` if you self-host.
 
 ## Documentation
 

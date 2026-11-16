@@ -8,8 +8,9 @@ hardware, and every individual measurement.
 - [`quality/`](quality/): alpha-matte accuracy on the P3M-10k validation sets
   (Python, CPU).
 - [`performance/`](performance/): speed in the browser, decode → background
-  replacement → H.264 encode, with the SDK's model layer and MediaPipe Tasks for
-  Web.
+  replacement → H.264 encode, organised as model × engine × pipeline: MediaPipe's
+  selfie model on MediaPipe Tasks, LiteRT.js and Longpipe's engine; Longpipe's
+  model with the network on every frame and as the SDK actually ships it.
 - [`METHODOLOGY.md`](METHODOLOGY.md): what is measured, fairness caveats, and how
   these numbers relate to the charts previously shown in the README. **Read it
   before quoting any number.**
@@ -39,44 +40,63 @@ small and up beat it. P3M-500-NP is the cleaner comparison: Longpipe trained on
 P3M-10k's (face-blurred) training split and selects checkpoints on a validation
 set that includes P3M-500-P. See [METHODOLOGY.md](METHODOLOGY.md#caveats).
 
-### Performance: Apple M4 MacBook Pro, Chrome 157
+### Performance: Apple M4 MacBook Pro, Chrome 157 (v2)
 
-Background replacement on a 192-frame webcam clip, median of 5 runs, two
-sessions ("s1 / s2"). **Transcode** = WebCodecs decode → effect → H.264 encode
-(end-to-end). **Process** = decode → effect → wait for the output frame, no
-encoder. **Model ms** = model only, GPU-synchronised. Longpipe runs the network
-on every frame via `longpipe/model`. Full results and conditions:
-[`performance/results/2026-11-15-apple-m4.md`](performance/results/2026-11-15-apple-m4.md).
+Background replacement on a 192-frame webcam clip, organised as **model ×
+engine × pipeline**: MediaPipe's selfie model on three engines (MediaPipe Tasks,
+LiteRT.js, Longpipe's), and Longpipe's model with the network on every frame and
+**as shipped** (the SDK's own renderer: full network on key frames, a learned
+optical-flow network on the frames in between, a temporal stabiliser on every
+frame). Headline metric: **transcode FPS**, WebCodecs decode → effect → H.264
+encode → MP4, the same output path for every pipeline. Full results and
+conditions: [`performance/results/2026-11-15-apple-m4-v2.md`](performance/results/2026-11-15-apple-m4-v2.md).
 
-| Pipeline | Mask | 360p transcode FPS | 720p transcode FPS | 360p process FPS | 720p process FPS | Model ms (360p) |
-|---|---|---:|---:|---:|---:|---:|
-| Passthrough (decode → encode) | – | 1155 / 1082 | 424 / 399 | 1885 / 1446 | 706 | – |
-| Canvas copy, WebGPU | – | 99 / 154 | 97 / 159 | 1034 / 769 | 401 | – |
-| Longpipe xs — WebGPU (f16) | 384×240 | 101 / 147 | 121† / 108 | 449 / 332 | 179 | 1.38 |
-| Longpipe small — WebGPU (f16) | 384×224 | 111 / 148 | 125† / 109 | 421 / 307 | 170 | 1.50 |
-| Longpipe medium — WebGPU (f16) | 512×320 | 98 / 137 | 100 / 116 | 336 / 246 | 144 | 2.16 |
-| Longpipe large — WebGPU (f32) | 640×400 | 123 / 147 | 123 / 103 | 236 / 185 | 107 | 3.35 |
-| Longpipe xl — WebGPU (f32) | 1280×768 | 95 / 92 | 88 / 62 | 108 / 90 | 53 | 8.29 |
-| Longpipe xs — WebGL2 (f16) | 384×240 | 77 / 110 | 74 / 106 | 284 / 194 | 121 | 2.81 |
-| Longpipe small — WebGL2 (f16) | 384×224 | 75 / 111 | 75 / 104 | 275 / 227 | 108 | 2.84 |
-| Longpipe medium — WebGL2 (f16) | 512×320 | 74 / 104 | 74 / 99 | 219 / 183 | 87 | 4.23 |
-| Longpipe large — WebGL2 (f32) | 640×400 | 73 / 99 | 97 / 93 | 177 / 145 | 74 | 5.30 |
-| Longpipe xl — WebGL2 (f32) | 1280×768 | 70 / 65 | 46 / 60 | 86 / 73 | 43 | 10.63 |
-| MediaPipe square — GPU (WebGL) | 256×256 | 83 / 104 | 76 / 95 | 166 / 147 | 79 | 5.06 |
-| MediaPipe landscape — GPU (WebGL) | 256×144 | 86 / 102 | 73 / 103 | 175 / 136 | 80 | 4.97 |
-| MediaPipe square — CPU (WASM) | 256×256 | 67 / 89 | 83 / 83 | 151 / 133 | 75 | 4.92 |
-| MediaPipe landscape — CPU (WASM) | 256×144 | 76 / 77 | 84 / 87 | 209 / 180 | 89 | 3.19 |
+Transcode FPS, median of 5 interleaved runs, **session 1 / session 2**, **360p · 720p**:
 
-† overlapped a 5 s background GPU job in session 1; use the session 2 value.
+| Model | Engine | Pipeline | Mask | FPS (360p · 720p) |
+|---|---|---|---|---:|
+| – (no model) | – | passthrough (decode → encode) | – | 789 / 739 · 249 / 263 |
+| – (no model) | WebGPU | canvas copy | – | 586 / 551 · 224 / 228 |
+| – (no model) | WebGL2 | canvas copy | – | 451 / 427 · 185 / 195 |
+| MediaPipe square | MediaPipe Tasks, GPU delegate | every frame | 256×256 | 118 / 114 · 93 / 94 |
+| MediaPipe landscape | MediaPipe Tasks, GPU delegate | every frame | 256×144 | 123 / 120 · 93 / 97 |
+| MediaPipe square | MediaPipe Tasks, CPU delegate | every frame | 256×256 | 117 / 114 · 69 / 70 |
+| MediaPipe landscape | MediaPipe Tasks, CPU delegate | every frame | 256×144 | 150 / 153 · 81 / 82 |
+| MediaPipe square | LiteRT.js, WebGPU | every frame | 256×256 | 380 / 381 · 201 / 196 |
+| MediaPipe landscape | LiteRT.js, WebGPU | every frame | 256×144 | 414 / 411 · 196 / 204 |
+| MediaPipe square | Longpipe, WebGPU | every frame | 256×256 | 206 / 192 · 132 / 130 |
+| MediaPipe landscape | Longpipe, WebGPU | every frame | 256×144 | 209 / 205 · 130 / 132 |
+| MediaPipe square | Longpipe, WebGL2 | every frame | 256×256 | 125 / 123 · 90 / 90 |
+| MediaPipe landscape | Longpipe, WebGL2 | every frame | 256×144 | 122 / 123 · 88 / 92 |
 
-On this machine the encoder path caps transcode FPS (the canvas-copy row has
-no model at all) and absolute numbers drifted between sessions, but the
-process-mode orderings held in both sessions: Longpipe WebGPU xs–large are faster
-than every MediaPipe configuration (large only narrowly in session 2); **Longpipe
-xl is slower than all of them**; and on **WebGL2 only xs and small are clearly
-faster** than MediaPipe (medium is level, large slower). In end-to-end transcode
-the gaps are much smaller.
-One machine, one browser: run it on yours.
+| Longpipe model, Longpipe engine | xs (384×240) | small (384×224) | medium (512×320) | large (640×400) | xl (1280×768) |
+|---|---:|---:|---:|---:|---:|
+| **As shipped**, WebGPU | 308 / 288 · 159 / 161 | 291 / 298 · 155 / 162 | 241 / 237 · 140 / 146 | 150 / 157 · 104 / 108 | 91 / 88 · 69 / 69 |
+| **As shipped**, WebGL2 | 205 / 192 · 122 / 129 | 195 / 189 · 121 / 125 | 154 / 159 · 104 / 105 | 102 / 101 · 76 / 78 | 63 / 60 · 49 / 52 |
+| Network every frame, WebGPU | 273 / 280 · 154 / 157 | 261 / 277 · 145 / 156 | 217 / 216 · 133 / 141 | 203 / 199 · 129 / 132 | 119 / 121 · 89 / 93 |
+| Network every frame, WebGL2 | 189 / 191 · 124 / 129 | 190 / 183 · 122 / 121 | 149 / 139 · 103 / 106 | 137 / 134 · 100 / 100 | 85 / 84 · 68 / 68 |
+| Network every frame, WebGPU, f32 | | | | 162 / 162 · 107 / 110 | 82 / 82 · 64 / 66 |
+| Network every frame, WebGL2, f32 | | | | 128 / 121 · 88 / 89 | 70 / 69 · 55 / 54 |
+
+On this machine:
+
+- **MediaPipe's model on LiteRT.js (WebGPU) is the fastest pipeline tested**,
+  faster than every Longpipe preset. On the same model, LiteRT.js is 1.8–2.0×
+  faster than Longpipe's engine on WebGPU, which is ~1.7× faster than MediaPipe
+  Tasks.
+- **Longpipe as shipped vs MediaPipe Tasks**: on WebGPU, xs–medium are faster
+  than every Tasks configuration, large is level (360p) or faster (720p), xl is
+  slower than Tasks' best configuration. On WebGL2, xs/small are faster, medium
+  level, large and xl slower than Tasks' best.
+- **The shipped flow schedule barely pays for itself in speed**: xs–medium are
+  0–14% faster than the network on every frame; large/xl are 18–27% slower
+  (they run the flow network on every frame too). Its purpose, temporal
+  stability, is not measured here.
+- One machine, in use while measured (a production GPU worker, whose jobs were
+  detected and excluded, and other apps). Read [METHODOLOGY.md](METHODOLOGY.md#performance)
+  for what each row runs, the output-path investigation, and caveats. The first
+  run ([`2026-11-15-apple-m4.md`](performance/results/2026-11-15-apple-m4.md)) is
+  kept as published; its transcode numbers were capped by the old output path.
 
 ## Quick start
 
@@ -112,19 +132,31 @@ cd benchmarks/performance
 npm install                    # also downloads the test clip, MediaPipe models and Longpipe weights (sha256-checked)
 
 npm run bench -- --check       # sanity-check every pipeline's output first
-npm run bench                  # 360p + 720p; transcode, process and model modes; 5 runs each
-npm run bench -- --samples 360p --modes transcode --pipelines passthrough,longpipe-webgpu-small,mediapipe-gpu
-node tools/report.mjs results/<file>.json   # markdown tables from a results file
+npm run bench                  # 360p + 720p transcode, every pipeline, 5 interleaved rounds
+npm run bench -- --modes process,model --runs 3          # diagnostics
+npm run bench -- --samples 360p --pipelines passthrough,shipped-webgpu-small,litert-webgpu,mediapipe-gpu
+node tools/report.mjs s1=results/<file>.json [s2=results/<file2>.json]   # markdown tables
+node tools/ceiling.mjs --headless  # output-path investigation (see METHODOLOGY.md)
 ```
 
 Add `--headless` to run without a window (fine on macOS; on Linux see
-METHODOLOGY.md). `--dtype f16|f32` forces Longpipe's precision (default: the SDK
-preset's). Or run `npm run dev` and open http://localhost:5174 to pick
-pipelines and run it in your own browser, then **Download JSON**.
+METHODOLOGY.md). `--output direct` hands canvas frames straight to the encoder
+instead of the readback stage (see METHODOLOGY.md, "Output path").
+`--busy-cmd '<command>'` discards and repeats any measurement that overlapped a
+moment when the command exited 0 (e.g. a background GPU job is running). Or run
+`npm run dev` and open http://localhost:5174 to pick pipelines and run them in
+your own browser, then **Download JSON**.
+
+Pipeline names: `passthrough`, `canvas-copy-{webgpu,webgl}` (ceilings);
+`mediapipe-{gpu,cpu}[-landscape]` (MediaPipe Tasks); `litert-webgpu[-landscape]`
+(LiteRT.js); `lp-mediapipe-{webgpu,webgl}-{square,landscape}` (MediaPipe model on
+Longpipe's engine); `longpipe-{webgpu,webgl}-{xs,small,medium,large,xl}[-f32]`
+(network every frame); `shipped-{webgpu,webgl}-{xs,…,xl}` (the SDK's own
+renderer, as shipped).
 
 Close other apps, plug in power, and check the passthrough and canvas-copy rows:
-they show how much of the frame budget the decoder/encoder leave on your
-machine.
+they show how much of the frame budget the decoder/output path/encoder leave on
+your machine.
 
 ## Getting P3M-10k
 
