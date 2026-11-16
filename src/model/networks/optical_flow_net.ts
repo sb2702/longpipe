@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Op } from '~/model/backend.ts'
+import { runBatched, type Backend, type Tensor, type Op } from '~/model/backend.ts'
 import type { FlowWeights } from '~/model/weights.ts'
 
 // Per-stage kernel sizes / pads of the learned contracting path — mirrors training
@@ -39,7 +39,7 @@ export class OpticalFlowNet implements Op {
   private readonly steps: Op[]
 
   constructor(
-    backend: Backend, frameA: Tensor, frameB: Tensor, taps: Tensor[],
+    private readonly backend: Backend, frameA: Tensor, frameB: Tensor, taps: Tensor[],
     w: FlowWeights, decW = 16,
     opts: { fuseStem?: boolean; halfTap?: Tensor } = {},
   ) {
@@ -115,7 +115,8 @@ export class OpticalFlowNet implements Op {
     this.steps = steps
   }
 
+  // One command buffer per run (see Backend.batch).
   run(): void {
-    for (const op of this.steps) op.run()
+    runBatched(this.backend, () => { for (const op of this.steps) op.run() })
   }
 }

@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Op } from '~/model/backend.ts'
+import { runBatched, type Backend, type Tensor, type Op } from '~/model/backend.ts'
 import type { FaceWeights } from '~/model/weights.ts'
 import { DecoderBlock } from '~/model/blocks/decoder_block.ts'
 
@@ -28,7 +28,7 @@ export class FaceHeatmapNet implements Op {
   private readonly steps: Op[]
 
   // taps: the base network's encoderTaps (finest→coarsest, length ≥ 3).
-  constructor(backend: Backend, taps: Tensor[], w: FaceWeights) {
+  constructor(private readonly backend: Backend, taps: Tensor[], w: FaceWeights) {
     if (taps.length < 3)
       throw new Error(`FaceHeatmapNet: needs ≥3 encoder taps, got ${taps.length}`)
     const deepest = taps[taps.length - 1]
@@ -56,7 +56,8 @@ export class FaceHeatmapNet implements Op {
     this.steps = steps
   }
 
+  // One command buffer per run (see Backend.batch).
   run(): void {
-    for (const op of this.steps) op.run()
+    runBatched(this.backend, () => { for (const op of this.steps) op.run() })
   }
 }

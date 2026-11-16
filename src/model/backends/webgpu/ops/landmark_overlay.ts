@@ -94,7 +94,9 @@ export class LandmarkOverlayWebGPU {
 
     // drawImage=false layers this face's dots onto whatever a previous overlay
     // left in the target (multi-face) — load, don't clear, and skip the image.
-    const enc = this.backend.device.createCommandEncoder()
+    // Inside backend.batch(): record onto the batch's encoder (submitted with it).
+    const shared = this.backend.batchEncoder()
+    const enc = shared ?? this.backend.device.createCommandEncoder()
     const pass = enc.beginRenderPass({
       colorAttachments: [{
         view: this.outputView,
@@ -112,7 +114,7 @@ export class LandmarkOverlayWebGPU {
     pass.setBindGroup(0, this.ptsBindGroup)
     pass.draw(this.count * 6)
     pass.end()
-    this.backend.device.queue.submit([enc.finish()])
+    if (!shared) this.backend.device.queue.submit([enc.finish()])
     this.outputView = null
   }
 }

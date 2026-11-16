@@ -66,7 +66,9 @@ export class CompositePassthroughWebGPU {
     if (!this.outputView)
       throw new Error('CompositePassthroughWebGPU.run() called before setOutput()')
 
-    const enc = this.backend.device.createCommandEncoder()
+    // Inside backend.batch(): record onto the batch's encoder (submitted with it).
+    const shared = this.backend.batchEncoder()
+    const enc = shared ?? this.backend.device.createCommandEncoder()
     const pass = enc.beginRenderPass({
       colorAttachments: [{
         view:       this.outputView,
@@ -79,7 +81,7 @@ export class CompositePassthroughWebGPU {
     pass.setBindGroup(0, this.bindGroup)
     pass.draw(6)
     pass.end()
-    this.backend.device.queue.submit([enc.finish()])
+    if (!shared) this.backend.device.queue.submit([enc.finish()])
 
     // GPUTexture is invalidated after the next browser paint — force the
     // caller to set it again before the next frame.

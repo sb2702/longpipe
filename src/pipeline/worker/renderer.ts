@@ -2,7 +2,7 @@
 // with frame-skipping logic. Adapters call process(frame) per input frame;
 // renderer decides whether to run the model this frame.
 
-import type { Backend, Tensor, InputOp, Op, RenderTarget } from '~/model/backend.ts'
+import { runBatched, type Backend, type Tensor, type InputOp, type Op, type RenderTarget } from '~/model/backend.ts'
 // Note: this file builds the GPU compute chain (network + RenderOp). The
 // Streams API pipe chain (inputReadable → transform → outputWritable) is
 // wired in worker/index.ts handleInit() where transport adapters are
@@ -270,7 +270,13 @@ export class Renderer {
   // (kind === 'none', or disabled / still booting). The model runs iff EITHER
   // surface needs alpha — so a preview effect forces inference even when the
   // main output is passthrough (matrix cell b).
+  // On WebGPU the whole frame (model, flow, stabiliser, composite) is recorded
+  // into one command buffer and submitted once (see Backend.batch).
   process(frame: VideoFrame): void {
+    runBatched(this.backend, () => this.processFrame(frame))
+  }
+
+  private processFrame(frame: VideoFrame): void {
     this.renderOp.setSource(frame)
     const now = performance.now()
 

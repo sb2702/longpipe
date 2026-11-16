@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Op } from '~/model/backend.ts'
+import { runBatched, type Backend, type Tensor, type Op } from '~/model/backend.ts'
 import type { LandmarkWeights } from '~/model/weights.ts'
 
 // Face-landmark regressor — mirrors training/landmarks/landmark_model.py
@@ -31,7 +31,7 @@ export class LandmarkNet implements Op {
   private readonly steps: Op[]
 
   // input: (crop, crop, 4) — RGB in .xyz (ImageNet-normalized), .w dead.
-  constructor(backend: Backend, input: Tensor, w: LandmarkWeights) {
+  constructor(private readonly backend: Backend, input: Tensor, w: LandmarkWeights) {
     if (w.blocks.length !== BLOCKS.length)
       throw new Error(`LandmarkNet: expected ${BLOCKS.length} block weights, got ${w.blocks.length}`)
     this.inputs = [input]
@@ -67,7 +67,8 @@ export class LandmarkNet implements Op {
     this.steps = steps
   }
 
+  // One command buffer per run (see Backend.batch).
   run(): void {
-    for (const op of this.steps) op.run()
+    runBatched(this.backend, () => { for (const op of this.steps) op.run() })
   }
 }

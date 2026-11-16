@@ -166,7 +166,8 @@ export class FaceTouchupWebGPU {
     if (!this.outputView)
       throw new Error('FaceTouchupWebGPU.run() called before setOutput()')
 
-    const enc = this.device.createCommandEncoder()
+    const shared = this.backend.batchEncoder()   // inside backend.batch(): record onto its encoder
+    const enc = shared ?? this.device.createCommandEncoder()
     for (const p of this.passes) {
       const pass = enc.beginRenderPass({
         colorAttachments: [{
@@ -185,7 +186,7 @@ export class FaceTouchupWebGPU {
       pass.draw(p.verts, p.mesh ? this.activeSlots : 1)
       pass.end()
     }
-    this.device.queue.submit([enc.finish()])
+    if (!shared) this.device.queue.submit([enc.finish()])
     this.outputView = null
   }
 }
@@ -220,7 +221,7 @@ export class FaceTouchupStageWebGPU {
   private activeSlots: number
 
   constructor(
-    backend: WebGPUBackend,
+    private readonly backend: WebGPUBackend,
     frame: Tensor,
     landmarks: Tensor,
     box: Tensor,
@@ -367,7 +368,8 @@ export class FaceTouchupStageWebGPU {
   }
 
   run(): void {
-    const enc = this.device.createCommandEncoder()
+    const shared = this.backend.batchEncoder()   // inside backend.batch(): record onto its encoder
+    const enc = shared ?? this.device.createCommandEncoder()
     for (const p of this.passes) {
       const pass = enc.beginRenderPass({
         colorAttachments: [{
@@ -389,6 +391,6 @@ export class FaceTouchupStageWebGPU {
     c.setBindGroup(0, this.unpackBind)
     c.dispatchWorkgroups(this.unpackDispatch[0], this.unpackDispatch[1], 1)
     c.end()
-    this.device.queue.submit([enc.finish()])
+    if (!shared) this.device.queue.submit([enc.finish()])
   }
 }

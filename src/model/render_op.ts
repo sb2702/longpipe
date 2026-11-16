@@ -1,4 +1,4 @@
-import type { Backend, Tensor, InputOp, ImageSource, RenderTarget } from '~/model/backend.ts'
+import { runBatched, type Backend, type Tensor, type InputOp, type ImageSource, type RenderTarget } from '~/model/backend.ts'
 import { BilinearUpscaler } from '~/model/effects/upscale_bilinear.ts'
 import { BicubicUpscaler  } from '~/model/effects/upscale_bicubic.ts'
 import { CompositorSolid } from '~/model/effects/compositor_solid.ts'
@@ -213,26 +213,33 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
     this.viewAlpha?.run()
   }
 
+  // Each public run* records into one command buffer (see Backend.batch).
   run(): void {
-    this.runModel()
-    this.runDisplay()
+    runBatched(this.backend, () => {
+      this.runModel()
+      this.runDisplay()
+    })
   }
 
   // Cheap, runs every frame: refresh display tensor, run the effect chain,
   // composite the 'main' target with whatever's currently in the alpha tensor
   // (which persists between model runs).
   runDisplay(): void {
-    this.refreshDisplayInput()
-    this.runEffects()
-    this.compositeMain('effect')
+    runBatched(this.backend, () => {
+      this.refreshDisplayInput()
+      this.runEffects()
+      this.compositeMain('effect')
+    })
   }
 
   // Effect-chain output straight to the canvas — background 'none' with an
   // active chain (e.g. touch-up on, no virtual background).
   runFgPassthrough(): void {
-    this.refreshDisplayInput()
-    this.runEffects()
-    this.compositeMain('fg')
+    runBatched(this.backend, () => {
+      this.refreshDisplayInput()
+      this.runEffects()
+      this.compositeMain('fg')
+    })
   }
 
   // True passthrough: writes the raw input image directly to the canvas. Used
@@ -240,8 +247,10 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
   // yet). setSource() is still required (display input needs a fresh
   // frame); model + alpha + effect pipeline is skipped entirely.
   runPassthrough(): void {
-    this.refreshDisplayInput()
-    this.compositeMain('raw')
+    runBatched(this.backend, () => {
+      this.refreshDisplayInput()
+      this.compositeMain('raw')
+    })
   }
 
   // Composite the 'main' target: the stored effect config, the effect-chain
@@ -288,8 +297,10 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
   // network.output's shape (canvas-res alpha). Call before the per-frame composite.
   applyAlpha(alpha: Tensor): void {
     if (!this.network || !this.upscaler) throw new Error('RenderOp.applyAlpha called before attachNetwork')
-    this.backend.copyTensor(alpha, this.network.output)
-    this.upscaler.run()
+    runBatched(this.backend, () => {
+      this.backend.copyTensor(alpha, this.network!.output)
+      this.upscaler!.run()
+    })
   }
 
   // Expensive, runs at preset.modelFps: refresh the alpha tensor.
@@ -297,9 +308,12 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
     if (!this.network || !this.networkInput || !this.upscaler) {
       throw new Error('RenderOp.runModel called before attachNetwork')
     }
-    this.networkInput.run()
-    this.network.run()
-    this.upscaler.run()
+    const { networkInput, network, upscaler } = this
+    runBatched(this.backend, () => {
+      networkInput.run()
+      network.run()
+      upscaler.run()
+    })
   }
 
   private makeUpscaler(): UpscalerHandle {

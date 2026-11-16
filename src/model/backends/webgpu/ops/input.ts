@@ -17,6 +17,7 @@ const IS_VIDEO_FRAME = (s: ImageSource): s is VideoFrame =>
 export class InputWebGPU implements InputOp {
   readonly output: WebGPUTensor;
 
+  private readonly backend: WebGPUBackend;
   private readonly device: GPUDevice;
   private readonly dtype: Dtype;
   private readonly sampler: GPUSampler;
@@ -33,6 +34,7 @@ export class InputWebGPU implements InputOp {
   private source: ImageSource | null = null;
 
   constructor(backend: WebGPUBackend, h: number, w: number) {
+    this.backend = backend;
     this.device = backend.device;
     this.dtype  = backend.dtype;
     this.output = backend.tensor(h, w, 4);
@@ -79,6 +81,9 @@ export class InputWebGPU implements InputOp {
 
   private run2d(src: ImageBitmap): void {
     this.ensureStagingTexture(src.width, src.height);
+    // Queue-timeline copy: submit any batched work first so it stays ordered
+    // (earlier recorded passes may still read the staging texture).
+    this.backend.flush();
     this.device.queue.copyExternalImageToTexture(
       { source: src, flipY: false },
       { texture: this.stagingTex! },
@@ -139,6 +144,13 @@ export class InputWebGPU implements InputOp {
   }
 
   private dispatchOnce(pipeline: GPUComputePipeline, bindGroup: GPUBindGroup): void {
+    const shared = this.backend.computePass();   // inside backend.batch()
+    if (shared) {
+      shared.setPipeline(pipeline);
+      shared.setBindGroup(0, bindGroup);
+      shared.dispatchWorkgroups(...this.dispatch);
+      return;
+    }
     const enc  = this.device.createCommandEncoder();
     const pass = enc.beginComputePass();
     pass.setPipeline(pipeline);

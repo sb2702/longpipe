@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Op, Activation } from '~/model/backend.ts'
+import { runBatched, type Backend, type Tensor, type Op, type Activation } from '~/model/backend.ts'
 import type { Conv2DWeights } from '~/model/weights.ts'
 
 // Google's MediaPipe Selfie Segmenter (Apache-2.0 weights; see
@@ -131,8 +131,9 @@ export class MediaPipeSelfie implements Op {
     this.output = mask.output
   }
 
+  // One command buffer per run (see Backend.batch).
   run(): void {
-    for (const op of this.steps) op.run()
+    runBatched(this.backend, () => { for (const op of this.steps) op.run() })
   }
 
   // Number of GPU passes per run (WebGL's pool is two draws; counted as one op).

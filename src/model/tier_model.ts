@@ -1,4 +1,4 @@
-import type { Backend, Tensor, Op } from '~/model/backend.ts'
+import { runBatched, type Backend, type Tensor, type Op } from '~/model/backend.ts'
 import type { ModelWeights } from '~/model/weights.ts'
 import type { UNetWrapperWeights } from '~/model/weights.ts'
 import {
@@ -37,7 +37,7 @@ export class TierModel implements Op {
   private readonly steps: { run(): void }[]
 
   constructor(
-    backend: Backend,
+    private readonly backend: Backend,
     x_hr: Tensor,
     baseWeights: ModelWeights,
     wrapperWeights: UNetWrapperWeights,
@@ -69,7 +69,8 @@ export class TierModel implements Op {
     this.halfTap = base.halfTap
   }
 
+  // One command buffer per run (see Backend.batch).
   run(): void {
-    for (const s of this.steps) s.run()
+    runBatched(this.backend, () => { for (const s of this.steps) s.run() })
   }
 }

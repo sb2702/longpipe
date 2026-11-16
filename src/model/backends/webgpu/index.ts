@@ -178,6 +178,64 @@ export class WebGPUBackend implements Backend {
     };
   }
 
+  // ── Command batching (see Backend.batch) ─────────────────────────────────
+  // Outside a batch every op encodes and submits its own command buffer. Inside
+  // one, compute ops append dispatches to a single shared compute pass, render
+  // passes and buffer copies go on the same encoder, and the encoder is
+  // submitted once when the outermost batch() returns. Within a pass WebGPU
+  // orders dispatches and makes each one's writes visible to the next, so the
+  // results are identical to running the ops one by one. Anything on the queue
+  // timeline (queue.writeBuffer / copyExternalImageToTexture, readback, sync)
+  // must call flush() first so it lands after the work recorded before it.
+  // One mutable record (not fields) so wrappers made with Object.create(backend)
+  // (autotune's synth backend) share the real backend's batch state.
+  private readonly batchState: {
+    depth: number;
+    enc:   GPUCommandEncoder | null;
+    pass:  GPUComputePassEncoder | null;
+  } = { depth: 0, enc: null, pass: null };
+
+  batch<T>(fn: () => T): T {
+    const b = this.batchState;
+    b.depth++;
+    try {
+      return fn();
+    } finally {
+      if (--b.depth === 0) this.flush();
+    }
+  }
+
+  // The open batch's compute pass (begun on first use), or null outside a batch.
+  // Internal: used by compute ops to record their dispatch.
+  computePass(): GPUComputePassEncoder | null {
+    const b = this.batchState;
+    if (b.depth === 0) return null;
+    if (!b.pass) b.pass = this.batchEncoder()!.beginComputePass();
+    return b.pass;
+  }
+
+  // The open batch's command encoder with no pass open (ends the shared compute
+  // pass if one is open), or null outside a batch. Internal: render passes and
+  // copies record onto it instead of submitting their own command buffer.
+  batchEncoder(): GPUCommandEncoder | null {
+    const b = this.batchState;
+    if (b.depth === 0) return null;
+    if (b.pass) { b.pass.end(); b.pass = null; }
+    return (b.enc ??= this.device.createCommandEncoder());
+  }
+
+  // Submit whatever the open batch has recorded so far (no-op when nothing is
+  // pending). The batch stays open; later ops start a new encoder.
+  flush(): void {
+    const b = this.batchState;
+    if (b.pass) { b.pass.end(); b.pass = null; }
+    if (b.enc) {
+      const enc = b.enc;
+      b.enc = null;
+      this.device.queue.submit([enc.finish()]);
+    }
+  }
+
   // Configure a GPUCanvasContext for this backend's device + format. Shared by
   // the constructor (main) and attachCanvas (preview).
   private configureContext(ctx: GPUCanvasContext): void {
@@ -286,6 +344,7 @@ export class WebGPUBackend implements Backend {
 
 
   async readback(tensor: WebGPUTensor): Promise<Float32Array> {
+    this.flush();
     const staging = this.device.createBuffer({
       size: tensor.buffer.size,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
@@ -309,18 +368,22 @@ export class WebGPUBackend implements Backend {
   copyTensor(src: WebGPUTensor, dst: WebGPUTensor): void {
     if (src.buffer.size !== dst.buffer.size)
       throw new Error(`copyTensor: size mismatch (src ${src.buffer.size} vs dst ${dst.buffer.size})`);
-    const enc = this.device.createCommandEncoder();
+    const shared = this.batchEncoder();
+    const enc = shared ?? this.device.createCommandEncoder();
     enc.copyBufferToBuffer(src.buffer, 0, dst.buffer, 0, src.buffer.size);
-    this.device.queue.submit([enc.finish()]);
+    if (!shared) this.device.queue.submit([enc.finish()]);
   }
 
   // Awaits all in-flight queue work. Used for benchmarking when we want
   // a sync barrier without paying the readback bandwidth cost.
   async sync(): Promise<void> {
+    this.flush();
     await this.device.queue.onSubmittedWorkDone();
   }
 
   destroy(): void {
+    this.batchState.pass = null;
+    this.batchState.enc = null;
     this.device.destroy();
   }
 }

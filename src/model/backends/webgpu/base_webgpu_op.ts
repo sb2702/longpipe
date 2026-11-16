@@ -75,13 +75,24 @@ export abstract class WebGPUOp implements Op {
     this.bindGroup = this.defaultBindGroup()
   }
 
+  // Inside backend.batch() the dispatch joins the batch's shared compute pass;
+  // otherwise it is encoded and submitted on its own.
   run(): void {
+    const shared = this.backend.computePass()
+    if (shared) {
+      this.encode(shared)
+      return
+    }
     const enc = this.backend.device.createCommandEncoder()
     const pass = enc.beginComputePass()
+    this.encode(pass)
+    pass.end()
+    this.backend.device.queue.submit([enc.finish()])
+  }
+
+  protected encode(pass: GPUComputePassEncoder): void {
     pass.setPipeline(this.pipeline)
     pass.setBindGroup(0, this.bindGroup)
     pass.dispatchWorkgroups(...this.dispatch)
-    pass.end()
-    this.backend.device.queue.submit([enc.finish()])
   }
 }

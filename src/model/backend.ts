@@ -410,6 +410,14 @@ export interface Backend {
   // GRU samples next frame. WebGPU = copyBufferToBuffer; WebGL = copyTexSubImage2D.
   copyTensor(src: Tensor, dst: Tensor): void;
 
+  // Optional: run `fn` with every op's GPU work recorded into ONE command
+  // buffer, submitted when the outermost batch returns (WebGPU; per-op submits
+  // cost ~25 µs of CPU each on Chrome, which dominated small networks). Ops
+  // behave exactly as when run one by one: queue-timeline work (readback,
+  // sync, frame uploads) flushes the pending batch first, so ordering holds.
+  // Backends without it (WebGL) just run `fn`; call through runBatched().
+  batch?<T>(fn: () => T): T;
+
   // Wait for all pending GPU work to complete. Cheaper than readback when
   // you only need a sync barrier (e.g., timing benchmarks). WebGPU uses
   // queue.onSubmittedWorkDone(); WebGL2 uses fenceSync + clientWaitSync
@@ -417,4 +425,9 @@ export interface Backend {
   sync(): Promise<void>;
 
   destroy(): void;
+}
+
+// Run `fn` inside backend.batch() when the backend supports it (see Backend.batch).
+export function runBatched<T>(backend: Backend, fn: () => T): T {
+  return backend.batch ? backend.batch(fn) : fn()
 }
