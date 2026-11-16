@@ -137,7 +137,20 @@ npm run bench -- --modes process,model --runs 3          # diagnostics
 npm run bench -- --samples 360p --pipelines passthrough,shipped-webgpu-small,litert-webgpu,mediapipe-gpu
 node tools/report.mjs s1=results/<file>.json [s2=results/<file2>.json]   # markdown tables
 node tools/ceiling.mjs --headless  # output-path investigation (see METHODOLOGY.md)
+node tools/profile.mjs configs.json out.json   # per-dispatch GPU profile of one network (see below)
 ```
+
+`tools/profile.mjs` (page `web/profile.html`, code `web/src/profile.js`) builds
+one network from this repo's `src/` (or LiteRT.js) and reports latency,
+back-to-back throughput, CPU time per run, queue submits / passes / dispatches
+per run, and each dispatch's GPU time from timestamp queries (headless Chrome
+with `--enable-webgpu-developer-features`). `configs.json` is a list such as
+`[{"impl":"longpipe","backend":"webgpu","net":"mp-square","dtype":"f16"},
+{"impl":"litert","net":"mp-square"}]`; `net` is `mp-square`, `mp-landscape` or
+a tier; `"frame": {"w": 640, "h": 360}` profiles the whole per-frame path
+(Input → network → RenderOp) instead; `"exclude": {"name": "<label regex>"}`
+also reports the one-pass GPU time without those dispatches (what fusing them
+away could save at most).
 
 Add `--headless` to run without a window (fine on macOS; on Linux see
 METHODOLOGY.md). `--output direct` hands canvas frames straight to the encoder
