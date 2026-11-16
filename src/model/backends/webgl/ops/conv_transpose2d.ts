@@ -3,7 +3,7 @@ import type { Conv2DWeights } from '~/model/weights.ts'
 import type { WebGLBackend } from '~/model/backends/webgl/index.ts'
 import { WebGLTensor, WebGLOp } from '~/model/backends/webgl/base_webgl_op.ts'
 import shaderSrc from '~/model/backends/webgl/shaders/conv_transpose2d.glsl'
-import { convTransposeOutSize } from '~/model/backends/webgpu/ops/conv_utils.ts'
+import { convTransposeOutSize, activationCode } from '~/model/backends/webgpu/ops/conv_utils.ts'
 import { toUploadView } from '~/utils/weights.ts'
 
 // Gather-form transposed conv. Weight/bias textures use the SAME layout as
@@ -53,7 +53,7 @@ export class ConvTranspose2DWebGL extends WebGLOp {
       u_stride:       params.stride,
       u_pad_top:      params.padding,
       u_pad_left:     params.padding,
-      u_activation:   params.activation === 'relu6' ? 1 : params.activation === 'relu' ? 2 : params.activation === 'leaky' ? 3 : 0,
+      u_activation:   activationCode(params.activation),
     }
 
     this.defaultSetup()

@@ -79,20 +79,21 @@ export class MediaPipeSelfie implements Op {
     const squeezeExcite = (x: Tensor, fc1: string, fc2: string) =>
       this.scale(x, this.conv(this.conv(this.pool(x), fc1, 'relu'), fc2, 'sigmoid'))
 
-    // MobileNetV3 block: 1×1 expand → depthwise → (SE) → 1×1 project (+ residual)
+    // MobileNetV3 block: 1×1 expand → depthwise → (SE) → 1×1 project (+ residual,
+    // fused into the projection: ProjResidual)
     const invertedResidual = (x: Tensor, expand: string, dw: string, project: string,
       o: { stride?: number; se?: [string, string]; act?: Activation; residual?: boolean } = {}) => {
       const act = o.act ?? 'relu'
       let y = this.depthwise(this.conv(x, expand, act), dw, act, o.stride ?? 1)
       if (o.se) y = squeezeExcite(y, ...o.se)
-      y = this.conv(y, project)
-      return o.residual ? this.add(x, y) : y
+      return o.residual ? this.projResidual(y, x, project) : this.conv(y, project)
     }
 
     // Upsample, blend with the encoder skip through an attention gate, refine
-    // with a 1×1 conv and a residual depthwise conv.
+    // with a 1×1 conv and a residual depthwise conv. (Bilinear 2× + the 1×1
+    // projection run fused: UpsampleConv1x1.)
     const decoderBlock = (x: Tensor, skip: Tensor, proj: string, [fc1, fc2]: [string, string], conv1: string, dw: string) => {
-      const up = this.conv(this.upsample2x(x), proj)
+      const up = this.upsampleConv(x, proj)
       const gate = this.conv(this.conv(this.pool(this.add(skip, up)), fc1, 'relu'), fc2, 'sigmoid')
       const y = this.conv(this.add(this.scale(skip, gate), up), conv1, 'relu')
       return this.add(y, this.depthwise(y, dw, 'relu'))
@@ -121,14 +122,12 @@ export class MediaPipeSelfie implements Op {
     x = decoderBlock(x, s2, 'conv2d_35', ['conv2d_36', 'conv2d_37'], 'conv2d_38', 'depthwise_conv2d_9')   // /4
     x = decoderBlock(x, s1, 'conv2d_39', ['conv2d_40', 'conv2d_41'], 'conv2d_42', 'depthwise_conv2d_10')  // /2
 
-    // 2×2 stride-2 transposed conv → full res, then sigmoid
+    // 2×2 stride-2 transposed conv → full res, sigmoid fused
     const seg = this.layer('segment')
-    const up = backend.ops.ConvTranspose2d(x, seg, { outChannels: 4, kernel: 2, stride: 2, padding: 0, activation: 'none' })
+    const up = backend.ops.ConvTranspose2d(x, seg, { outChannels: 4, kernel: 2, stride: 2, padding: 0, activation: 'sigmoid' })
     this.check('segment', seg.weights.length, 4 * 1 * (x.c / 4) * 16)
     this.steps.push(up)
-    const mask = backend.ops.Sigmoid(up.output)
-    this.steps.push(mask)
-    this.output = mask.output
+    this.output = up.output
   }
 
   // One command buffer per run (see Backend.batch).
@@ -175,10 +174,24 @@ export class MediaPipeSelfie implements Op {
     return this.push(this.backend.ops.DepthwiseConv2d(x, l, { kernel, stride, padding: 'same', activation }))
   }
 
+  // 1×1 projection + residual add in one pass.
+  private projResidual(x: Tensor, skip: Tensor, name: string): Tensor {
+    const l = this.layer(name)
+    const outChannels = l.bias.length
+    this.check(name, l.weights.length, (outChannels / 4) * (x.c / 4) * 16)
+    if (outChannels !== skip.c) throw new Error(`MediaPipeSelfie: '${name}' residual has ${skip.c} channels, expected ${outChannels}`)
+    return this.push(this.backend.ops.ProjResidual(x, skip, l, { outChannels }))
+  }
+
+  // Bilinear 2× (half-pixel centres) + 1×1 conv, fused.
+  private upsampleConv(x: Tensor, name: string): Tensor {
+    const l = this.layer(name)
+    const outChannels = l.bias.length
+    this.check(name, l.weights.length, (outChannels / 4) * (x.c / 4) * 16)
+    return this.push(this.backend.ops.UpsampleConv1x1(x, l, { outH: x.h * 2, outW: x.w * 2, outChannels, activation: 'none' }))
+  }
+
   private pool(x: Tensor): Tensor       { return this.push(this.backend.ops.GlobalAvgPool(x)) }
   private scale(x: Tensor, s: Tensor)    { return this.push(this.backend.ops.ChannelScale(x, s)) }
   private add(a: Tensor, b: Tensor)      { return this.push(this.backend.ops.Add(a, b)) }
-  private upsample2x(x: Tensor): Tensor {
-    return this.push(this.backend.ops.BilinearUpsample(x, { outH: x.h * 2, outW: x.w * 2 }))
-  }
 }

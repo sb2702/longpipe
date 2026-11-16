@@ -4,7 +4,7 @@ import type { WebGPUBackend } from "~/model/backends/webgpu/index.ts";
 import { WebGPUTensor, WebGPUOp } from "~/model/backends/webgpu/base_webgpu_op.ts";
 import f32Src from "~/model/backends/webgpu/shaders/conv_transpose2d.wgsl";
 import f16Src from "~/model/backends/webgpu/shaders/conv_transpose2d_f16.wgsl";
-import { convTransposeOutSize } from "~/model/backends/webgpu/ops/conv_utils.ts";
+import { convTransposeOutSize, activationCode } from "~/model/backends/webgpu/ops/conv_utils.ts";
 import { toUploadView } from "~/utils/weights.ts";
 
 // Gather-form transposed conv. Weight buffer is uploaded raw — identical flat
@@ -35,7 +35,7 @@ export class ConvTranspose2DWebGPU extends WebGPUOp {
       inGroups, outGroups,
       params.kernel, params.kernel,
       params.stride, params.padding, params.padding,
-      params.activation === "relu6" ? 1 : params.activation === "relu" ? 2 : params.activation === "leaky" ? 3 : 0,
+      activationCode(params.activation),
     ]));
 
     this.defaultSetup();

@@ -26,6 +26,8 @@ fn act(v: vec4<f32>, a: u32) -> vec4<f32> {
     if (a == 1u) { return clamp(v, vec4<f32>(0.0), vec4<f32>(6.0)); }
     if (a == 2u) { return max(v, vec4<f32>(0.0)); }
     if (a == 3u) { return max(v, 0.1 * v); }
+    if (a == 4u) { return v * clamp(v + 3.0, vec4<f32>(0.0), vec4<f32>(6.0)) / 6.0; }   // hard-swish
+    if (a == 5u) { return 1.0 / (1.0 + exp(-v)); }                                       // sigmoid
     return v;
 }
 
