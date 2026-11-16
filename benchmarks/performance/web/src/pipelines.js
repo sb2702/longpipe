@@ -121,9 +121,9 @@ async function canvasCopyWebGL() {
 
 // Precision. EffectsPipeline creates ONE backend for all presets, with dtype
 // 'f16' by default (src/pipeline/index.ts:397), falling back to f32 only when
-// WebGPU lacks shader-f16 (src/pipeline/worker/setup_backend.ts:349); the
+// WebGPU lacks shader-f16 (src/pipeline/worker/setup_backend.ts:61); the
 // preset's own dtype in presets.ts (f32 for large/xl) is overridden by the
-// resolved one (src/pipeline/worker/resolve_preset.ts:476). So as shipped every
+// resolved one (src/pipeline/worker/resolve_preset.ts:34). So as shipped every
 // preset runs f16 where available. The `-f32` variants run large/xl at the
 // precision presets.ts lists for them (what the 2026-11-15 run measured).
 // Weights file: the one EffectsPipeline fetches for that precision
@@ -221,7 +221,7 @@ async function longpipeMediaPipe(kind, variant, { width, height }, requested = '
 // `counters` counts full-network and flow-network runs to verify this.
 async function shipped(kind, tier, { width, height }) {
   // EffectsPipeline's default backend precision, patched into the preset as
-  // resolve_preset.ts:476 does (see weightsFile above).
+  // resolve_preset.ts:34 does (see weightsFile above).
   let dtype = 'f16'
   if (kind === 'webgpu' && !(await SrcWebGPUBackend.hasF16Support())) dtype = 'f32'
   const preset = { ...PRESETS.find((p) => p.model === tier), dtype }

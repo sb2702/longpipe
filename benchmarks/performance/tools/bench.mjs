@@ -4,7 +4,7 @@
 //
 //   npm run bench -- [--samples 360p,720p] [--modes transcode,process,model] [--runs 5]
 //                    [--pipelines passthrough,shipped-webgpu-xs,...] [--output readback|direct]
-//                    [--busy-cmd "pgrep -f some_gpu_job"] [--headless] [--check] [--out results/my-machine.json]
+//                    [--busy-cmd 'pgrep -f "[s]ome_gpu_job"'] [--headless] [--check] [--out results/my-machine.json]
 //
 // Protocol: for each (sample, mode), `--runs` rounds; each round measures every
 // pipeline once (create -> warm-up pass -> one timed pass -> destroy), in an
@@ -16,7 +16,8 @@
 // machine is busy with other work (e.g. a background GPU job). A measurement
 // whose timed part overlapped a busy sample (±1.5 s) is discarded and repeated
 // once the machine has been idle for 5 s; discarded measurements are kept in the
-// report.
+// report. With `pgrep -f`, write the pattern so it can't match this script's own
+// command line, e.g. --busy-cmd 'pgrep -f "[m]y_gpu_job"'.
 //
 // Adapted from github.com/sb2702/webrtc-hacks-webgpu (segmentation/tools/bench.mjs, MIT).
 import { exec, execSync } from 'node:child_process'
