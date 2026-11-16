@@ -74,29 +74,64 @@ export abstract class WebGLOp implements Op {
       throw new Error(`GLSL link error: ${gl.getProgramInfoLog(this.program)}`)
   }
 
+  // Per-op GL state cached on first run: uniform locations (looked up once —
+  // getUniformLocation is a string lookup through the command buffer), the last
+  // uniform values uploaded (uniforms persist in the program, so static ones are
+  // set once and only changes are re-sent), and a framebuffer with this op's
+  // output already attached (saves a framebufferTexture2D per draw).
+  private glCache: {
+    samplerLocs: (WebGLUniformLocation | null)[]
+    ints:   Map<string, { loc: WebGLUniformLocation | null; val: number | undefined }>
+    floats: Map<string, { loc: WebGLUniformLocation | null; val: number | undefined }>
+    fbo:    WebGLFramebuffer
+    target: WebGLTexture
+  } | null = null
+
   run(): void {
     const gl = this.backend.gl
     gl.useProgram(this.program)
 
-    // Bind textures in order
+    let c = this.glCache
+    if (!c || c.target !== this.output.texture) {
+      if (c) gl.deleteFramebuffer(c.fbo)
+      const fbo = gl.createFramebuffer()!
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.output.texture, 0)
+      c = this.glCache = {
+        samplerLocs: this.samplers.map(({ name }, i) => {
+          const loc = gl.getUniformLocation(this.program, name)
+          gl.uniform1i(loc, i)   // texture unit i — fixed for this program
+          return loc
+        }),
+        ints: new Map(), floats: new Map(), fbo, target: this.output.texture,
+      }
+    }
+
+    // Bind textures in order (units are global state: rebind every draw)
     this.samplers.forEach(({ name, texture }, i) => {
+      if (i >= c!.samplerLocs.length) {   // a sampler added after the first run
+        const loc = gl.getUniformLocation(this.program, name)
+        gl.uniform1i(loc, i)
+        c!.samplerLocs.push(loc)
+      }
       gl.activeTexture(gl.TEXTURE0 + i)
       gl.bindTexture(gl.TEXTURE_2D, texture)
-      gl.uniform1i(gl.getUniformLocation(this.program, name), i)
     })
 
-    // Set integer uniforms
+    // Integer / float uniforms: upload only when the value changed
     for (const [name, val] of Object.entries(this.uniformInts)) {
-      gl.uniform1i(gl.getUniformLocation(this.program, name), val)
+      let u = c.ints.get(name)
+      if (!u) c.ints.set(name, u = { loc: gl.getUniformLocation(this.program, name), val: undefined })
+      if (u.val !== val) { gl.uniform1i(u.loc, val); u.val = val }
     }
-    // Set float uniforms
     for (const [name, val] of Object.entries(this.uniformFloats)) {
-      gl.uniform1f(gl.getUniformLocation(this.program, name), val)
+      let u = c.floats.get(name)
+      if (!u) c.floats.set(name, u = { loc: gl.getUniformLocation(this.program, name), val: undefined })
+      if (u.val !== val) { gl.uniform1f(u.loc, val); u.val = val }
     }
 
     // Render to output texture
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.backend.fbo)
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.output.texture, 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, c.fbo)
     gl.viewport(0, 0, this.dispatch[0], this.dispatch[1])
     gl.bindVertexArray(null)
     gl.drawArrays(gl.TRIANGLES, 0, 6)
