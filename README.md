@@ -42,33 +42,14 @@ await pipeline.ready                  // optional — resolves once the effect i
 
 ### Benchmarks vs MediaPipe
 
+Longpipe implements multiple downstream features (face effects, backgrounds) with one neural network, but if you want to compare it to another library, the closest would be the Mediapipe selfie model for background segmentation, from the [@mediapipe/tasks-vision](https://www.npmjs.com/package/@mediapipe/tasks-vision) library. 
+
 ![Frames per second, 360p, Apple M4](analysis/speed-360p.svg)
 
 ![Matte error on P3M-500-P](analysis/quality-p3m.svg)
 
-- **Speed:** a full 360p decode → background replacement → H.264 encode, measured on an Apple M4 in Chrome 157.
-  Longpipe runs as shipped, including its optical-flow frames. MediaPipe's tasks-vision library has no WebGPU
-  delegate, so its fastest GPU path is WebGL.
-- **Quality:** mean absolute alpha error on [P3M-10k](https://github.com/JizhiziLi/P3M)'s P3M-500-P set.
-  MediaPipe's model scores the same on any engine.
-
 Methodology, caveats (including where MediaPipe's model is faster, on LiteRT.js), the 720p, WebGL and IoU results,
 and scripts to reproduce everything: **[full analysis](analysis/README.md)**.
-
-## Models
-
-Longpipe runs one of two segmentation models through the same GPU pipeline (WebGPU / WebGL2 backends, zero-copy frame input, compositor, worker and transports):
-
-| `model` | What it is | Background effects | Touch-up, auto-reframe | Flow stabilization | Presets / autotune |
-|---|---|---|---|---|---|
-| `'longpipe'` (default) | Longpipe's own hydranet, five tiers `xs`–`xl` | ✓ | ✓ | ✓ | ✓ |
-| `'mediapipe-selfie'` | Google's [MediaPipe Selfie Segmenter](https://ai.google.dev/edge/mediapipe/solutions/vision/image_segmenter#selfie-model), square 256×256 or landscape 256×144 (picked from the output aspect; force with `'mediapipe-selfie-square'` / `'mediapipe-selfie-landscape'`) | ✓ | ✗ (throws) | ✗ | ✗ (one fixed model) |
-
-```ts
-const pipeline = new EffectsPipeline(stream, { model: 'mediapipe-selfie', background: 'blur' })
-```
-
-Use `'mediapipe-selfie'` if you specifically want MediaPipe's model, e.g. to match an existing MediaPipe deployment while getting Longpipe's pipeline. Longpipe's own models drive every effect from one encoder pass and are more accurate ([benchmarks](#benchmarks-vs-mediapipe)). The MediaPipe weights are Apache-2.0 (© Google) and are converted by [`scripts/convert_mediapipe_selfie.py`](scripts/convert_mediapipe_selfie.py); see [`third_party/mediapipe/NOTICE.md`](third_party/mediapipe/NOTICE.md). They are served from `cdn.longpipe.dev/models/mediapipe/selfie/v1/`, or from your `weightsBaseUrl` if you self-host.
 
 ## Documentation
 
@@ -84,16 +65,6 @@ Full docs live at **[longpipe.dev/docs](https://longpipe.dev/docs)**:
 - [ONNX & other runtimes](https://longpipe.dev/docs/onnx)
 
 Machine-readable for LLMs and agents: [`llms.txt`](https://longpipe.dev/llms.txt) · [`llms-full.txt`](https://longpipe.dev/llms-full.txt)
-
-## Models (ONNX)
-
-The trained models are also published as official ONNX exports (all five tiers, matting, face keypoints,
-optical flow and the 478-point face mesh) for Python, native apps, servers and `onnxruntime-web`:
-
-- **Hugging Face:** [huggingface.co/Longpipe/longpipe](https://huggingface.co/Longpipe/longpipe)
-- **CDN:** `https://cdn.longpipe.dev/models/v/0.0.5/onnx/` (CORS-enabled)
-
-Inputs, outputs and examples: [longpipe.dev/docs/onnx](https://longpipe.dev/docs/onnx).
 
 ## Roadmap
 
