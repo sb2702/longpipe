@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 334" width="820" height="334" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Matte error on P3M-500-P (mean absolute alpha error)</title>
+<desc id="d">P3M-10k validation, 500 portrait photos, scored at full resolution · lower is better. Longpipe xl: 0.0071; Longpipe medium: 0.0106; Longpipe large: 0.0111; Longpipe small: 0.0170; Longpipe xs: 0.0210; MediaPipe selfie (square): 0.0304; MediaPipe selfie (landscape): 0.0322.</desc>
+<rect width="820" height="334" fill="#fcfcfb"/>
+<text x="16" y="30" font-size="18" font-weight="600" fill="#0b0b0b">Matte error on P3M-500-P (mean absolute alpha error)</text>
+<text x="16" y="52" font-size="13" fill="#52514e">P3M-10k validation, 500 portrait photos, scored at full resolution · lower is better</text>
+<line x1="330.0" y1="72" x2="330.0" y2="288" stroke="#e6e5e0" stroke-width="1"/>
+<text x="330.0" y="306" font-size="12" fill="#52514e" text-anchor="middle">0</text>
+<line x1="437.5" y1="72" x2="437.5" y2="288" stroke="#e6e5e0" stroke-width="1"/>
+<text x="437.5" y="306" font-size="12" fill="#52514e" text-anchor="middle">0.01</text>
+<line x1="545.0" y1="72" x2="545.0" y2="288" stroke="#e6e5e0" stroke-width="1"/>
+<text x="545.0" y="306" font-size="12" fill="#52514e" text-anchor="middle">0.02</text>
+<line x1="652.5" y1="72" x2="652.5" y2="288" stroke="#e6e5e0" stroke-width="1"/>
+<text x="652.5" y="306" font-size="12" fill="#52514e" text-anchor="middle">0.03</text>
+<line x1="760.0" y1="72" x2="760.0" y2="288" stroke="#e6e5e0" stroke-width="1"/>
+<text x="760.0" y="306" font-size="12" fill="#52514e" text-anchor="middle">0.04</text>
+<text x="545.0" y="324" font-size="12" fill="#52514e" text-anchor="middle">mean absolute alpha error (MAD)</text>
+<g><title>Longpipe xl: 0.0071</title><path d="M330,84 H402.3 Q406.3,84 406.3,88 V98 Q406.3,102 402.3,102 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="97.5" font-size="13" fill="#0b0b0b" text-anchor="end">Longpipe xl</text>
+<text x="412.3" y="97.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">0.0071</text>
+<g><title>Longpipe medium: 0.0106</title><path d="M330,114 H439.9 Q443.9,114 443.9,118 V128 Q443.9,132 439.9,132 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="127.5" font-size="13" fill="#0b0b0b" text-anchor="end">Longpipe medium</text>
+<text x="449.9" y="127.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">0.0106</text>
+<g><title>Longpipe large: 0.0111</title><path d="M330,144 H445.3 Q449.3,144 449.3,148 V158 Q449.3,162 445.3,162 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="157.5" font-size="13" fill="#0b0b0b" text-anchor="end">Longpipe large</text>
+<text x="455.3" y="157.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">0.0111</text>
+<g><title>Longpipe small: 0.0170</title><path d="M330,174 H508.8 Q512.8,174 512.8,178 V188 Q512.8,192 508.8,192 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="187.5" font-size="13" fill="#0b0b0b" text-anchor="end">Longpipe small</text>
+<text x="518.8" y="187.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">0.0170</text>
+<g><title>Longpipe xs: 0.0210</title><path d="M330,204 H551.8 Q555.8,204 555.8,208 V218 Q555.8,222 551.8,222 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="217.5" font-size="13" fill="#0b0b0b" text-anchor="end">Longpipe xs</text>
+<text x="561.8" y="217.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">0.0210</text>
+<g><title>MediaPipe selfie (square): 0.0304</title><path d="M330,234 H652.8 Q656.8,234 656.8,238 V248 Q656.8,252 652.8,252 H330 Z" fill="#9a9890"/></g>
+<text x="320" y="247.5" font-size="13" fill="#0b0b0b" text-anchor="end">MediaPipe selfie (square)</text>
+<text x="662.8" y="247.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">0.0304</text>
+<g><title>MediaPipe selfie (landscape): 0.0322</title><path d="M330,264 H672.1 Q676.1,264 676.1,268 V278 Q676.1,282 672.1,282 H330 Z" fill="#9a9890"/></g>
+<text x="320" y="277.5" font-size="13" fill="#0b0b0b" text-anchor="end">MediaPipe selfie (landscape)</text>
+<text x="682.1" y="277.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">0.0322</text>
+<line x1="330" y1="72" x2="330" y2="288" stroke="#52514e" stroke-width="1"/>
+</svg>

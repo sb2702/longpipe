@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 334" width="820" height="334" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Background replacement in the browser: frames per second</title>
+<desc id="d">360p decode → background replacement → H.264 encode · Apple M4, Chrome 157 · Longpipe 0.0.18 · higher is better. MediaPipe selfie on Longpipe (WebGPU): 379; Longpipe xs (WebGPU): 344; Longpipe small (WebGPU): 332; Longpipe medium (WebGPU): 250; Longpipe large (WebGPU): 158; Longpipe xl (WebGPU): 83; MediaPipe tasks-vision (GPU, WebGL): 123.</desc>
+<rect width="820" height="334" fill="#fcfcfb"/>
+<text x="16" y="30" font-size="18" font-weight="600" fill="#0b0b0b">Background replacement in the browser: frames per second</text>
+<text x="16" y="52" font-size="13" fill="#52514e">360p decode → background replacement → H.264 encode · Apple M4, Chrome 157 · Longpipe 0.0.18 · higher is better</text>
+<line x1="330.0" y1="72" x2="330.0" y2="288" stroke="#e6e5e0" stroke-width="1"/>
+<text x="330.0" y="306" font-size="12" fill="#52514e" text-anchor="middle">0</text>
+<line x1="437.5" y1="72" x2="437.5" y2="288" stroke="#e6e5e0" stroke-width="1"/>
+<text x="437.5" y="306" font-size="12" fill="#52514e" text-anchor="middle">100</text>
+<line x1="545.0" y1="72" x2="545.0" y2="288" stroke="#e6e5e0" stroke-width="1"/>
+<text x="545.0" y="306" font-size="12" fill="#52514e" text-anchor="middle">200</text>
+<line x1="652.5" y1="72" x2="652.5" y2="288" stroke="#e6e5e0" stroke-width="1"/>
+<text x="652.5" y="306" font-size="12" fill="#52514e" text-anchor="middle">300</text>
+<line x1="760.0" y1="72" x2="760.0" y2="288" stroke="#e6e5e0" stroke-width="1"/>
+<text x="760.0" y="306" font-size="12" fill="#52514e" text-anchor="middle">400</text>
+<text x="545.0" y="324" font-size="12" fill="#52514e" text-anchor="middle">frames per second</text>
+<g><title>MediaPipe selfie on Longpipe (WebGPU): 379</title><path d="M330,84 H733.4 Q737.4,84 737.4,88 V98 Q737.4,102 733.4,102 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="97.5" font-size="13" fill="#0b0b0b" text-anchor="end">MediaPipe selfie on Longpipe (WebGPU)</text>
+<text x="743.4" y="97.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">379</text>
+<g><title>Longpipe xs (WebGPU): 344</title><path d="M330,114 H695.8 Q699.8,114 699.8,118 V128 Q699.8,132 695.8,132 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="127.5" font-size="13" fill="#0b0b0b" text-anchor="end">Longpipe xs (WebGPU)</text>
+<text x="705.8" y="127.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">344</text>
+<g><title>Longpipe small (WebGPU): 332</title><path d="M330,144 H682.9 Q686.9,144 686.9,148 V158 Q686.9,162 682.9,162 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="157.5" font-size="13" fill="#0b0b0b" text-anchor="end">Longpipe small (WebGPU)</text>
+<text x="692.9" y="157.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">332</text>
+<g><title>Longpipe medium (WebGPU): 250</title><path d="M330,174 H594.8 Q598.8,174 598.8,178 V188 Q598.8,192 594.8,192 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="187.5" font-size="13" fill="#0b0b0b" text-anchor="end">Longpipe medium (WebGPU)</text>
+<text x="604.8" y="187.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">250</text>
+<g><title>Longpipe large (WebGPU): 158</title><path d="M330,204 H495.9 Q499.9,204 499.9,208 V218 Q499.9,222 495.9,222 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="217.5" font-size="13" fill="#0b0b0b" text-anchor="end">Longpipe large (WebGPU)</text>
+<text x="505.9" y="217.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">158</text>
+<g><title>Longpipe xl (WebGPU): 83</title><path d="M330,234 H415.2 Q419.2,234 419.2,238 V248 Q419.2,252 415.2,252 H330 Z" fill="#2a78d6"/></g>
+<text x="320" y="247.5" font-size="13" fill="#0b0b0b" text-anchor="end">Longpipe xl (WebGPU)</text>
+<text x="425.2" y="247.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">83</text>
+<g><title>MediaPipe tasks-vision (GPU, WebGL): 123</title><path d="M330,264 H458.2 Q462.2,264 462.2,268 V278 Q462.2,282 458.2,282 H330 Z" fill="#9a9890"/></g>
+<text x="320" y="277.5" font-size="13" fill="#0b0b0b" text-anchor="end">MediaPipe tasks-vision (GPU, WebGL)</text>
+<text x="468.2" y="277.5" font-size="12" fill="#52514e" font-variant-numeric="tabular-nums">123</text>
+<line x1="330" y1="72" x2="330" y2="288" stroke="#52514e" stroke-width="1"/>
+</svg>

@@ -19,6 +19,8 @@ the Longpipe SDK as shipped. They also include MediaPipe's model running on Long
 
 ## Performance
 
+![Frames per second, 360p, Apple M4](speed-360p.svg)
+
 Background replacement on a 192-frame webcam clip at **360p**, on an Apple M4 MacBook Pro with
 Chrome 157, Longpipe 0.0.18. Frames per second for the full transcode (WebCodecs decode → effect →
 H.264 encode), median of interleaved runs. Higher is better.
@@ -72,6 +74,8 @@ will differ on other hardware and browsers; the ordering is what to compare.
 
 ## Quality
 
+![Matte error on P3M-500-P](quality-p3m.svg)
+
 Matte accuracy on the [P3M-10k](https://github.com/JizhiziLi/P3M) validation sets: 1,000 portrait
 photos with hand-labelled alpha mattes. Each image is scored at full resolution with the P3M paper's
 own metric code.
@@ -122,3 +126,7 @@ Code: [`benchmarks/quality/eval_p3m.py`](../benchmarks/quality/eval_p3m.py) runs
 its official ONNX exports and MediaPipe through Google's `mediapipe` Python package, using the same
 `.tflite` file as the web library. Full metrics (SAD, MSE, gradient, connectivity) are in
 [`benchmarks/quality/results/2026-11-15-p3m.md`](../benchmarks/quality/results/2026-11-15-p3m.md).
+
+## Charts
+
+`python3 analysis/charts.py` regenerates `speed-360p.svg` and `quality-p3m.svg` from the numbers above.
