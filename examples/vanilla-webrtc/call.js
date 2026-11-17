@@ -32,7 +32,8 @@ export async function startLoopbackCall(localStream, { onRemoteTrack } = {}) {
   }
 }
 
-// The few RTP numbers worth watching: what pc1 sent and what pc2 decoded.
+// The few RTP numbers worth watching: what pc1 sent and what pc2 decoded, plus
+// the cumulative timing counters behind the latency breakdown (see latencyBreakdown).
 export async function callStats(call) {
   const out = { video: {}, audio: {} }
   const [sent, recv] = await Promise.all([call.pc1.getStats(), call.pc2.getStats()])
@@ -40,6 +41,7 @@ export async function callStats(call) {
     if (r.type === 'outbound-rtp' && r.kind === 'video') {
       out.video.framesSent = r.framesSent ?? 0
       out.video.framesEncoded = r.framesEncoded ?? 0
+      out.video.totalEncodeTime = r.totalEncodeTime ?? 0          // seconds, summed over framesEncoded
     }
     if (r.type === 'outbound-rtp' && r.kind === 'audio') out.audio.packetsSent = r.packetsSent ?? 0
   })
@@ -49,6 +51,9 @@ export async function callStats(call) {
       out.video.framesReceived = r.framesReceived ?? 0
       out.video.frameWidth = r.frameWidth ?? 0
       out.video.frameHeight = r.frameHeight ?? 0
+      out.video.totalDecodeTime = r.totalDecodeTime ?? 0          // seconds, summed over framesDecoded
+      out.video.jitterBufferDelay = r.jitterBufferDelay ?? 0      // seconds, summed over jitterBufferEmittedCount
+      out.video.jitterBufferEmittedCount = r.jitterBufferEmittedCount ?? 0
     }
     if (r.type === 'inbound-rtp' && r.kind === 'audio') {
       out.audio.packetsReceived = r.packetsReceived ?? 0
@@ -58,4 +63,21 @@ export async function callStats(call) {
     }
   })
   return out
+}
+
+// Per-frame encode / jitter-buffer / decode time in ms over the interval
+// between two callStats() samples (deltas of the cumulative counters, so a
+// model switch or bypass shows up within a second instead of being averaged
+// into the call's lifetime). null where the interval had no frames.
+export function latencyBreakdown(prev, cur) {
+  const per = (sumKey, countKey) => {
+    const n = (cur.video[countKey] ?? 0) - (prev?.video[countKey] ?? 0)
+    const t = (cur.video[sumKey] ?? 0) - (prev?.video[sumKey] ?? 0)
+    return n > 0 && t >= 0 ? (t / n) * 1000 : null
+  }
+  return {
+    encodeMs: per('totalEncodeTime', 'framesEncoded'),
+    jitterMs: per('jitterBufferDelay', 'jitterBufferEmittedCount'),
+    decodeMs: per('totalDecodeTime', 'framesDecoded'),
+  }
 }

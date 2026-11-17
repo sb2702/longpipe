@@ -23,6 +23,11 @@
     td:first-child { color: var(--muted); }
     #lastError { color: var(--bad); }
     #lastError.none { color: var(--ok); }
+    .latency td:last-child { font-weight: 600; }
+    .latency .est td { border-top: 1px solid var(--line); }
+    /* Glass-to-glass marker (?flash=1): lights up when the corner square is drawn into the input. */
+    #flash { position: fixed; top: 8px; right: 8px; width: 64px; height: 64px; background: #000; border: 2px solid #888; z-index: 10; }
+    #flash.on { background: #fff; }
     #log { margin-top: 12px; max-height: 160px; overflow: auto; font: 12px ui-monospace, monospace; white-space: pre-wrap; color: var(--muted); }
   </style>
 </head>
@@ -59,6 +64,19 @@
         <option value="none">none (no GPU)</option>
       </select>
     </label>
+    <label>Model
+      <select name="model">
+        <option value="auto">auto (benchmark + adaptive)</option>
+        <option value="xs">xs</option>
+        <option value="small">small</option>
+        <option value="medium">medium</option>
+        <option value="large">large</option>
+        <option value="xl">xl</option>
+        <option value="mediapipe">MediaPipe selfie (restarts)</option>
+      </select>
+    </label>
+    <label><span><input name="bypass" type="checkbox" /> bypass Longpipe (raw tracks)</span></label>
+    <label><span><input name="flash" type="checkbox" /> flash marker (on Start)</span></label>
     <button id="start" type="button">Start</button>
     <button id="stop" type="button" disabled>Stop</button>
     <label><span><input name="listen" type="checkbox" /> hear remote audio</span></label>
@@ -72,6 +90,7 @@
   <table>
     <tbody>
       <tr><td>status</td><td id="r-status">–</td></tr>
+      <tr><td>model · dtype · backend</td><td id="r-model">–</td></tr>
       <tr><td>backend</td><td id="r-backend">–</td></tr>
       <tr><td>input fps / output fps</td><td id="r-fps">–</td></tr>
       <tr><td>frames sent / decoded (remote fps)</td><td id="r-frames">–</td></tr>
@@ -82,6 +101,18 @@
       <tr><td>last error</td><td id="lastError" class="none">none</td></tr>
     </tbody>
   </table>
+  <table class="latency">
+    <caption style="text-align:left; font-size:12px; color:var(--muted)">Latency, per frame, last ~1 s</caption>
+    <tbody>
+      <tr><td>capture (≈ 1 frame interval)</td><td id="l-capture">–</td></tr>
+      <tr><td>Longpipe (in → out, <code>getStats().latencyMs</code>)</td><td id="l-longpipe">–</td></tr>
+      <tr><td>encode (outbound-rtp)</td><td id="l-encode">–</td></tr>
+      <tr><td>jitter buffer (inbound-rtp)</td><td id="l-jitter">–</td></tr>
+      <tr><td>decode (inbound-rtp)</td><td id="l-decode">–</td></tr>
+      <tr class="est"><td>estimated end to end (sum; excludes network + display)</td><td id="l-total">–</td></tr>
+    </tbody>
+  </table>
+  <div id="flash" hidden></div>
   <div id="log"></div>
 
   <script type="module" src="./main.js"></script>

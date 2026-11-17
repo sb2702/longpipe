@@ -7,22 +7,29 @@
 //
 // URL parameters preset the controls (handy on a phone, and used by the e2e
 // tests): ?input=clip&bg=color&color=%2300ff00&denoise=on&backend=webgl2
-// plus three that have no control:
-//   preset=fast|balanced|quality  model preset (default 'auto' = benchmark the device)
+//   &model=auto|xs|small|medium|large|xl|mediapipe&bypass=1&flash=1
+// plus some that have no control:
+//   preset=fast|balanced|quality  older spelling of model= (xs | medium | xl)
 //   weights=local|<url> where weights come from ('local' = ./assets/models/,
 //                       see `npm run e2e:assets`; default: Longpipe's CDN)
 //   denoiseModel=rnnoise|dfn|…  (default 'auto')
+//   camera=front|back   which phone camera
 //   debug=1             verbose [longpipe/…] console logging
-import { EffectsPipeline } from 'longpipe'
-import { startLoopbackCall, callStats } from './call.js'
-import { cameraInput, clipInput, generatedBackgroundImage } from './inputs.js'
+import { EffectsPipeline, PRESETS } from 'longpipe'
+import { startLoopbackCall, callStats, latencyBreakdown } from './call.js'
+import { cameraInput, clipInput, generatedBackgroundImage, withFlashMarker } from './inputs.js'
 
 const $ = (id) => document.getElementById(id)
 const form = $('controls')
 const params = new URLSearchParams(location.search)
-for (const name of ['input', 'bg', 'color', 'denoise', 'backend']) {
+for (const name of ['input', 'bg', 'color', 'denoise', 'backend', 'model']) {
   if (params.has(name)) form.elements[name].value = params.get(name)
 }
+// ?preset=fast|balanced|quality (what the e2e tests pass) → the matching tier.
+const PRESET_PARAM = { fast: 'xs', balanced: 'medium', quality: 'xl', auto: 'auto' }[params.get('preset')]
+if (PRESET_PARAM && !params.has('model')) form.elements.model.value = PRESET_PARAM
+form.elements.bypass.checked = params.get('bypass') === '1'
+form.elements.flash.checked = params.get('flash') === '1'
 const CLIP_URL = './assets/media/woman_on_video_call_360p.mp4'
 // ?camera=back|front picks the phone camera (front/back rotation + mirroring checks).
 const CAMERA_FACING = { back: 'environment', front: 'user' }[params.get('camera')]
@@ -38,10 +45,14 @@ const state = {
   errors: [],           // every onError, in order
   recovered: [],        // every onRecovered
   trackChanges: 0,      // onTrackChanged count
-  stats: null,          // last pipeline.getStats()
+  stats: null,          // last pipeline.getStats() (null while bypassed)
   audioStats: null,     // last pipeline.getAudioStats()
   rtp: null,            // last callStats()
   remoteFps: 0,
+  bypass: false,        // raw camera + mic on the senders, no pipeline
+  model: null,          // the model control value the current pipeline runs ('auto', 'xs'…, 'mediapipe')
+  livePreset: null,     // last model name the worker reported (getStats().preset)
+  latency: null,        // { captureMs, longpipeMs, encodeMs, jitterMs, decodeMs, totalMs } (ms, last ~1 s)
 }
 
 let input = null       // { stream, stop }
@@ -63,9 +74,21 @@ function readConfig() {
     color: f.color.value,
     denoise: f.denoise.value === 'on',
     backend: f.backend.value,
-    preset: params.get('preset') ?? 'auto',
+    model: f.model.value,
+    bypass: f.bypass.checked,
+    flash: f.flash.checked,
     denoiseModel: params.get('denoiseModel') ?? 'auto',
   }
+}
+
+// The model control → EffectsPipeline options.
+//   'auto'             benchmark the device, then the adaptive controller moves between tiers
+//   'xs' … 'xl'        one fixed Longpipe tier (a PRESETS entry), no adaptive controller
+//   'mediapipe'        Google's MediaPipe Selfie Segmenter (background effects only)
+const isTier = (m) => PRESETS.some((p) => p.model === m)
+function modelOptions(model) {
+  if (model === 'mediapipe') return { model: 'mediapipe-selfie' }
+  return { model: 'longpipe', preset: model === 'auto' ? 'auto' : PRESETS.find((p) => p.model === model) }
 }
 
 async function backgroundFor(cfg) {
@@ -87,7 +110,7 @@ function startPipeline(cfg, stream, background) {
   const p = new EffectsPipeline(stream, {
     background,
     backend: cfg.backend,                 // 'auto' in production
-    preset: cfg.preset,
+    ...modelOptions(cfg.model),
     weightsBaseUrl: WEIGHTS,
     debug: params.has('debug'),
     // Denoise is built in once; the toggle switches it live (setDenoise).
@@ -129,13 +152,20 @@ function startPipeline(cfg, stream, background) {
 async function start() {
   if (state.running) return
   const cfg = readConfig()
-  Object.assign(state, { running: true, config: cfg, ready: null, readyError: null, errors: [], recovered: [], trackChanges: 0 })
+  Object.assign(state, { running: true, config: cfg, ready: null, readyError: null, errors: [], recovered: [], trackChanges: 0, bypass: cfg.bypass, model: null, livePreset: null, latency: null })
   $('start').disabled = true
   try {
     input = cfg.input === 'clip' ? await clipInput(CLIP_URL) : await cameraInput({ facingMode: CAMERA_FACING })
-    pipeline = startPipeline(cfg, input.stream, await backgroundFor(cfg))
-    $('local').srcObject = pipeline.stream
-    call = await startLoopbackCall(pipeline.stream, {
+    if (cfg.flash) input = await withFlashMarker(input, { onFlash: (on) => { $('flash').className = on ? 'on' : '' } })
+    $('flash').hidden = !cfg.flash
+    let outgoing = input.stream
+    if (!cfg.bypass) {
+      pipeline = startPipeline(cfg, input.stream, await backgroundFor(cfg))
+      state.model = cfg.model
+      outgoing = pipeline.stream
+    }
+    $('local').srcObject = outgoing
+    call = await startLoopbackCall(outgoing, {
       onRemoteTrack: (_track, remote) => { $('remote').srcObject = remote },
     })
     $('stop').disabled = false
@@ -150,19 +180,70 @@ async function start() {
   }
 }
 
-// Backend is a construction option, so changing it means a new pipeline. The
-// call stays up: swap the tracks on the existing senders.
+// Put `stream`'s tracks on the existing senders: no renegotiation.
+async function sendStream(stream) {
+  await call.senders.video?.replaceTrack(stream.getVideoTracks()[0] ?? null)
+  await call.senders.audio?.replaceTrack(stream.getAudioTracks()[0] ?? null)
+  $('local').srcObject = stream
+}
+
+// Backend and model family are construction options, so changing them means a
+// new pipeline. The call stays up: destroy the old pipeline, build the new one
+// on the same input, swap the tracks on the existing senders.
 async function restartPipeline() {
-  if (!state.running) return
+  if (!state.running || state.bypass) return
   const cfg = readConfig()
-  const old = pipeline
-  Object.assign(state, { config: cfg, ready: null, readyError: null })
+  Object.assign(state, { config: cfg, ready: null, readyError: null, stats: null, livePreset: null })
+  pipeline?.destroy()
   pipeline = startPipeline(cfg, input.stream, await backgroundFor(cfg))
-  await call.senders.video?.replaceTrack(pipeline.stream.getVideoTracks()[0] ?? null)
-  await call.senders.audio?.replaceTrack(pipeline.stream.getAudioTracks()[0] ?? null)
-  $('local').srcObject = pipeline.stream
-  old.destroy()
-  log(`pipeline restarted with backend=${cfg.backend}`)
+  state.model = cfg.model
+  await sendStream(pipeline.stream)
+  log(`pipeline restarted: backend=${cfg.backend} model=${cfg.model}`)
+}
+
+// Model control. Between Longpipe tiers the switch is live (setPreset: same
+// pipeline, same track; it also stops the adaptive controller). 'auto' and
+// MediaPipe are construction options, so those rebuild.
+async function switchModel() {
+  if (!state.running || state.bypass) return
+  const model = form.elements.model.value
+  if (isTier(model) && state.model !== 'mediapipe' && pipeline) {
+    state.config = readConfig()
+    const p = pipeline
+    await p.setPreset(PRESETS.find((x) => x.model === model))
+    if (p === pipeline) state.model = model
+    log(`setPreset(${model}): live, same pipeline`)
+  } else {
+    await restartPipeline()
+  }
+}
+
+// Bypass: the raw camera + mic go straight to the senders and the pipeline is
+// destroyed (nothing competing for the CPU/GPU), which gives the WebRTC-only
+// latency baseline. Off: a new pipeline, tracks swapped back. No renegotiation
+// either way.
+async function setBypass(on) {
+  if (!state.running || on === state.bypass) return
+  state.bypass = on
+  state.config = readConfig()
+  if (on) {
+    const old = pipeline
+    pipeline = null
+    Object.assign(state, { stats: null, audioStats: null, model: null })
+    await sendStream(input.stream)
+    old?.destroy()
+    log('bypass on: raw camera + mic on the senders, pipeline destroyed')
+  } else {
+    await restartPipeline()
+    log('bypass off: pipeline back on the senders')
+  }
+}
+
+// Control changes run one at a time (a rebuild awaits a background load).
+let queue = Promise.resolve()
+const serial = (what, fn) => {
+  queue = queue.then(fn).catch((e) => log(`${what} failed: ${e?.type ?? ''} ${e?.message ?? e}`))
+  return queue
 }
 
 async function stop() {
@@ -173,6 +254,8 @@ async function stop() {
   input?.stop()
   pipeline = call = input = null
   lastDecoded = null
+  lastRtp = null
+  $('flash').hidden = true
   $('local').srcObject = $('remote').srcObject = null
   state.running = false
   $('start').disabled = false
@@ -180,10 +263,13 @@ async function stop() {
 }
 
 let lastDecoded = null
+let lastRtp = null
+const ms = (v) => (v == null ? '–' : `${v.toFixed(1)} ms`)
 async function updateStats(tick = false) {
-  if (!pipeline || !call) return
-  const [s, rtp] = await Promise.all([pipeline.getStats(), callStats(call)])
-  if (!pipeline) return
+  if (!call) return
+  const p = pipeline
+  const [s, rtp] = await Promise.all([p ? p.getStats() : null, callStats(call)])
+  if (!call || p !== pipeline) return
   const now = performance.now()
   if (tick && lastDecoded && rtp.video.framesDecoded != null) {
     state.remoteFps = Math.round((rtp.video.framesDecoded - lastDecoded.n) / ((now - lastDecoded.t) / 1000))
@@ -191,19 +277,59 @@ async function updateStats(tick = false) {
   if (tick) lastDecoded = { n: rtp.video.framesDecoded ?? 0, t: now }
   state.stats = s
   state.rtp = rtp
-  state.audioStats = pipeline.getAudioStats()
+  state.audioStats = p?.getAudioStats() ?? null
 
-  $('r-status').textContent = s.status
-  $('r-backend').textContent = `${s.backend}${state.ready?.preset ? ` (${state.ready.preset}, ${state.ready.dtype})` : ''}`
-  $('r-fps').textContent = `${Math.round(s.inputFps ?? 0)} / ${s.fps}`
+  // Latency breakdown over the last interval (the 1 s tick; a manual refresh
+  // reuses the last tick's numbers so it doesn't shrink the window).
+  if (tick) {
+    const rtc = lastRtp ? latencyBreakdown(lastRtp, rtp) : null
+    lastRtp = rtp
+    if (rtc) {
+      const fps = s?.inputFps || input?.stream.getVideoTracks()[0]?.getSettings().frameRate || 30
+      const captureMs = 1000 / fps
+      const longpipeMs = s && s.latencyMs > 0 ? s.latencyMs : null
+      const parts = [captureMs, longpipeMs, rtc.encodeMs, rtc.jitterMs, rtc.decodeMs]
+      state.latency = { captureMs, longpipeMs, ...rtc, totalMs: parts.reduce((a, v) => a + (v ?? 0), 0) }
+    }
+  }
+  renderLatency()
+
   $('r-frames').textContent = `${rtp.video.framesSent ?? 0} / ${rtp.video.framesDecoded ?? 0} (${state.remoteFps} fps, ${rtp.video.frameWidth ?? 0}×${rtp.video.frameHeight ?? 0})`
   $('r-audio').textContent = rtp.audio.packetsReceived != null
     ? `${rtp.audio.packetsReceived} packets, level ${(rtp.audio.audioLevel ?? 0).toFixed(3)}`
     : 'no audio track'
+
+  if (!s) {
+    // Bypassed: no pipeline, the raw tracks are on the senders.
+    for (const id of ['r-backend', 'r-fps', 'r-denoise', 'r-paths', 'r-restarts']) $(id).textContent = '–'
+    $('r-status').textContent = 'bypassed (raw camera + mic → pc1)'
+    $('r-model').textContent = 'none (bypass)'
+    return
+  }
+  $('r-status').textContent = s.status
+  $('r-backend').textContent = s.backend
+  // What's actually running: the worker's model name (changes with setPreset
+  // and the adaptive controller), the dtype the backend resolved, the backend.
+  // ('none' = the worker didn't answer this time: keep the last name it gave.)
+  if (s.preset !== 'none') state.livePreset = s.preset
+  const live = state.livePreset === 'boot' ? 'loading…' : state.livePreset ?? state.ready?.preset ?? '…'
+  const adaptive = state.model === 'auto' ? ' (auto: adaptive)' : ''
+  $('r-model').textContent = s.backend === 'none' ? 'none (passthrough)' : `${live}${adaptive} · ${state.ready?.dtype ?? '…'} · ${s.backend}`
+  $('r-fps').textContent = `${Math.round(s.inputFps ?? 0)} / ${s.fps}`
   const a = state.audioStats
   $('r-denoise').textContent = a ? `${a.model}, ${a.active ? 'active' : 'bypassed'}, ${a.sampleRate} Hz` : (state.config?.denoise ? 'starting / unavailable' : 'off')
   $('r-paths').textContent = `${s.inputPath} → ${s.outputPath}`
   $('r-restarts').textContent = String(s.restarts)
+}
+
+function renderLatency() {
+  const l = state.latency
+  $('l-capture').textContent = l ? `≈ ${ms(l.captureMs)} (one frame interval)` : '–'
+  $('l-longpipe').textContent = state.bypass ? 'bypassed' : l ? ms(l.longpipeMs) : '–'
+  $('l-encode').textContent = l ? ms(l.encodeMs) : '–'
+  $('l-jitter').textContent = l ? ms(l.jitterMs) : '–'
+  $('l-decode').textContent = l ? ms(l.decodeMs) : '–'
+  $('l-total').textContent = l ? `≈ ${ms(l.totalMs)}` : '–'
 }
 
 // ── Controls ────────────────────────────────────────────────────────────────
@@ -219,7 +345,9 @@ form.elements.color.addEventListener('input', () => {
   if (pipeline && form.elements.bg.value === 'color') pipeline.setBackground({ color: form.elements.color.value }).catch(() => {})
 })
 form.elements.denoise.addEventListener('change', () => pipeline?.setDenoise(form.elements.denoise.value === 'on'))
-form.elements.backend.addEventListener('change', () => { restartPipeline().catch((e) => log(`restart failed: ${e?.message ?? e}`)) })
+form.elements.backend.addEventListener('change', () => serial('restart', restartPipeline))
+form.elements.model.addEventListener('change', () => serial('model switch', switchModel))
+form.elements.bypass.addEventListener('change', () => serial('bypass', () => setBypass(form.elements.bypass.checked)))
 form.elements.listen.addEventListener('change', () => {
   $('remote').muted = !form.elements.listen.checked   // off by default: loopback + speakers = echo
   pipeline?.resumeAudio()                            // a gesture: unblock a suspended AudioContext
@@ -282,6 +410,9 @@ window.example = {
   start,
   stop,
   restartPipeline,
+  // Same as using the controls (the e2e tests and quick scripts drive these).
+  setModel(m) { form.elements.model.value = m; return serial('model switch', switchModel) },
+  setBypass(on) { form.elements.bypass.checked = on; return serial('bypass', () => setBypass(on)) },
   sampleRemote,
   get pipeline() { return pipeline },
   async audioLevels() {
