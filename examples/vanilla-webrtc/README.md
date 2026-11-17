@@ -106,3 +106,11 @@ Note the browser + version, and the **backend** and **paths** rows, for each.
 7. **Stop.** Camera light goes off; no new errors in the console.
 8. **Phone only:** lock the screen for 10 s and come back; video and audio should resume (if audio
    is silent, tick "hear remote audio" again: that's a user gesture that resumes the AudioContext).
+9. **Phone only: rotation.** Portrait: the remote video is upright and portrait (e.g. 720×1280),
+   like the local preview. Turn the phone to landscape both ways (left and right) mid-call: the
+   remote video turns landscape and stays upright within about a second, with no black frames or
+   errors. Repeat with the back camera (`?camera=back`; `?camera=front` is the default on phones).
+   On the front camera, hold up some text: the remote video should be mirrored the same way as
+   the local preview. iOS Safari doesn't expose the camera's rotation (`VideoFrame.rotation`), so
+   the SDK measures it once a second by comparing the `<video>` with the raw frame; with
+   `debug: true` the console logs each `orientation … → …` change.

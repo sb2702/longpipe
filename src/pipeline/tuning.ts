@@ -3,6 +3,7 @@
 // from the package entry); tests import this module directly and mutate it.
 
 import type { Topology } from './topology'
+import type { Orientation } from '~/model/orientation.ts'
 
 export const TUNING = {
   // Control calls (setBackground, setPreset, …): max wait for the worker's
@@ -29,6 +30,9 @@ export const TUNING = {
   // Test-only: force a transport pair or a backend ('none' simulates no GPU).
   forceTopology:    null as Topology | null,
   forceBackend:     null as 'webgpu' | 'webgl' | 'none' | null,
+  // Test-only: on the rvfc-postmessage input, tag every frame with this hidden
+  // orientation instead of measuring it (simulates Safari's camera frames).
+  simulateHiddenOrientation: null as Orientation | null,
 }
 
 export const TUNING_DEFAULTS = { ...TUNING, restartBackoffMs: [...TUNING.restartBackoffMs] }

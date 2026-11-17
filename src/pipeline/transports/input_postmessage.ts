@@ -17,6 +17,8 @@
 // worker drains fast enough; v0.2 should add an ack-based gating loop.
 
 import { createLogger } from '../debug'
+import { TUNING } from '../tuning'
+import { createOrientationProbe, engineExposesRotation } from '../orientation_probe'
 
 const log = createLogger('input-postmessage/main')
 
@@ -60,6 +62,10 @@ export function setupPostMessageInput(inputStream: MediaStream): PostMessageInpu
   const mainPort   = channel.port1
   const workerPort = channel.port2
 
+  // Safari: camera frames carry a hidden rotation (see orientation_probe.ts).
+  // Measured here, where the upright <video> is, and sent with each frame.
+  const probe = engineExposesRotation() ? null : createOrientationProbe(video, log)
+
   let stopped = false
   let presented = 0
   let ticks = 0
@@ -71,7 +77,8 @@ export function setupPostMessageInput(inputStream: MediaStream): PostMessageInpu
     try {
       // VideoFrame.timestamp is microseconds; rVFC's mediaTime is seconds.
       const frame = new VideoFrame(video, { timestamp: meta.mediaTime * 1_000_000 })
-      mainPort.postMessage({ frame }, [frame])
+      const orientation = TUNING.simulateHiddenOrientation ?? probe?.measure(frame)
+      mainPort.postMessage({ frame, orientation }, [frame])
     } catch (err) {
       // VideoFrame() can throw if the video isn't ready yet for this tick;
       // safe to skip — next rVFC will retry.

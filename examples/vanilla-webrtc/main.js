@@ -24,6 +24,8 @@ for (const name of ['input', 'bg', 'color', 'denoise', 'backend']) {
   if (params.has(name)) form.elements[name].value = params.get(name)
 }
 const CLIP_URL = './assets/media/woman_on_video_call_360p.mp4'
+// ?camera=back|front picks the phone camera (front/back rotation + mirroring checks).
+const CAMERA_FACING = { back: 'environment', front: 'user' }[params.get('camera')]
 const weightsParam = params.get('weights')
 const WEIGHTS = weightsParam === 'local' ? new URL('./assets/models/', location.href).href : weightsParam || undefined
 
@@ -130,7 +132,7 @@ async function start() {
   Object.assign(state, { running: true, config: cfg, ready: null, readyError: null, errors: [], recovered: [], trackChanges: 0 })
   $('start').disabled = true
   try {
-    input = cfg.input === 'clip' ? await clipInput(CLIP_URL) : await cameraInput()
+    input = cfg.input === 'clip' ? await clipInput(CLIP_URL) : await cameraInput({ facingMode: CAMERA_FACING })
     pipeline = startPipeline(cfg, input.stream, await backgroundFor(cfg))
     $('local').srcObject = pipeline.stream
     call = await startLoopbackCall(pipeline.stream, {

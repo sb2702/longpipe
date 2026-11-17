@@ -100,7 +100,14 @@ export function setupBitmapShuttleOutput(
         stopRaw()
       }
       try {
-        ctx.transferFromImageBitmap(e.data.bmp)
+        // The worker's output follows the input's orientation (a phone turned
+        // mid-call): match the bitmap so captureStream emits its real size.
+        const bmp = e.data.bmp
+        if (bmp.width !== canvas.width || bmp.height !== canvas.height) {
+          canvas.width  = bmp.width
+          canvas.height = bmp.height
+        }
+        ctx.transferFromImageBitmap(bmp)
       } catch (err) {
         // transferFromImageBitmap can throw if the bitmap was somehow already
         // consumed; log + drop so the pipe doesn't stall.
@@ -141,6 +148,13 @@ export function setupBitmapShuttleOutput(
         // input not ready yet — try again next frame
         schedule(tick)
         return
+      }
+      // Follow the input's (upright) orientation, as the worker does.
+      const vw = video.videoWidth, vh = video.videoHeight
+      if (vw !== vh && canvas.width !== canvas.height && (vw > vh) !== (canvas.width > canvas.height)) {
+        const w = canvas.width
+        canvas.width  = canvas.height
+        canvas.height = w
       }
       createImageBitmap(video, {
         resizeWidth:   canvas.width,

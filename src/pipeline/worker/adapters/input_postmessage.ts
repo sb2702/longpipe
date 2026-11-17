@@ -1,3 +1,5 @@
+import { tagFrameOrientation, type Orientation } from '~/model/orientation.ts'
+
 // Per-frame postMessage input adapter.
 //
 // Main thread reads frames from a hidden <video> via requestVideoFrameCallback
@@ -11,8 +13,11 @@ export function createPostMessageInput(port: MessagePort): ReadableStream<VideoF
   let pending: VideoFrame | null = null
   let resolvePull: ((frame: VideoFrame) => void) | null = null
 
-  port.onmessage = (e: MessageEvent<{ frame: VideoFrame }>) => {
-    const { frame } = e.data
+  port.onmessage = (e: MessageEvent<{ frame: VideoFrame; orientation?: Orientation }>) => {
+    const { frame, orientation } = e.data
+    // Main measured the display orientation the frame still needs (Safari's
+    // hidden camera rotation); the renderer looks it up per frame.
+    tagFrameOrientation(frame, orientation)
     if (resolvePull) {
       const r = resolvePull
       resolvePull = null

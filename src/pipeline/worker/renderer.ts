@@ -17,6 +17,7 @@ import { TIER_CONFIG } from '~/model/tier_config.ts'
 import { MediaPipeSelfie, MEDIAPIPE_SELFIE_CONFIG } from '~/model/networks/mediapipe_selfie.ts'
 import type { MediaPipeSelfieVariant, MediaPipeSelfieWeights } from '~/model/networks/mediapipe_selfie.ts'
 import type { FaceTopology, FaceTouchupParams, FaceTouchupStageOp } from '~/model/backend.ts'
+import { frameResidualOrientation, uprightSize, normalizeRotation, type Orientation } from '~/model/orientation.ts'
 
 // Auto-reframe defaults — tuned by eye in demo/reframe.html. `auto` adds the
 // deadband/ease pair, which only exist while tracking (in manual the frame never
@@ -273,7 +274,10 @@ export class Renderer {
   // On WebGPU the whole frame (model, flow, stabiliser, composite) is recorded
   // into one command buffer and submitted once (see Backend.batch).
   process(frame: VideoFrame, source: VideoFrame | ImageBitmap = frame): void {
-    runBatched(this.backend, () => this.processFrame(frame, source))
+    const orientation = this.sourceOrientation(frame, source)
+    // Outside the batch: a turn of the phone rebuilds the canvas-sized chain.
+    this.followOrientation(source, orientation)
+    runBatched(this.backend, () => this.processFrame(source, orientation))
   }
 
   // Firefox ships WebGPU with external textures disabled (importExternalTexture
@@ -283,6 +287,76 @@ export class Renderer {
   // externalTexturesSupported). Returns the frame itself when no copy is needed;
   // otherwise a bitmap the caller must close().
   private externalOk: boolean | undefined
+
+  // ── Orientation ───────────────────────────────────────────────────────────
+  // The display transform the GPU still has to apply to `source`:
+  //   - Safari's hidden camera rotation, measured on main and tagged on the
+  //     frame (rvfc input; see pipeline/orientation_probe.ts);
+  //   - engines exposing VideoFrame.rotation apply it themselves in
+  //     importExternalTexture / texImage2D (verified in Chrome 147), EXCEPT
+  //     that Chrome's createImageBitmap(frame) may return the unrotated bitmap
+  //     (full Chrome 147 does, headless-shell doesn't). On the bitmap path,
+  //     detect that from the bitmap's shape (exact for 90/270; 180 and flip
+  //     can't be told from shape and are assumed applied).
+  private sourceOrientation(frame: VideoFrame, source: VideoFrame | ImageBitmap): Orientation {
+    const tagged = frameResidualOrientation(frame)
+    if (!(source instanceof ImageBitmap)) return tagged
+    const f = frame as VideoFrame & { rotation?: number; flip?: boolean }
+    const rot = normalizeRotation(f.rotation ?? 0)
+    if ((rot === 90 || rot === 270) && (source.width > source.height) !== (frame.displayWidth > frame.displayHeight)) {
+      return { rotation: rot, flip: !!f.flip }
+    }
+    return tagged
+  }
+
+  // Output follows the upright input's orientation: when the phone turns, the
+  // canvas (and everything sized to it) swaps to portrait/landscape. Debounced
+  // over a few frames so a transition can't trigger two rebuilds.
+  private orientationMismatch = 0
+  private static readonly ORIENTATION_DEBOUNCE = 2
+  private followOrientation(source: VideoFrame | ImageBitmap, o: Orientation): void {
+    const sw = source instanceof ImageBitmap ? source.width  : source.displayWidth
+    const sh = source instanceof ImageBitmap ? source.height : source.displayHeight
+    const up = uprightSize(sw, sh, o)
+    const cw = this.canvas.width, ch = this.canvas.height
+    const mismatch = up.w !== up.h && cw !== ch && (up.w > up.h) !== (cw > ch)
+    if (!mismatch) { this.orientationMismatch = 0; return }
+    if (++this.orientationMismatch < Renderer.ORIENTATION_DEBOUNCE) return
+    this.orientationMismatch = 0
+    this.resizeOutput(ch, cw)
+  }
+
+  // Resize the output canvas (and the preview canvas) and rebuild everything
+  // sized to it: RenderOp (display input, upscaler, compositors), background
+  // inputs, and the network chain (re-oriented to match — see netRes). Runs
+  // synchronously between frames, so no frame is presented from a half-built
+  // state; the resized canvas is drawn in the same task (no blank frame).
+  resizeOutput(w: number, h: number): void {
+    if (w === this.canvas.width && h === this.canvas.height) return
+    this.canvas.width  = w
+    this.canvas.height = h
+    if (this.previewCanvas) {
+      this.previewCanvas.width  = w
+      this.previewCanvas.height = h
+    }
+    this.renderOp = new RenderOp(this.backend)
+    this.bgImageInputs.clear()
+    this.bgVideoInputs.clear()
+    this.renderOp.setBackground(this.translateBackgroundFor('main', this.currentBackground))
+    if (this.preset && this.lastWeightsBuf) this.setPreset(this.preset, this.lastWeightsBuf)
+    else if (this.mediapipe && this.lastWeightsBuf) this.setMediaPipeSelfie(this.mediapipe, this.lastWeightsBuf)
+    if (this.previewBg) this.previewEffectSpec = this.previewBg.kind === 'none' ? null : this.translateBackgroundFor('preview', this.previewBg)
+  }
+
+  // Network resolution oriented like the output: the tiers are fully
+  // convolutional, so a portrait output runs the tier at its transposed
+  // resolution instead of squashing a portrait frame into a landscape tensor
+  // (face boxes assume grid px == frame px aspect; touch-up / reframe rely on it).
+  private orientRes(r: { w: number; h: number }): { w: number; h: number } {
+    const portrait = this.canvas.height > this.canvas.width
+    return portrait === (r.h > r.w) ? r : { w: r.h, h: r.w }
+  }
+  private lastWeightsBuf: ArrayBuffer | null = null
 
   // Frame pacing for WebGPU: nothing else stops the worker from submitting
   // frames faster than the GPU finishes them (the bitmap-shuttle path has no
@@ -313,8 +387,8 @@ export class Renderer {
     return this.externalOk ? frame : await createImageBitmap(frame)
   }
 
-  private processFrame(frame: VideoFrame, source: VideoFrame | ImageBitmap = frame): void {
-    this.renderOp.setSource(source)
+  private processFrame(source: VideoFrame | ImageBitmap, orientation: Orientation): void {
+    this.renderOp.setSource(source, orientation)
     const now = performance.now()
 
     const hasNet        = this.renderOp.hasNetwork()
@@ -516,7 +590,7 @@ export class Renderer {
     const cfg = this.reframeCfg
     if (!cfg || !fc || !this.preset) return
 
-    const c = TIER_CONFIG[this.preset.model].canvasRes
+    const c = this.orientRes(TIER_CONFIG[this.preset.model].canvasRes)
     const autoCfg = cfg.auto ?? true
     const auto = autoCfg !== false
     const sm = { ...REFRAME_AUTO_DEFAULTS, ...(typeof autoCfg === 'object' ? autoCfg : {}) }
@@ -645,6 +719,7 @@ export class Renderer {
     const cfg = MEDIAPIPE_SELFIE_CONFIG[variant]
     if (!cfg) throw new Error(`renderer: unknown MediaPipe selfie variant '${variant}'`)
     const w = loadWeightsFromBinary(weightsBuf) as unknown as MediaPipeSelfieWeights
+    this.lastWeightsBuf = weightsBuf
     const networkInput = this.backend.ops.Input(cfg.inputRes.h, cfg.inputRes.w)
     const net = new MediaPipeSelfie(this.backend, networkInput.output, w)
     this.renderOp.attachNetwork(net, networkInput, {
@@ -672,10 +747,14 @@ export class Renderer {
     // structure / placement, NOT the .bin. Cast: the resolved shape is the
     // union of base ModelWeights + wrapper + optional gru.
     const w = loadWeightsFromBinary(weightsBuf) as any
+    this.lastWeightsBuf = weightsBuf
 
     // x_hr at canvas res — authoritative from tier_config, not preset.resolution
-    // (the wrapper down-path strides this to base res internally).
-    const networkInput = this.backend.ops.Input(cfg.canvasRes.h, cfg.canvasRes.w)
+    // (the wrapper down-path strides this to base res internally). Oriented like
+    // the output (portrait → transposed).
+    const canvasRes = this.orientRes(cfg.canvasRes)
+    const baseRes   = this.orientRes(cfg.baseRes)
+    const networkInput = this.backend.ops.Input(canvasRes.h, canvasRes.w)
 
     const tier = new TierModel(
       this.backend, networkInput.output, w.base, w.wrapper, cfg.wrapper, cfg.base,
@@ -694,7 +773,7 @@ export class Renderer {
     // previous, on the last-available flow.
     this.flow = null
     if (w.flow) {
-      const b = cfg.baseRes, c = cfg.canvasRes
+      const b = baseRes, c = canvasRes
       const everyFrame = preset.skipFrames === 0
       const zeros = (h: number, wd: number) => this.backend.tensor(h, wd, 4, new Float32Array(h * wd * 4))
       // Flow stem input = the canvas frame (matting's input) downsampled to base,
@@ -791,7 +870,7 @@ export class Renderer {
     let hmFlowDown: Op | null = null
     let hmWarp: Op | null = null
     if (this.flow && (this.preset.skipFrames ?? 0) > 0) {
-      const baseW = TIER_CONFIG[this.preset.model].baseRes.w
+      const baseW = this.orientRes(TIER_CONFIG[this.preset.model].baseRes).w
       hmHeld = zerosT(hm.h, hm.w, hm.c)
       hmFlowDown = this.backend.ops.BilinearUpsample(this.flow.net.output, { outH: hm.h, outW: hm.w })
       // flow values are base-res px → heatmap-res px
@@ -920,8 +999,9 @@ export class Renderer {
       }
       case 'video': {
         const input = this.bgInputFor(this.bgVideoInputs, target)
-        // Switching from one video to another on this target — close the prior.
-        if (prevPort) prevPort.close()
+        // Switching from one video to another on this target — close the prior
+        // (a rebuild re-binds the SAME port: keep it).
+        if (prevPort && prevPort !== bg.port) prevPort.close()
         this.bgVideoPorts.set(target, bg.port)
         bg.port.onmessage = (e: MessageEvent<{ frame: VideoFrame }>) => {
           const frame = e.data.frame

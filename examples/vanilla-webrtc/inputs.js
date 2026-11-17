@@ -8,9 +8,10 @@
 //                    tests use. Must be called from a user gesture (the
 //                    AudioContext needs one in most browsers).
 
-export async function cameraInput() {
+// facingMode: 'user' (front) / 'environment' (back) on phones; undefined = default camera.
+export async function cameraInput({ facingMode } = {}) {
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: { width: 1280, height: 720, frameRate: 30 },
+    video: { width: 1280, height: 720, frameRate: 30, ...(facingMode ? { facingMode: { ideal: facingMode } } : {}) },
     audio: true,
   })
   return { stream, stop: () => stream.getTracks().forEach((t) => t.stop()) }

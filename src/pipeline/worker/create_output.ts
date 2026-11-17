@@ -15,6 +15,7 @@
 // The other paths do raw passthrough on the main side (relay / main canvas).
 
 import type { InitData } from '../messages'
+import { frameResidualOrientation, uprightSize, isIdentity } from '~/model/orientation.ts'
 import type { Renderer } from './renderer'
 import { createMstgOutput }            from './adapters/output_mstg'
 import { createTransferCaptureOutput } from './adapters/output_transfer_capture'
@@ -57,8 +58,32 @@ export function createRawOutputSink(data: InitData, onFrame: () => void): Writab
   const c = ctx
   return new WritableStream<VideoFrame>({
     write(frame) {
-      try { c.drawImage(frame, 0, 0, canvas.width, canvas.height) } finally { frame.close() }
+      try { drawOriented(c, canvas, frame) } finally { frame.close() }
       onFrame()
     },
   })
+}
+
+// Draw a frame upright: apply the hidden orientation main measured (Safari
+// camera frames; see orientation_probe.ts) and follow its portrait/landscape
+// shape, like the GPU renderer does.
+function drawOriented(c: OffscreenCanvasRenderingContext2D, canvas: OffscreenCanvas, frame: VideoFrame): void {
+  const o = frameResidualOrientation(frame)
+  const up = uprightSize(frame.displayWidth, frame.displayHeight, o)
+  if (up.w !== up.h && canvas.width !== canvas.height && (up.w > up.h) !== (canvas.width > canvas.height)) {
+    const w = canvas.width
+    canvas.width  = canvas.height
+    canvas.height = w
+  }
+  const W = canvas.width, H = canvas.height
+  if (isIdentity(o)) { c.drawImage(frame, 0, 0, W, H); return }
+  c.save()
+  // Last transform applies first to the content: rotate clockwise, then flip.
+  if (o.flip) { c.translate(W, 0); c.scale(-1, 1) }
+  c.translate(W / 2, H / 2)
+  c.rotate(o.rotation * Math.PI / 180)
+  const sideways = o.rotation === 90 || o.rotation === 270
+  const sw = sideways ? H : W, sh = sideways ? W : H
+  c.drawImage(frame, -sw / 2, -sh / 2, sw, sh)
+  c.restore()
 }
