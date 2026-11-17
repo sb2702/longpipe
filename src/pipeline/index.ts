@@ -468,7 +468,9 @@ export class Pipeline implements PromiseLike<Pipeline> {
   private previewAttached = false
 
   constructor(inputStream: MediaStream, options: PipelineOptions) {
-    const opts = { ...DEFAULTS, ...options }
+    // Explicit `undefined` (e.g. `weightsBaseUrl: maybeUrl`) means "use the default", not "unset it".
+    const defined = Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) as PipelineOptions
+    const opts = { ...DEFAULTS, ...defined }
     this.opts = opts
     // Set debug FIRST so any subsequent log() calls in this constructor
     // (and downstream main-thread modules) honor the flag from the start.
