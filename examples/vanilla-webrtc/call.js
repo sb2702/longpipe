@@ -1,0 +1,61 @@
+// A loopback "call": two RTCPeerConnections in the same page, pc1 → pc2, with
+// the signaling done by passing objects directly. In a real app pc2 is on the
+// other side of your signaling server; everything else is the same.
+
+export async function startLoopbackCall(localStream, { onRemoteTrack } = {}) {
+  const pc1 = new RTCPeerConnection()
+  const pc2 = new RTCPeerConnection()
+  pc1.onicecandidate = (e) => { if (e.candidate) pc2.addIceCandidate(e.candidate).catch(() => {}) }
+  pc2.onicecandidate = (e) => { if (e.candidate) pc1.addIceCandidate(e.candidate).catch(() => {}) }
+
+  const remoteStream = new MediaStream()
+  pc2.ontrack = (e) => {
+    remoteStream.addTrack(e.track)
+    onRemoteTrack?.(e.track, remoteStream)
+  }
+
+  // One sender per kind. Keep them: replaceTrack() is how you swap a track
+  // later (camera switch, or Longpipe's onTrackChanged) without renegotiating.
+  const senders = {}
+  for (const track of localStream.getTracks()) senders[track.kind] = pc1.addTrack(track, localStream)
+
+  const offer = await pc1.createOffer()
+  await pc1.setLocalDescription(offer)
+  await pc2.setRemoteDescription(offer)
+  const answer = await pc2.createAnswer()
+  await pc2.setLocalDescription(answer)
+  await pc1.setRemoteDescription(answer)
+
+  return {
+    pc1, pc2, senders, remoteStream,
+    close() { pc1.close(); pc2.close() },
+  }
+}
+
+// The few RTP numbers worth watching: what pc1 sent and what pc2 decoded.
+export async function callStats(call) {
+  const out = { video: {}, audio: {} }
+  const [sent, recv] = await Promise.all([call.pc1.getStats(), call.pc2.getStats()])
+  sent.forEach((r) => {
+    if (r.type === 'outbound-rtp' && r.kind === 'video') {
+      out.video.framesSent = r.framesSent ?? 0
+      out.video.framesEncoded = r.framesEncoded ?? 0
+    }
+    if (r.type === 'outbound-rtp' && r.kind === 'audio') out.audio.packetsSent = r.packetsSent ?? 0
+  })
+  recv.forEach((r) => {
+    if (r.type === 'inbound-rtp' && r.kind === 'video') {
+      out.video.framesDecoded = r.framesDecoded ?? 0
+      out.video.framesReceived = r.framesReceived ?? 0
+      out.video.frameWidth = r.frameWidth ?? 0
+      out.video.frameHeight = r.frameHeight ?? 0
+    }
+    if (r.type === 'inbound-rtp' && r.kind === 'audio') {
+      out.audio.packetsReceived = r.packetsReceived ?? 0
+      out.audio.totalSamplesReceived = r.totalSamplesReceived ?? 0
+      out.audio.audioLevel = r.audioLevel ?? 0
+      out.audio.totalAudioEnergy = r.totalAudioEnergy ?? 0
+    }
+  })
+  return out
+}

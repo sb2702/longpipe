@@ -57,15 +57,23 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dev": "vite --config demo/vite.config.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "example": "vite --config examples/vanilla-webrtc/vite.config.js",
+    "example:lan": "vite --config examples/vanilla-webrtc/vite.config.js --mode lan",
+    "e2e:assets": "node tests/e2e/fetch_assets.mjs",
+    "test:e2e": "playwright test -c tests/e2e/playwright.config.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^22.0.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitest/browser": "^3.0.0",
     "@webgpu/types": "^0.1.69",
+    "esbuild": "^0.27.7",
     "playwright": "^1.44.0",
     "tsup": "^8.1.0",
     "typescript": "^5.5.0",
+    "vite": "^7.3.2",
     "vitest": "^3.0.0"
   }
 }

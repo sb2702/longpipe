@@ -17,3 +17,8 @@ demo/public
 
 # Staged third-party weights (scripts/convert_mediapipe_selfie.py) — uploaded to the CDN, not committed
 dist-weights/
+
+# e2e / example: downloaded media + weights (tests/e2e/fetch_assets.mjs), test output
+examples/vanilla-webrtc/public/assets/
+tests/e2e/results/
+tests/e2e/.cache/
