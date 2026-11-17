@@ -419,6 +419,10 @@ export class Pipeline implements PromiseLike<Pipeline> {
   private resolvedDtype:  Dtype = 'f32'
   private preferBackend:  'auto' | 'webgl' = 'auto'
   private webgpuLosses = 0
+  // Backend the CURRENT worker's init resolved to — set as soon as init
+  // answers, before weights/startRender, so a GPU lost during startup is
+  // attributed to the right backend (backendKind is only set once running).
+  private workerBackendKind: BackendKind | null = null
 
   // Recovery bookkeeping.
   private restarts = 0
@@ -601,6 +605,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     }
     const attach = this.output.attachWorker()
 
+    this.workerBackendKind = null
     const worker = createWorker()
     const controller = new WorkerController(worker, (message, cause) => {
       if (gen === this.gen) this.recover('worker-crash', message, cause)
@@ -650,6 +655,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
       if (gen !== this.gen) return
       log('init resolved:', initRes)
       this.resolvedDtype = initRes.resolvedDtype
+      this.workerBackendKind = initRes.resolvedBackend === 'none' ? null : initRes.resolvedBackend
 
       if (initRes.resolvedBackend === 'none') {
         this.onNoBackend(initRes, isRestart)
@@ -803,7 +809,10 @@ export class Pipeline implements PromiseLike<Pipeline> {
     // Raw on the same track if this path allows it; else a new track.
     if (!this.output.startRaw(this.inputStream)) this.takeoverOutput(type)
 
-    if (type === 'backend-lost' && this.backendKind === 'webgpu') {
+    // workerBackendKind, not backendKind: a device lost during startup (before
+    // startRender finished) must count too, or a GPU that dies on its first
+    // frame retries WebGPU until recovery gives up instead of moving to WebGL2.
+    if (type === 'backend-lost' && this.workerBackendKind === 'webgpu') {
       this.webgpuLosses++
       // Lost WebGPU twice: stop trying it, use WebGL2.
       if (this.webgpuLosses >= 2) this.preferBackend = 'webgl'
