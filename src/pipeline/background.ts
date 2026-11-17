@@ -75,7 +75,17 @@ export interface NormalizedBackground {
 
 // ---- Parser ----
 
-export async function normalizeBackground(input: BackgroundInput): Promise<NormalizedBackground> {
+export interface NormalizeOptions {
+  // Video backgrounds only: the video stopped decoding AFTER setup (network
+  // drop, corrupt segment). The last frame stays on screen.
+  onVideoError?: (message: string) => void
+}
+
+// Max wait for a background URL (image fetch / video first frame). A URL that
+// never answers must not stall pipeline startup or a setBackground() call.
+export const BACKGROUND_LOAD_TIMEOUT_MS = 15_000
+
+export async function normalizeBackground(input: BackgroundInput, opts: NormalizeOptions = {}): Promise<NormalizedBackground> {
   if (typeof input === 'string') {
     if (input === 'none') return { background: { kind: 'none' } }
     if (input === 'blur') return { background: { kind: 'blur', sigma: SIGMA_MEDIUM } }
@@ -89,7 +99,7 @@ export async function normalizeBackground(input: BackgroundInput): Promise<Norma
     return { background: { kind: 'image', bitmap: await createImageBitmap(input) } }
   }
   if (typeof HTMLVideoElement !== 'undefined' && input instanceof HTMLVideoElement) {
-    return await parseVideo(input)
+    return await parseVideo(input, opts)
   }
 
   // Cast to the object-form union: by this point we've ruled out strings
@@ -100,12 +110,12 @@ export async function normalizeBackground(input: BackgroundInput): Promise<Norma
   if (obj.color !== undefined) return { background: { kind: 'color', rgb: parseColor(obj.color) } }
   if (obj.blur  !== undefined) return { background: { kind: 'blur',  sigma: parseBlur(obj.blur) } }
   if (obj.image !== undefined) return { background: { kind: 'image', bitmap: await parseImage(obj.image) } }
-  if (obj.video !== undefined) return await parseVideo(obj.video)
+  if (obj.video !== undefined) return await parseVideo(obj.video, opts)
 
   throw new Error(`background: unrecognized input shape — ${describe(input)}`)
 }
 
-async function parseVideo(input: VideoInput): Promise<NormalizedBackground> {
+async function parseVideo(input: VideoInput, opts: NormalizeOptions): Promise<NormalizedBackground> {
   // Coerce the public VideoInput shape into setupVideoSource's input
   // (HTMLVideoElement | string | Blob). The { data, type } object form
   // wraps to a Blob first; everything else is passed through.
@@ -121,7 +131,7 @@ async function parseVideo(input: VideoInput): Promise<NormalizedBackground> {
   } else {
     throw new Error(`background.video: unrecognized shape — ${describe(input)}`)
   }
-  const setup = await setupVideoSource(src)
+  const setup = await setupVideoSource(src, { timeoutMs: BACKGROUND_LOAD_TIMEOUT_MS, onError: opts.onVideoError })
   return {
     background:   { kind: 'video', port: setup.port },
     transferList: setup.transferList,
@@ -190,10 +200,22 @@ async function parseImage(i: ImageInput): Promise<ImageBitmap> {
 }
 
 async function loadImageFromUrl(url: string): Promise<ImageBitmap> {
-  const res = await fetch(url)
+  const signal = typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+    ? AbortSignal.timeout(BACKGROUND_LOAD_TIMEOUT_MS)
+    : undefined
+  let res: Response
+  try {
+    res = await fetch(url, { signal })
+  } catch (err) {
+    throw new Error(`background: failed to load image from ${url} (${(err as Error).name === 'TimeoutError' ? 'timed out' : (err as Error).message})`)
+  }
   if (!res.ok) throw new Error(`background: failed to load image from ${url} (HTTP ${res.status})`)
   const blob = await res.blob()
-  return createImageBitmap(blob)
+  try {
+    return await createImageBitmap(blob)
+  } catch (err) {
+    throw new Error(`background: could not decode image from ${url} (${(err as Error).message})`)
+  }
 }
 
 function describe(v: unknown): string {

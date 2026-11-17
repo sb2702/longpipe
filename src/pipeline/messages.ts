@@ -11,6 +11,8 @@ import type { ManualPreset, PresetName } from './presets'
 import type { Background } from './background'
 import type { Topology } from './topology'
 import type { ResolvedModel } from './model_choice'
+import type { PipelineError, PipelineErrorType } from './errors'
+export type { PipelineError, ErrorSource, PipelineErrorType } from './errors'
 
 // ── Command-keyed maps ──────────────────────────────────────────────────────
 // Type-safe sendMessage<C>(cmd, data) → Promise<response>.
@@ -35,6 +37,10 @@ export interface CmdDataMap {
   setTouchup:    TouchupPayload | null
   setReframe:    ReframeConfig | null
   reframeNow:    void
+  // Swap the input frame source (camera switch) without touching the output.
+  setInput:      { inputReadable?: ReadableStream<VideoFrame>; inputPort?: MessagePort }
+  // Test hooks (simulate failures). Not used by the SDK itself.
+  debug:         { action: 'lose-backend' | 'hang' | 'throw' }
 }
 
 export interface CmdResponseMap {
@@ -51,6 +57,8 @@ export interface CmdResponseMap {
   setTouchup:    void
   setReframe:    void
   reframeNow:    void
+  setInput:      void
+  debug:         void
 }
 
 // Touch-up wire payload — the flattened FaceTopology (typed arrays and
@@ -86,12 +94,16 @@ export interface InitData {
   // when possible and falls back when not. 'auto' = pick the best available
   // (try WebGPU → fall back to WebGL). Resolved values come back via
   // InitResponse so main can log/display what's actually running.
-  backend:  'webgpu' | 'webgl' | 'auto'
+  // 'none' skips GPU setup entirely (test hook for the no-GPU path).
+  backend:  'webgpu' | 'webgl' | 'auto' | 'none'
   dtype:    Dtype
 
   // When true, the worker enables the same debug-log gate as the main thread
   // (both contexts have their own setDebug state). Default false.
   debug?:   boolean
+
+  // Heartbeat cadence for main's watchdog (ms). Default 1000.
+  heartbeatMs?: number
 
   // Note: weights are NOT in InitData. Two-phase init: 'init' resolves
   // backend + preset and returns InitResponse; main then fetches weights
@@ -103,15 +115,25 @@ export interface InitData {
   // the postMessage transfer list at init time.
   inputReadable?:  ReadableStream<VideoFrame>      // topology.input  === 'mstp'
   inputPort?:      MessagePort                     // topology.input  === 'rvfc-postmessage'
-  outputWritable?: WritableStream<VideoFrame>      // topology.output === 'mstg'
+  outputFramePort?: MessagePort                    // topology.output === 'mstg' (VideoFrames → relay worker)
   outputCanvas?:   OffscreenCanvas                 // topology.output === 'transfer-capture'
   outputPort?:     MessagePort                     // topology.output === 'bitmap-shuttle'
 }
 
+export type BackendKind = 'webgpu' | 'webgl'
+// Public backend name ('webgl2', not the internal 'webgl').
+export type ActiveBackend = 'webgpu' | 'webgl2' | 'none'
+
 export interface InitResponse {
-  resolvedPreset:  ManualPreset | null             // 'auto' resolves to a concrete preset; null for MediaPipe models
-  resolvedBackend: 'webgpu' | 'webgl'              // what the worker actually got
+  resolvedPreset:  ManualPreset | null             // 'auto' resolves to a concrete preset; null for MediaPipe models / no backend
+  resolvedBackend: BackendKind | 'none'            // what the worker actually got ('none' = no usable GPU)
   resolvedDtype:   Dtype                           // patched if downgraded (f16 → f32)
+  // 'none' backend only: whether the worker draws raw frames to its output
+  // itself (transfer-capture with a 2D context). When false, the main thread
+  // provides the raw passthrough.
+  workerDrawsRaw?: boolean
+  // 'none' backend only: why GPU setup failed.
+  backendError?:   string
 }
 
 export interface PresetSwapResult {
@@ -135,37 +157,53 @@ export interface RendererStats {
   // selector picked on a given browser. Static across the session.
   inputPath:     string    // 'mstp' | 'rvfc-postmessage'
   outputPath:    string    // 'mstg' | 'transfer-capture' | 'bitmap-shuttle'
+  backend:       ActiveBackend
 }
 
-// ── Public error type — surfaced to callers via PipelineOptions.onError ─────
+export type PipelineStatus =
+  | 'starting'     // constructed; worker booting (output: raw / unprocessed)
+  | 'running'      // effect pipeline live
+  | 'passthrough'  // effects unavailable (no GPU, init failed, recovery gave up); output: raw camera
+  | 'recovering'   // worker restarting / backend being recreated; output: raw camera
+  | 'ended'        // input camera ended; output ended
+  | 'destroyed'
 
-// `source` categorizes where the error originated so callers can branch
-// (e.g. log differently, surface UI, retry only certain kinds). 'unknown'
-// is the catchall for errors that don't fit a narrower bucket.
-export type ErrorSource =
-  | 'backend-lost'   // WebGL context lost / WebGPU device lost
-  | 'worker'         // generic worker / pipe failure
-  | 'adaptive'       // adaptive preset swap failed
-  | 'background'    // background setup or runtime issue (e.g. video track ended)
-  | 'audio'         // audio denoise subsystem (worklet init, asset fetch, etc.)
-  | 'unknown'
+// What getStats() returns: the worker's renderer counters plus main-side state.
+export interface PipelineStats extends RendererStats {
+  status:    PipelineStatus
+  // Measured input (camera) frame rate, or null if it can't be measured here.
+  inputFps:  number | null
+  // Automatic restarts so far (worker crash / backend loss).
+  restarts:  number
+}
 
-export interface PipelineError {
-  message:     string
-  source:      ErrorSource
-  // false = the pipeline cannot continue; caller should destroy() + recreate.
-  // true  = transient; pipeline keeps running in degraded state.
-  recoverable: boolean
-  // Original Error / DOMException / etc. — opaque, for debugging.
-  cause?:      unknown
+export interface ReadyInfo {
+  backend: ActiveBackend
+  dtype:   Dtype | null
+  preset:  string | null     // resolved model name ('small', …, 'mediapipe-selfie-…'), null with no backend
 }
 
 // ── Persistent events from worker → main ────────────────────────────────────
 
 export interface EventMap {
-  ready: void
-  stats: RendererStats
-  error: PipelineError
+  ready:      void
+  stats:      RendererStats
+  error:      WorkerErrorEvent
+  // Liveness + progress, every TUNING.heartbeatMs. framesOut counts frames
+  // the worker wrote to the output (effect or raw).
+  heartbeat:  { framesOut: number }
+  // The input stream closed (camera ended / stopped).
+  inputEnded: void
+}
+
+// Error event from the worker. `type` drives main's reaction: 'backend-lost'
+// and 'worker-crash' (pipe failure) trigger recovery; others are reported.
+export interface WorkerErrorEvent {
+  type:    PipelineErrorType
+  message: string
+  source?: PipelineError['source']
+  fatal?:  boolean
+  cause?:  unknown
 }
 
 export type EventName = keyof EventMap
@@ -180,7 +218,9 @@ export interface WorkerRequest<C extends CmdName = CmdName> {
 
 export interface WorkerResponse<C extends CmdName = CmdName> {
   request_id: string
-  res:        CmdResponseMap[C]
+  res?:       CmdResponseMap[C]
+  // Present when the command threw: the call's promise rejects with it.
+  error?:     { message: string }
 }
 
 export interface WorkerEvent<E extends EventName = EventName> {

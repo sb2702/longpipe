@@ -13,6 +13,8 @@ export interface InputSetup {
     inputPort?:     MessagePort
   }
   transferList: Transferable[]
+  // Input frames delivered so far, when this path can count them (rVFC).
+  framesIn?:    () => number
   cleanup:      () => void
 }
 
@@ -31,6 +33,7 @@ export function setupInput(path: InputPath, inputStream: MediaStream): InputSetu
       return {
         initFields:   { inputPort: s.port },
         transferList: s.transferList,
+        framesIn:     s.framesIn,
         cleanup:      s.cleanup,
       }
     }

@@ -821,6 +821,9 @@ export class Renderer {
   // listeners stop firing) and destroy the backend (WebGPU device.destroy
   // releases all GPU buffers/textures/pipelines; WebGL loseContext does
   // the equivalent). After destroy(), this Renderer is unusable.
+  // Backend handle for the failure-simulation test hook (worker 'debug' cmd).
+  get backendHandle(): Backend { return this.backend }
+
   destroy(): void {
     for (const port of this.bgVideoPorts.values()) port.close()
     this.bgVideoPorts.clear()
@@ -844,6 +847,7 @@ export class Renderer {
       enabled:    this.enabled,
       inputPath:  this.topology.input,
       outputPath: this.topology.output,
+      backend:    this.backendKind === 'webgl' ? 'webgl2' : 'webgpu',
     }
   }
 

@@ -18,8 +18,9 @@ const log = createLogger('adaptive')
 // callers actually want to tune.
 const POLL_INTERVAL_MS = 2000
 const COOLDOWN_MS      = 10000   // min gap between any two swaps
-const SOURCE_FPS       = 30      // assumed source rate for budget calc
-const MIN_FPS          = 20      // fps below this for OVERSHOOT_MS → downgrade
+const SOURCE_FPS       = 30      // configured target rate (cap) for budget calc
+const MIN_FPS          = 20      // at a 30 fps target: fps below this for OVERSHOOT_MS → downgrade
+const MIN_FPS_FRAC     = MIN_FPS / SOURCE_FPS   // …scaled to the actual target (2/3)
 const OVERSHOOT_MS     = 5000
 const HEADROOM_FRAC    = 0.3     // modelMs / frame budget below this for HEADROOM_MS → upgrade
 const HEADROOM_MS      = 15000   // upgrade is more conservative than downgrade
@@ -27,6 +28,10 @@ const HEADROOM_MS      = 15000   // upgrade is more conservative than downgrade
 export interface AdaptiveOptions {
   backendKind:     'webgpu' | 'webgl'
   initialModel:    ModelName
+  // Measured input (camera) fps, or null when unknown. The controller's
+  // target is min(input fps, 30): a 15 fps camera rendering 15 fps is on
+  // target, not overloaded. Omitted/null → assume a 30 fps source.
+  getInputFps?:    () => number | null
   // Fetch weights for a model (resolves f16/f32 pack + fallback in the caller).
   fetchWeights:    (model: ModelName) => Promise<ArrayBuffer>
   getStats:        () => Promise<RendererStats>
@@ -46,10 +51,12 @@ export class AdaptiveController {
   private overshootStart:   number = 0    // first time fps < threshold; reset on recovery
   private headroomStart:    number = 0    // first time modelMs comfortable; reset on spike
 
-  constructor(private opts: AdaptiveOptions) {
+  constructor(private opts: AdaptiveOptions, now: number = performance.now()) {
     this.currentPresetIdx = PRESETS.findIndex(p => p.model === opts.initialModel)
-    this.lastSwapAt       = performance.now()
+    this.lastSwapAt       = now
   }
+
+  get currentModel(): ModelName { return PRESETS[this.currentPresetIdx]?.model ?? this.opts.initialModel }
 
   start(): void {
     log(`started; backend=${this.opts.backendKind} initial=${this.opts.initialModel} idx=${this.currentPresetIdx}`)
@@ -63,20 +70,21 @@ export class AdaptiveController {
     this.timer = null
   }
 
-  private async tick(): Promise<void> {
+  // One poll. Public (with an injectable clock) so tests can drive it.
+  async tick(now: number = performance.now()): Promise<void> {
     // Background tabs throttle setInterval/raf; modelMs/fps numbers are
     // unreliable. Skip the tick rather than risk a spurious downgrade.
     if (typeof document !== 'undefined' && document.hidden) return
 
-    const now = performance.now()
     if (now - this.lastSwapAt < COOLDOWN_MS) return
 
-    const stats = await this.opts.getStats()
+    const stats  = await this.opts.getStats()
+    const target = this.targetFps()
 
-    // Downgrade — both backends, FPS-based.
-    if (stats.fps < MIN_FPS) {
+    // Downgrade — both backends, FPS-based, relative to the input rate.
+    if (stats.fps < target * MIN_FPS_FRAC) {
       if (this.overshootStart === 0) this.overshootStart = now
-      if (now - this.overshootStart >= OVERSHOOT_MS) this.tryDowngrade(stats.fps)
+      if (now - this.overshootStart >= OVERSHOOT_MS) this.tryDowngrade(stats.fps, now)
     } else {
       this.overshootStart = 0
     }
@@ -84,38 +92,47 @@ export class AdaptiveController {
     // Upgrade — WebGPU only, modelMs-based. WebGL stats don't have GPU
     // timing because per-frame fence sync is too heavy.
     if (this.opts.backendKind === 'webgpu' && stats.modelMs > 0) {
-      const budgetMs = (1000 / SOURCE_FPS) * HEADROOM_FRAC
+      const budgetMs = (1000 / target) * HEADROOM_FRAC
       if (stats.modelMs < budgetMs) {
         if (this.headroomStart === 0) this.headroomStart = now
-        if (now - this.headroomStart >= HEADROOM_MS) this.tryUpgrade(stats.modelMs, budgetMs)
+        if (now - this.headroomStart >= HEADROOM_MS) this.tryUpgrade(stats.modelMs, budgetMs, now)
       } else {
         this.headroomStart = 0
       }
     }
   }
 
-  private tryDowngrade(fps: number): void {
-    if (this.currentPresetIdx <= 0) return
-    const next = this.currentPresetIdx - 1
-    log(`downgrade ${PRESETS[this.currentPresetIdx].model} → ${PRESETS[next].model} (fps=${fps})`)
-    void this.swap(next)
+  // Effective target fps: the camera's measured rate, capped at SOURCE_FPS.
+  // Tiny measured rates (paused / static screen share) are clamped so we
+  // never "target" ~0 fps.
+  targetFps(): number {
+    const input = this.opts.getInputFps?.() ?? null
+    if (input === null || !Number.isFinite(input) || input <= 0) return SOURCE_FPS
+    return Math.max(5, Math.min(SOURCE_FPS, input))
   }
 
-  private tryUpgrade(modelMs: number, budgetMs: number): void {
+  private tryDowngrade(fps: number, now: number): void {
+    if (this.currentPresetIdx <= 0) return
+    const next = this.currentPresetIdx - 1
+    log(`downgrade ${PRESETS[this.currentPresetIdx].model} → ${PRESETS[next].model} (fps=${fps}, target=${this.targetFps().toFixed(1)})`)
+    void this.swap(next, now)
+  }
+
+  private tryUpgrade(modelMs: number, budgetMs: number, now: number): void {
     // Adaptive follows the same policy as autotune: never upgrade INTO xl —
     // it's the explicit opt-in tier ('quality' / manual preset only).
     if (PRESETS[this.currentPresetIdx + 1]?.model === 'xl') return
     if (this.currentPresetIdx >= PRESETS.length - 1) return
     const next = this.currentPresetIdx + 1
     log(`upgrade ${PRESETS[this.currentPresetIdx].model} → ${PRESETS[next].model} (modelMs=${modelMs.toFixed(1)} < ${budgetMs.toFixed(1)})`)
-    void this.swap(next)
+    void this.swap(next, now)
   }
 
-  private async swap(idx: number): Promise<void> {
+  private async swap(idx: number, now: number): Promise<void> {
     const preset = PRESETS[idx]
     // Start cooldown immediately (before the async fetch) so the next
     // poll can't trigger another swap while this one is in flight.
-    this.lastSwapAt     = performance.now()
+    this.lastSwapAt     = now
     this.overshootStart = 0
     this.headroomStart  = 0
     try {
@@ -132,6 +149,8 @@ export class AdaptiveController {
       // Leave currentPresetIdx unchanged; cooldown still applies so we
       // don't immediately retry.
       this.opts.onError?.({
+        type:        'adaptive',
+        fatal:       false,
         message:     `adaptive preset swap failed: ${(err as Error).message ?? String(err)}`,
         source:      'adaptive',
         recoverable: true,

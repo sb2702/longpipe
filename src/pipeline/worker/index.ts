@@ -1,14 +1,22 @@
-// Worker entry point. Two responsibilities:
+// Worker entry point. Responsibilities:
 //
-//   1. Dispatch incoming control-plane messages (init / setBackground /
-//      setEnabled / setPreset / getStats / destroy) to typed handlers.
+//   1. Dispatch incoming control-plane messages to typed handlers. A handler
+//      that throws answers THAT request with an error (main rejects the
+//      call's promise); it no longer takes the pipeline down.
 //   2. handleInit: setupBackend → construct Renderer in boot mode →
 //      wire input + output + start pipe (passthrough flowing immediately)
 //      → resolvePreset (autotune; pipe keeps pumping passthrough during
 //      this) → return InitResponse.
+//      No usable GPU → 'none' mode: no renderer. On transfer-capture the
+//      worker draws raw frames with a 2D context; on the other paths main
+//      does raw passthrough, so the worker just releases its input.
 //   3. handleStartRender: renderer.setPreset(preset, weights) — attaches
 //      the network in place. Renderer flips from passthrough to effect
 //      mid-pipe; no pipe restart, no stream relock.
+//   4. Health: a heartbeat every TUNING.heartbeatMs (main's watchdog), and
+//      events for GPU loss ('error' type 'backend-lost'), pipe failure
+//      ('error' type 'worker-crash') and input end ('inputEnded'). Main
+//      reacts by switching the output to raw and restarting this worker.
 //
 // All actual work lives in the submodules; this file should stay thin.
 
@@ -37,11 +45,39 @@ import { Renderer } from './renderer'
 import { setupBackend }     from './setup_backend'
 import { resolvePreset }    from './resolve_preset'
 import { createInputStream } from './create_input'
-import { createOutputSink }  from './create_output'
-import { startPipe }         from './pipe'
+import { createOutputSink, createRawOutputSink } from './create_output'
 
 let renderer:  Renderer        | null = null
-let pumpAbort: AbortController | null = null
+let initData:  InitData        | null = null
+
+// Input pipe. The output sink lives for the worker's lifetime; the input
+// side can be swapped (setInput) — hence preventAbort/preventClose and a
+// generation counter so a superseded pipe's settle is ignored.
+let outputSink:  WritableStream<VideoFrame> | null = null
+let inputAbort:  AbortController | null = null
+let pipeDone:    Promise<void> | null = null
+let pipeGen = 0
+
+// Teardown / failure flags: GPU loss and our own destroy both make the pipe
+// fail; neither should be reported as a pipe crash on top.
+let shuttingDown = false
+let backendLost  = false
+
+// No-GPU mode (resolvedBackend 'none').
+let noneMode = false
+
+// Frames written to the output (effect or raw) — reported in the heartbeat.
+let framesOut = 0
+const frameTimes: number[] = []
+const onFrame = () => {
+  framesOut++
+  if (noneMode) {
+    const now = performance.now()
+    frameTimes.push(now)
+    while (frameTimes.length && now - frameTimes[0] > 1000) frameTimes.shift()
+  }
+}
+let heartbeat: ReturnType<typeof setInterval> | null = null
 
 // State held between handleInit and handleStartRender — the latter only
 // needs to know which preset the autotune chose (so it can pass it to
@@ -60,14 +96,15 @@ self.onmessage = async function (event: MessageEvent<WorkerRequest>) {
     respond(request_id, res)
   } catch (err) {
     log('cmd FAILED:', cmd, err)
-    emit('error', {
-      message:     `${cmd} failed: ${(err as Error).message ?? String(err)}`,
-      source:      'worker',
-      recoverable: false,
-      cause:       err,
-    })
+    respondError(request_id, `${cmd} failed: ${(err as Error)?.message ?? String(err)}`)
   }
 }
+
+// Stray async failures (e.g. a background-video port callback) shouldn't
+// vanish silently.
+self.addEventListener('unhandledrejection', (e) => {
+  console.error('[longpipe/worker] unhandled rejection:', (e as PromiseRejectionEvent).reason)
+})
 
 async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
   switch (cmd) {
@@ -76,7 +113,7 @@ async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
     case 'setBackground': return handleSetBackground(data as Background)
     case 'setEnabled':    return handleSetEnabled((data as CmdDataMap['setEnabled']).enabled)
     case 'setPreset':   return handleSetPreset(data as CmdDataMap['setPreset'])
-    case 'getStats':    return renderer?.getStats() ?? null
+    case 'getStats':    return getStats()
     case 'destroy':     return handleDestroy()
     case 'attachPreview': return handleAttachPreview(data as CmdDataMap['attachPreview'])
     case 'setPreview':    return handleSetPreview(data as CmdDataMap['setPreview'])
@@ -84,8 +121,46 @@ async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
     case 'setTouchup':    return handleSetTouchup(data as CmdDataMap['setTouchup'])
     case 'setReframe':    return handleSetReframe(data as CmdDataMap['setReframe'])
     case 'reframeNow':    return handleReframeNow()
+    case 'setInput':      return handleSetInput(data as CmdDataMap['setInput'])
+    case 'debug':         return handleDebug(data as CmdDataMap['debug'])
     default: throw new Error(`unknown cmd: ${cmd}`)
   }
+}
+
+function startHeartbeat(ms: number): void {
+  if (heartbeat) clearInterval(heartbeat)
+  heartbeat = setInterval(() => emit('heartbeat', { framesOut }), ms)
+}
+
+// (Re)start the input → output pipe. The sink stays open across input swaps.
+function startInputPipe(input: ReadableStream<VideoFrame>, sink: WritableStream<VideoFrame>): void {
+  const gen = ++pipeGen
+  const abort = new AbortController()
+  inputAbort = abort
+  pipeDone = input.pipeTo(sink, { signal: abort.signal, preventAbort: true, preventClose: true })
+    .then(() => {
+      if (gen !== pipeGen || shuttingDown) return
+      log('pipe completed (input ended)')
+      emit('inputEnded', undefined)
+    })
+    .catch(err => {
+      if (gen !== pipeGen || abort.signal.aborted || shuttingDown || backendLost) {
+        log('pipe stopped (expected):', (err as Error)?.message)
+        return
+      }
+      log('pipe FAILED:', err)
+      emit('error', {
+        type:    'worker-crash',
+        message: `pipe failed: ${(err as Error)?.message ?? String(err)}`,
+        source:  'worker',
+      })
+    })
+}
+
+function stopInputPipe(): void {
+  pipeGen++
+  inputAbort?.abort()
+  inputAbort = null
 }
 
 async function handleInit(data: InitData): Promise<InitResponse> {
@@ -93,7 +168,9 @@ async function handleInit(data: InitData): Promise<InitResponse> {
   // Set this BEFORE the first log() of this call so the message respects it.
   setDebug(!!data.debug)
   log('handleInit: start; topology=', data.topology, 'preset=', data.preset, 'backend=', data.backend, 'dtype=', data.dtype)
-  if (renderer) throw new Error('handleInit: already initialized')
+  if (initData) throw new Error('handleInit: already initialized')
+  initData = data
+  startHeartbeat(data.heartbeatMs ?? 1000)
 
   // dtype: f16 if backend supports shader-f16, else f32. Preset's intended
   // dtype (e.g. PRESETS lists large/xl as f32 for accuracy) is only a
@@ -102,12 +179,52 @@ async function handleInit(data: InitData): Promise<InitResponse> {
   // preset, but bench timings underestimate the cost of large/xl on
   // devices that would otherwise need f32. Acceptable for v0.1.
   log('handleInit: setupBackend…')
-  const setup = await setupBackend(data, data.canvasSize, {
-    onContextLost: (err) => {
-      log('GPU context lost:', err.message)
-      emit('error', err)
-    },
-  })
+  let setup: Awaited<ReturnType<typeof setupBackend>> | null = null
+  let backendError: string | undefined
+  if (data.backend === 'none') {
+    backendError = 'GPU backend disabled'
+  } else {
+    try {
+      setup = await setupBackend(data, data.canvasSize, {
+        onContextLost: (err) => {
+          if (backendLost) return
+          backendLost = true
+          log('GPU context lost:', err.message)
+          // Stop feeding a dead context; main switches the output to raw and
+          // restarts this worker with a fresh backend.
+          stopInputPipe()
+          emit('error', err)
+        },
+        isShuttingDown: () => shuttingDown,
+      })
+    } catch (e) {
+      backendError = (e as Error)?.message ?? String(e)
+    }
+  }
+
+  const input = createInputStream(data)
+
+  if (!setup) {
+    // ── No GPU: fail open with raw frames ────────────────────────────────
+    noneMode = true
+    log('handleInit: no backend —', backendError)
+    const rawSink = createRawOutputSink(data, onFrame)
+    if (rawSink) {
+      outputSink = rawSink
+      startInputPipe(input, rawSink)
+    } else {
+      // Main side provides raw (relay / main canvas). Release our input.
+      void input.cancel().catch(() => {})
+    }
+    resolvedPreset = null
+    return {
+      resolvedPreset:  null,
+      resolvedBackend: 'none',
+      resolvedDtype:   data.dtype,
+      workerDrawsRaw:  !!rawSink,
+      backendError,
+    }
+  }
   log('handleInit: backend ready:', setup.resolvedBackend, setup.resolvedDtype, 'canvas:', setup.canvas.width, 'x', setup.canvas.height)
 
   // Construct Renderer in boot mode (no preset, no weights, no network).
@@ -122,32 +239,10 @@ async function handleInit(data: InitData): Promise<InitResponse> {
     topology:    data.topology,
   })
 
-  pumpAbort = new AbortController()
-  log('handleInit: createInputStream…')
-  const input  = createInputStream(data)
   log('handleInit: createOutputSink…')
-  const output = createOutputSink(data, renderer, pumpAbort.signal)
-
+  outputSink = createOutputSink(data, renderer, onFrame)
   log('handleInit: starting pipe (passthrough)…')
-  startPipe({
-    input,
-    output,
-    signal: pumpAbort.signal,
-  }).then(() => {
-    log('pipe completed (input ended)')
-  }).catch(err => {
-    if (pumpAbort?.signal.aborted) {
-      log('pipe aborted (expected on destroy)')
-      return
-    }
-    log('pipe FAILED:', err)
-    emit('error', {
-      message:     `pipe failed: ${(err as Error).message}`,
-      source:      'worker',
-      recoverable: false,
-      cause:       err,
-    })
-  })
+  startInputPipe(input, outputSink)
 
   // Autotune (or named-preset lookup). Pipe is already pumping passthrough,
   // so the consumer sees live video while this runs (~1-2s on cold start).
@@ -191,8 +286,13 @@ async function handleStartRender(weights: ArrayBuffer): Promise<void> {
   emit('ready', undefined)
 }
 
+function requireRenderer(cmd: string): Renderer {
+  if (!renderer) throw new Error(noneMode ? `${cmd}: no GPU backend` : `${cmd}: not initialized`)
+  return renderer
+}
+
 async function handleSetBackground(bg: Background): Promise<void> {
-  renderer?.setBackground(bg)
+  requireRenderer('setBackground').setBackground(bg)
 }
 
 async function handleSetEnabled(on: boolean): Promise<void> {
@@ -200,13 +300,11 @@ async function handleSetEnabled(on: boolean): Promise<void> {
 }
 
 async function handleAttachPreview(data: CmdDataMap['attachPreview']): Promise<void> {
-  if (!renderer) throw new Error('handleAttachPreview: not initialized')
-  renderer.attachPreview(data.canvas)
+  requireRenderer('attachPreview').attachPreview(data.canvas)
 }
 
 async function handleSetPreview(data: CmdDataMap['setPreview']): Promise<void> {
-  if (!renderer) throw new Error('handleSetPreview: not initialized')
-  renderer.setPreview(data.background, data.fps !== undefined ? { fps: data.fps } : undefined)
+  requireRenderer('setPreview').setPreview(data.background, data.fps !== undefined ? { fps: data.fps } : undefined)
 }
 
 async function handleClearPreview(): Promise<void> {
@@ -216,7 +314,7 @@ async function handleClearPreview(): Promise<void> {
 async function handleSetPreset(
   data: CmdDataMap['setPreset'],
 ): Promise<PresetSwapResult> {
-  if (!renderer)      throw new Error('handleSetPreset: not initialized')
+  const r = requireRenderer('setPreset')
   if (model.family === 'mediapipe-selfie')
     throw new Error("handleSetPreset: presets select Longpipe tiers; not available with a MediaPipe model")
   if (!data.weights)  throw new Error('handleSetPreset: weights required for runtime preset swap')
@@ -230,16 +328,70 @@ async function handleSetPreset(
     ? (resolveNamedPreset(data.preset) ?? throwUnknown(data.preset))
     : data.preset
 
-  renderer.setPreset(resolved, data.weights)
+  r.setPreset(resolved, data.weights)
+  resolvedPreset = resolved
   return { resolvedPreset: resolved }
+}
+
+// Camera switch: pipe a new input into the same output sink.
+async function handleSetInput(data: CmdDataMap['setInput']): Promise<void> {
+  if (!initData) throw new Error('setInput: not initialized')
+  const next: InitData = { ...initData, inputReadable: data.inputReadable, inputPort: data.inputPort }
+  const input = createInputStream(next)
+  initData = next
+  if (!outputSink) {
+    // No-GPU on a main-raw path: nothing reads input here.
+    void input.cancel().catch(() => {})
+    return
+  }
+  const prev = pipeDone
+  stopInputPipe()
+  // Wait for the old pipe to release the sink's lock before piping again.
+  await prev?.catch(() => {})
+  startInputPipe(input, outputSink)
+}
+
+function getStats(): RendererStats | null {
+  if (renderer) return renderer.getStats()
+  if (!initData) return null
+  const now = performance.now()
+  while (frameTimes.length && now - frameTimes[0] > 1000) frameTimes.shift()
+  return {
+    fps: frameTimes.length, modelFps: 0, modelMs: 0, displayMs: 0, skipped: 0,
+    preset: 'none', skipFrames: 0, enabled: false,
+    inputPath: initData.topology.input, outputPath: initData.topology.output,
+    backend: 'none',
+  }
+}
+
+async function handleDebug(data: CmdDataMap['debug']): Promise<void> {
+  switch (data.action) {
+    case 'lose-backend': {
+      const b = requireRenderer('debug').backendHandle as unknown as {
+        device?: GPUDevice
+        gl?: WebGL2RenderingContext
+      }
+      if (b.device) b.device.destroy()
+      else if (b.gl) {
+        const ext = b.gl.getExtension('WEBGL_lose_context')
+        if (!ext) throw new Error('WEBGL_lose_context unavailable')
+        ext.loseContext()
+      } else throw new Error('debug: unknown backend')
+      return
+    }
+    case 'hang':  return new Promise<void>(() => { /* never settles */ })
+    case 'throw': throw new Error('debug: simulated failure')
+  }
 }
 
 async function handleDestroy(): Promise<void> {
   // Order matters: abort the pipe first so no more frames flow into the
   // renderer, THEN destroy the renderer (releases backend / GPU).
   // Reversed order can fire process() on a destroyed backend.
-  pumpAbort?.abort()
-  pumpAbort = null
+  shuttingDown = true
+  if (heartbeat) clearInterval(heartbeat)
+  heartbeat = null
+  stopInputPipe()
   renderer?.destroy()
   renderer = null
   resolvedPreset = null
@@ -254,9 +406,22 @@ function respond(request_id: string, res: unknown): void {
   ;(self as unknown as Worker).postMessage(reply)
 }
 
+function respondError(request_id: string, message: string): void {
+  const reply: WorkerResponse = { request_id, error: { message } }
+  ;(self as unknown as Worker).postMessage(reply)
+}
+
 function emit<E extends EventName>(name: E, res: EventMap[E]): void {
   const event: WorkerEvent<E> = { request_id: name, res }
-  ;(self as unknown as Worker).postMessage(event)
+  try {
+    ;(self as unknown as Worker).postMessage(event)
+  } catch {
+    // Uncloneable payload (e.g. a `cause` object) — send without it.
+    const r = res as { cause?: unknown }
+    if (r && typeof r === 'object' && 'cause' in r) {
+      ;(self as unknown as Worker).postMessage({ request_id: name, res: { ...r, cause: undefined } })
+    }
+  }
 }
 
 // Convenience for renderer to push stats up (wired via a callback in
@@ -269,18 +434,15 @@ export function emitStats(stats: RendererStats): void {
 // (or clear it). The renderer defers until a preset is attached, so this is
 // safe at any point after init.
 function handleSetReframe(cfg: import('../messages').ReframeConfig | null): void {
-  if (!renderer) throw new Error('setReframe before init')
-  renderer.setReframe(cfg)
+  requireRenderer('setReframe').setReframe(cfg)
 }
 
 function handleReframeNow(): void {
-  if (!renderer) throw new Error('reframeNow before init')
-  renderer.reframeNow()
+  requireRenderer('reframeNow').reframeNow()
 }
 
 function handleSetTouchup(p: import('../messages').TouchupPayload | null): void {
-  if (!renderer) throw new Error('setTouchup before init')
-  renderer.setFaceEffects(p === null ? null : {
+  requireRenderer('setTouchup').setFaceEffects(p === null ? null : {
     landmarkWeights: p.landmarkWeights,
     topology: { count: p.topoCount, uv: p.topoUv, idx: p.topoIdx, weightMask: p.weightMask },
     touchup: p.params,

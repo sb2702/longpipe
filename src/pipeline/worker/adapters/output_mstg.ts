@@ -1,21 +1,26 @@
 // MSTG output adapter.
 //
-// Worker renders to its own OffscreenCanvas, wraps each rendered frame in
-// a new VideoFrame, and writes it into a transferred WritableStream
-// constructed on main thread from a MediaStreamTrackGenerator.
+// Worker renders to its own OffscreenCanvas, wraps each rendered frame in a
+// new VideoFrame, and posts it (transferred, zero-copy) to the output relay
+// worker, which owns the MediaStreamTrackGenerator's writable (see
+// transports/relay_worker.ts for why the writable no longer lives here).
 //
-// Pipe: inputReadable → rendererTransform → mstgWritable.
-// Backpressure flows up the chain automatically.
+// Pipe: inputReadable → this sink. The relay drops a frame if the generator
+// hasn't accepted the previous one yet, so there's no queue to grow.
 
 import type { Renderer } from '../renderer'
 
-export function createMstgOutput(renderer: Renderer): TransformStream<VideoFrame, VideoFrame> {
-  return new TransformStream<VideoFrame, VideoFrame>({
-    transform(frame, controller) {
+export function createMstgOutput(renderer: Renderer, port: MessagePort, onFrame: () => void): WritableStream<VideoFrame> {
+  return new WritableStream<VideoFrame>({
+    write(frame) {
       renderer.process(frame)
       const out = new VideoFrame(renderer.canvas, { timestamp: frame.timestamp })
       frame.close()
-      controller.enqueue(out)
+      port.postMessage({ frame: out }, [out])
+      onFrame()
+    },
+    close() {
+      port.close()
     },
   })
 }

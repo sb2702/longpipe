@@ -1,9 +1,10 @@
 // Public surface — `Pipeline` internally, exported as `EffectsPipeline` so
 // the import site reads as what it does (`import { EffectsPipeline } from
 // 'longpipe'`). Internal code keeps the shorter `Pipeline` name.
-export { Pipeline as EffectsPipeline } from '~/pipeline/index.ts'
+export { Pipeline as EffectsPipeline, LongpipeError } from '~/pipeline/index.ts'
 export type {
-  PipelineOptions, TouchupOptions,
+  PipelineOptions, TouchupOptions, RecoveredInfo, TrackChange,
+  PipelineErrorType, ActiveBackend, PipelineStats, PipelineStatus, ReadyInfo,
   BackgroundInput, Background, BlurInput, ColorInput, ImageInput, VideoInput,
   PresetName, ManualPreset, ModelName, ModelChoice,
   AudioMode, AudioInput, DenoiseOptions, DenoiseModel, DenoiseTier, DenoiseModelOption, AudioStats,

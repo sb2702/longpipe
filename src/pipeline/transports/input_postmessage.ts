@@ -23,10 +23,13 @@ const log = createLogger('input-postmessage/main')
 export interface PostMessageInputSetup {
   port:         MessagePort
   transferList: Transferable[]
+  // Frames the <video> has presented so far (the camera's real delivery
+  // count, independent of how fast the worker consumes them).
+  framesIn:     () => number
   cleanup:      () => void
 }
 
-type RVFCMeta = { mediaTime: number }
+type RVFCMeta = { mediaTime: number; presentedFrames?: number }
 type RVFCCallback = (now: number, meta: RVFCMeta) => void
 type RVFCMethod = (cb: RVFCCallback) => number
 
@@ -58,9 +61,13 @@ export function setupPostMessageInput(inputStream: MediaStream): PostMessageInpu
   const workerPort = channel.port2
 
   let stopped = false
+  let presented = 0
+  let ticks = 0
 
   const tick: RVFCCallback = (_now, meta) => {
     if (stopped) return
+    ticks++
+    presented = meta.presentedFrames ?? ticks
     try {
       // VideoFrame.timestamp is microseconds; rVFC's mediaTime is seconds.
       const frame = new VideoFrame(video, { timestamp: meta.mediaTime * 1_000_000 })
@@ -84,6 +91,7 @@ export function setupPostMessageInput(inputStream: MediaStream): PostMessageInpu
   return {
     port:         workerPort,
     transferList: [workerPort],
+    framesIn:     () => presented,
     cleanup,
   }
 }

@@ -2,18 +2,24 @@
 //
 // Pairs with worker/adapters/output_bitmap_shuttle.ts on the worker side.
 // Universal fallback path: works on every browser we tested (Chromium,
-// Firefox, Safari).
+// Firefox, Safari). Also the path a transfer-capture (Safari) pipeline moves
+// to after its worker dies, because a transferred canvas can't be taken back.
 //
 // What main thread owns:
 //   - An off-DOM HTMLCanvasElement with bitmaprenderer context (the visible
 //     surface that captureStream observes — must be on main since
 //     OffscreenCanvas has no captureStream)
-//   - A MessagePort the worker sends ImageBitmaps to per frame
+//   - A MessagePort the worker sends ImageBitmaps to per frame (a fresh one
+//     per worker: attachWorker())
 //   - The output MediaStreamTrack from canvas.captureStream()
 //
 // Per frame: worker → port.postMessage({bmp}) → ctx.transferFromImageBitmap.
 // captureStream picks up the new bitmap automatically and emits it as a
 // VideoFrame on the track.
+//
+// Raw passthrough (startRaw): main copies input frames to the canvas itself —
+// during worker boot, with no GPU, and while a crashed worker restarts. It
+// stops once the attached worker has delivered HANDOFF_AT_FRAME bitmaps.
 
 import { createLogger } from '../debug'
 
@@ -21,17 +27,20 @@ const log = createLogger('bitmap-shuttle/main')
 
 export interface BitmapShuttleOutputSetup {
   videoTrack:   MediaStreamTrack
-  port:         MessagePort           // hand this to worker via transfer list
-  transferList: Transferable[]
-  // Stream input frames straight to the output canvas while the worker is
-  // initializing (autotune + weight fetch + first frame can take 1-3s).
-  // Auto-stops the moment the worker posts its first bitmap so the handoff
-  // is seamless. Safe to call once; no-op on subsequent calls.
-  startPassthrough: (inputStream: MediaStream) => void
+  attachWorker: () => { port: MessagePort; transferList: Transferable[] }
+  startRaw:     (inputStream: MediaStream) => boolean
+  end:          () => void
   cleanup:      () => void
 }
 
 const DEFAULT_FPS = 30
+// Worker's first few effect frames are slow (GPU shader compilation +
+// pipeline warmup). If we hand off on the very first bitmap, the
+// captureStream re-emits that single bitmap for ~200-300ms while the
+// worker grinds out frame 2, looking like a freeze. Keep passthrough
+// alive until the worker has produced HANDOFF_AT_FRAME bitmaps so the
+// handoff happens at steady-state cadence.
+const HANDOFF_AT_FRAME = 3
 
 export function setupBitmapShuttleOutput(
   size: { w: number; h: number },
@@ -53,55 +62,69 @@ export function setupBitmapShuttleOutput(
   if (tracks.length === 0) throw new Error('setupBitmapShuttleOutput: captureStream produced no video tracks')
   const videoTrack = tracks[0]
 
-  const channel    = new MessageChannel()
-  const mainPort   = channel.port1
-  const workerPort = channel.port2
-
-  // Passthrough state — only relevant between startPassthrough() and the
-  // worker reaching steady state. Closure-captured so it can be torn down
-  // from either trigger point.
-  let passthroughActive = false
-  let passthroughVideo: HTMLVideoElement | null = null
-  let stopPassthrough: () => void = () => {}
-
-  // Worker's first few effect frames are slow (GPU shader compilation +
-  // pipeline warmup). If we hand off on the very first bitmap, the
-  // captureStream re-emits that single bitmap for ~200-300ms while the
-  // worker grinds out frame 2, looking like a freeze. Keep passthrough
-  // alive until the worker has produced HANDOFF_AT_FRAME bitmaps so the
-  // handoff happens at steady-state cadence.
-  const HANDOFF_AT_FRAME = 3
+  let mainPort: MessagePort | null = null
+  let rawActive = false
+  let rawVideo: HTMLVideoElement | null = null
   let workerFramesReceived = 0
 
-  mainPort.onmessage = (e: MessageEvent<{ bmp: ImageBitmap }>) => {
-    if (passthroughActive) {
-      workerFramesReceived++
-      if (workerFramesReceived < HANDOFF_AT_FRAME) {
-        e.data.bmp.close()
-        return
-      }
-      stopPassthrough()
-    }
-    try {
-      ctx.transferFromImageBitmap(e.data.bmp)
-    } catch (err) {
-      // transferFromImageBitmap can throw if the bitmap was somehow already
-      // consumed; log + drop so the pipe doesn't stall.
-      log.warn('transferFromImageBitmap failed:', err)
+  const stopRaw = () => {
+    rawActive = false
+    if (rawVideo) {
+      rawVideo.srcObject = null
+      rawVideo.pause()
+      rawVideo = null
     }
   }
-  mainPort.start()
 
-  const startPassthrough = (inputStream: MediaStream) => {
-    if (passthroughActive) return
-    passthroughActive = true
+  const detach = () => {
+    if (!mainPort) return
+    mainPort.onmessage = null
+    mainPort.close()
+    mainPort = null
+  }
+
+  const attachWorker = () => {
+    detach()
+    const channel = new MessageChannel()
+    const port = channel.port1
+    mainPort = port
+    workerFramesReceived = 0
+    port.onmessage = (e: MessageEvent<{ bmp: ImageBitmap }>) => {
+      if (mainPort !== port) { e.data.bmp.close(); return }
+      if (rawActive) {
+        workerFramesReceived++
+        if (workerFramesReceived < HANDOFF_AT_FRAME) {
+          e.data.bmp.close()
+          return
+        }
+        stopRaw()
+      }
+      try {
+        ctx.transferFromImageBitmap(e.data.bmp)
+      } catch (err) {
+        // transferFromImageBitmap can throw if the bitmap was somehow already
+        // consumed; log + drop so the pipe doesn't stall.
+        log.warn('transferFromImageBitmap failed:', err)
+      }
+    }
+    port.start()
+    return { port: channel.port2, transferList: [channel.port2] as Transferable[] }
+  }
+
+  const startRaw = (inputStream: MediaStream): boolean => {
+    // A worker that is being replaced must not hand off (or draw) anymore.
+    detach()
+    stopRaw()
+    if (!inputStream.getVideoTracks().some(t => t.readyState !== 'ended')) return false
+    rawActive = true
+    workerFramesReceived = 0
 
     const video = document.createElement('video')
     video.srcObject  = inputStream
     video.muted      = true
     video.playsInline = true
     void video.play().catch(() => {})
-    passthroughVideo = video
+    rawVideo = video
 
     // Per-frame: createImageBitmap (with resize to canvas size for stable
     // captureStream output dims) → transferFromImageBitmap. Each iteration
@@ -113,7 +136,7 @@ export function setupBitmapShuttleOutput(
         : (cb) => { requestAnimationFrame(cb) }
 
     const tick = () => {
-      if (!passthroughActive) return
+      if (!rawActive || rawVideo !== video) return
       if (video.videoWidth === 0) {
         // input not ready yet — try again next frame
         schedule(tick)
@@ -124,7 +147,7 @@ export function setupBitmapShuttleOutput(
         resizeHeight:  canvas.height,
         resizeQuality: 'medium',
       }).then(bmp => {
-        if (!passthroughActive) { bmp.close(); return }
+        if (!rawActive || rawVideo !== video) { bmp.close(); return }
         try { ctx.transferFromImageBitmap(bmp) } catch { /* drop */ }
         schedule(tick)
       }).catch(() => {
@@ -134,29 +157,23 @@ export function setupBitmapShuttleOutput(
       })
     }
     schedule(tick)
-
-    stopPassthrough = () => {
-      passthroughActive = false
-      if (passthroughVideo) {
-        passthroughVideo.srcObject = null
-        passthroughVideo.pause()
-        passthroughVideo = null
-      }
-    }
+    return true
   }
 
-  const cleanup = () => {
-    stopPassthrough()
-    mainPort.onmessage = null
-    mainPort.close()
+  let ended = false
+  const end = () => {
+    if (ended) return
+    ended = true
+    stopRaw()
+    detach()
     videoTrack.stop()
   }
 
   return {
     videoTrack,
-    port:         workerPort,
-    transferList: [workerPort],
-    startPassthrough,
-    cleanup,
+    attachWorker,
+    startRaw,
+    end,
+    cleanup: end,
   }
 }

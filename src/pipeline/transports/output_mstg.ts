@@ -1,46 +1,84 @@
 // Main-side setup for the MediaStreamTrackGenerator output transport.
 //
-// Pairs with worker/adapters/output_mstg.ts. Chrome-only path.
+// Pairs with worker/adapters/output_mstg.ts. Chromium path.
 //
 // What main thread owns:
-//   - A MediaStreamTrackGenerator (kind: 'video'). Its `writable` is a
-//     WritableStream<VideoFrame> that's transferable. The generator IS
-//     a MediaStreamTrack — captureStream isn't involved.
+//   - A MediaStreamTrackGenerator (kind: 'video'). The generator IS the
+//     output MediaStreamTrack; it never changes for the pipeline's lifetime.
+//   - A tiny relay worker (relay_worker.ts) that holds the generator's
+//     transferred `writable` and writes either raw camera frames or the GPU
+//     worker's frames into it. That is what lets the SAME track carry raw
+//     video when the GPU worker is booting, has no GPU, lost its device, or
+//     crashed and is being restarted.
 //
-// We transfer the writable to the worker; the track stays on main and is
-// returned for inclusion in the output MediaStream. No canvas, no
-// per-frame messaging on main.
+// No canvas and no per-frame work on the main thread.
+
+import { createRelayWorker } from './relay_worker'
+import { createLogger } from '../debug'
+
+const log = createLogger('mstg/main')
 
 export interface MstgOutputSetup {
   videoTrack:   MediaStreamTrack
-  writable:     WritableStream<VideoFrame>
-  transferList: Transferable[]
+  // New frame port for a (re)started GPU worker. The relay keeps writing raw
+  // frames (if raw is active) until this port delivers its 3rd frame.
+  attachWorker: () => { port: MessagePort; transferList: Transferable[] }
+  // Raw passthrough from the input track, starting now. Detaches the current
+  // GPU-worker port (it is dead or about to be).
+  startRaw:     (inputStream: MediaStream) => boolean
+  end:          () => void
   cleanup:      () => void
 }
 
-// MediaStreamTrackGenerator isn't in default lib.dom yet; declare the
-// shape we use to avoid a global type augmentation.
 type MstgInstance = MediaStreamTrack & { writable: WritableStream<VideoFrame> }
 type MstgCtor = new (init: { kind: 'video' }) => MstgInstance
+type MstpCtor = new (init: { track: MediaStreamTrack }) => { readable: ReadableStream<VideoFrame> }
 
-export function setupMstgOutput(): MstgOutputSetup {
+export function setupMstgOutput(onRelayMode?: (mode: 'raw' | 'worker') => void): MstgOutputSetup {
   const Ctor = (self as unknown as { MediaStreamTrackGenerator?: MstgCtor }).MediaStreamTrackGenerator
   if (!Ctor) throw new Error('setupMstgOutput: MediaStreamTrackGenerator not supported on this browser')
 
   const generator = new Ctor({ kind: 'video' })
-  const writable  = generator.writable
+  const relay = createRelayWorker()
+  relay.postMessage({ type: 'init', writable: generator.writable }, [generator.writable])
+  relay.onmessage = (e: MessageEvent<{ type: string; mode?: 'raw' | 'worker' }>) => {
+    if (e.data.type === 'mode' && e.data.mode) {
+      log('relay mode:', e.data.mode)
+      onRelayMode?.(e.data.mode)
+    }
+  }
+  relay.onerror = (e) => console.error('[longpipe/pipeline] output relay worker error:', e.message)
 
-  const cleanup = () => {
-    // Aborting the writable signals upstream that we're done. The track
-    // itself is also stopped so the output MediaStream cleanly ends.
-    void writable.abort().catch(() => {})
+  const attachWorker = () => {
+    const ch = new MessageChannel()
+    relay.postMessage({ type: 'worker', port: ch.port1 }, [ch.port1])
+    return { port: ch.port2, transferList: [ch.port2] as Transferable[] }
+  }
+
+  const startRaw = (inputStream: MediaStream): boolean => {
+    const track = inputStream.getVideoTracks()[0]
+    const Proc = (self as unknown as { MediaStreamTrackProcessor?: MstpCtor }).MediaStreamTrackProcessor
+    if (!track || track.readyState === 'ended' || !Proc) return false
+    // A second processor on the camera track (the GPU worker may hold the
+    // first). The relay cancels it at handoff, which detaches only this
+    // processor — the camera track itself is untouched.
+    const { readable } = new Proc({ track })
+    relay.postMessage({ type: 'raw', readable, detach: true }, [readable])
+    return true
+  }
+
+  let ended = false
+  const end = () => {
+    if (ended) return
+    ended = true
+    relay.postMessage({ type: 'close' })
     generator.stop()
   }
 
-  return {
-    videoTrack:   generator,
-    writable,
-    transferList: [writable],
-    cleanup,
+  const cleanup = () => {
+    end()
+    relay.terminate()
   }
+
+  return { videoTrack: generator, attachWorker, startRaw, end, cleanup }
 }

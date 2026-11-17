@@ -10,11 +10,12 @@
 
 import type { Renderer } from '../renderer'
 
-export function createTransferCaptureOutput(renderer: Renderer): WritableStream<VideoFrame> {
+export function createTransferCaptureOutput(renderer: Renderer, onFrame: () => void = () => {}): WritableStream<VideoFrame> {
   return new WritableStream<VideoFrame>({
     write(frame) {
       renderer.process(frame)
       frame.close()
+      onFrame()
     },
   })
 }

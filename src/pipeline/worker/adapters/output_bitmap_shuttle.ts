@@ -12,6 +12,7 @@ import type { Renderer } from '../renderer'
 export function createBitmapShuttleOutput(
   renderer: Renderer,
   port:     MessagePort,
+  onFrame:  () => void = () => {},
 ): WritableStream<VideoFrame> {
   return new WritableStream<VideoFrame>({
     write(frame) {
@@ -19,6 +20,7 @@ export function createBitmapShuttleOutput(
       frame.close()
       const bmp = renderer.canvas.transferToImageBitmap()
       port.postMessage({ bmp }, [bmp])
+      onFrame()
     },
     close() {
       port.close()

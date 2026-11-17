@@ -24,7 +24,12 @@ type RVFCMeta = { mediaTime: number }
 type RVFCCallback = (now: number, meta: RVFCMeta) => void
 type RVFCMethod = (cb: RVFCCallback) => number
 
-export async function setupVideoSource(input: VideoSourceInput): Promise<VideoSourceSetup> {
+export interface VideoSourceOptions {
+  timeoutMs?: number                     // max wait for the first frame
+  onError?:   (message: string) => void  // decode/network error after setup
+}
+
+export async function setupVideoSource(input: VideoSourceInput, opts: VideoSourceOptions = {}): Promise<VideoSourceSetup> {
   // Resolve to a URL string. We always create our own <video> rather
   // than mutating the user's element — predictable lifecycle, no
   // surprise side effects on their playback state.
@@ -53,15 +58,33 @@ export async function setupVideoSource(input: VideoSourceInput): Promise<VideoSo
   video.playsInline = true
   video.src         = url
 
-  await new Promise<void>((resolve, reject) => {
-    video.addEventListener('loadeddata', () => resolve(), { once: true })
-    video.addEventListener('error',     () => reject(new Error(`background video: failed to load ${url}`)), { once: true })
-  })
+  const fail = (msg: string) => {
+    video.removeAttribute('src')
+    video.load()
+    if (ownedObjectURL) URL.revokeObjectURL(url)
+    return new Error(msg)
+  }
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timer = opts.timeoutMs
+        ? setTimeout(() => reject(new Error(`background video: timed out loading ${url}`)), opts.timeoutMs)
+        : null
+      video.addEventListener('loadeddata', () => { if (timer) clearTimeout(timer); resolve() }, { once: true })
+      video.addEventListener('error',     () => { if (timer) clearTimeout(timer); reject(new Error(`background video: failed to load ${url}`)) }, { once: true })
+    })
+  } catch (err) {
+    throw fail((err as Error).message)
+  }
   try {
     await video.play()
   } catch (err) {
-    throw new Error(`background video: play() rejected — ${(err as Error).message}`)
+    throw fail(`background video: play() rejected — ${(err as Error).message}`)
   }
+  // After setup: a decode / network error stops new frames; the worker keeps
+  // the last one. Report it (non-fatal) instead of failing silently.
+  video.addEventListener('error', () => {
+    if (!stopped) opts.onError?.(`background video stopped: ${video.error?.message || 'decode/network error'} (${url})`)
+  })
 
   const channel    = new MessageChannel()
   const mainPort   = channel.port1

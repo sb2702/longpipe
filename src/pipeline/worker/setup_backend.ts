@@ -21,7 +21,7 @@
 import type { Backend, Dtype } from '~/model/backend.ts'
 import { WebGPUBackend } from '~/model/backends/webgpu/index.ts'
 import { WebGLBackend }  from '~/model/backends/webgl/index.ts'
-import type { InitData, PipelineError } from '../messages'
+import type { InitData, WorkerErrorEvent } from '../messages'
 import { createLogger } from '../debug'
 
 const log = createLogger('setup_backend')
@@ -35,10 +35,14 @@ export interface BackendSetup {
 
 export interface SetupBackendOptions {
   // Fires once if the GPU backend dies after a successful setup —
-  // WebGPU device.lost or WebGL webglcontextlost. The pipeline is dead
-  // after this; caller should surface to user via onError and stop using
-  // the renderer.
-  onContextLost?: (err: PipelineError) => void
+  // WebGPU device.lost or WebGL webglcontextlost. The renderer is unusable
+  // after this; the worker stops its pipe and main restarts it (raw
+  // passthrough meanwhile).
+  onContextLost?: (err: WorkerErrorEvent) => void
+  // True while the worker is tearing down on purpose. Our own destroy()
+  // resolves device.lost with reason 'destroyed'; anything else (including
+  // a 'destroyed' we didn't ask for) is a real loss.
+  isShuttingDown?: () => boolean
 }
 
 export async function setupBackend(
@@ -68,12 +72,12 @@ export async function setupBackend(
       // We only surface if NOT triggered by our own destroy() — the
       // 'destroyed' reason indicates intentional teardown.
       backend.device.lost.then(info => {
-        if (info.reason === 'destroyed') return
+        if (opts.isShuttingDown?.()) return
         opts.onContextLost?.({
-          message:     `WebGPU device lost: ${info.reason}${info.message ? ' — ' + info.message : ''}`,
-          source:      'backend-lost',
-          recoverable: false,
-          cause:       info,
+          type:    'backend-lost',
+          message: `WebGPU device lost: ${info.reason}${info.message ? ' — ' + info.message : ''}`,
+          source:  'backend-lost',
+          cause:   { reason: info.reason, message: info.message },
         })
       }).catch(() => { /* device.lost itself rejecting is unexpected; ignore */ })
       return { backend, resolvedBackend: 'webgpu', resolvedDtype: dtype, canvas }
@@ -91,15 +95,14 @@ export async function setupBackend(
     try {
       const backend = WebGLBackend.create({ canvas, dtype: data.dtype })
       // OffscreenCanvas extends EventTarget — webglcontextlost fires here
-      // when the context is lost. preventDefault() would let us recover
-      // (via webglcontextrestored), but we don't support recovery yet, so
-      // we let it die and surface as a fatal error.
-      canvas.addEventListener('webglcontextlost', (e) => {
+      // when the context is lost. Recovery is a fresh worker + backend
+      // (driven by main), so we don't wait for webglcontextrestored.
+      canvas.addEventListener('webglcontextlost', () => {
+        if (opts.isShuttingDown?.()) return
         opts.onContextLost?.({
-          message:     'WebGL context lost',
-          source:      'backend-lost',
-          recoverable: false,
-          cause:       e,
+          type:    'backend-lost',
+          message: 'WebGL context lost',
+          source:  'backend-lost',
         })
       })
       return { backend, resolvedBackend: 'webgl', resolvedDtype: data.dtype, canvas }
