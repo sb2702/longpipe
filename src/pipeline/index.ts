@@ -100,6 +100,15 @@ export interface PipelineOptions {
   // downloads; falls back to f32 when the adapter lacks shader-f16). Force
   // 'f32' for maximum fidelity or to A/B-test f16-specific issues.
   dtype?:          Dtype
+  // GPU backend preference. Default 'auto' (WebGPU when the browser gives the
+  // SDK an adapter, else WebGL2) — leave it there in production. The others
+  // exist for testing and A/B checks:
+  //   'webgpu' — same as 'auto' (still falls back to WebGL2 if WebGPU can't start)
+  //   'webgl2' — never try WebGPU
+  //   'none'   — no GPU at all: raw passthrough, backend 'none', a non-fatal
+  //              'no-backend' error (exercises the fail-open path)
+  // The backend actually used is `pipeline.backend` / `ready` / `getStats()`.
+  backend?:        BackendPreference
   // 'passthrough' | 'drop' | 'denoise' | { denoise: DenoiseOptions }.
   // 'denoise' runs input audio through the AudioWorklet denoiser (separate from
   // the video worker). Default: 'passthrough'.
@@ -148,6 +157,20 @@ export interface PipelineOptions {
   // the main thread and inside the worker. Default false — production
   // consumers see nothing in console unless they opt in.
   debug?:          boolean
+}
+
+export type BackendPreference = 'auto' | 'webgpu' | 'webgl2' | 'none'
+
+// Public preference → worker init value. After WebGPU has been lost twice the
+// pipeline prefers WebGL2 whatever was asked (see recover()).
+function workerBackend(pref: BackendPreference | undefined, fallback: 'auto' | 'webgl'): InitData['backend'] {
+  if (fallback === 'webgl' && pref !== 'none') return 'webgl'
+  switch (pref) {
+    case 'webgl2': return 'webgl'
+    case 'webgpu': return 'webgpu'
+    case 'none':   return 'none'
+    default:       return 'auto'
+  }
 }
 
 export interface RecoveredInfo {
@@ -607,7 +630,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
         preset,
         background:  norm.background,
         enabled:     this.desired.enabled,
-        backend:     TUNING.forceBackend ?? this.preferBackend,
+        backend:     TUNING.forceBackend ?? workerBackend(this.opts.backend, this.preferBackend),
         dtype:       this.opts.dtype ?? 'f16',
         canvasSize:  this.outputSize,
         debug:       this.opts.debug,

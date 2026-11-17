@@ -4,7 +4,7 @@
 export { Pipeline as EffectsPipeline, LongpipeError } from '~/pipeline/index.ts'
 export type {
   PipelineOptions, TouchupOptions, RecoveredInfo, TrackChange,
-  PipelineErrorType, ActiveBackend, PipelineStats, PipelineStatus, ReadyInfo,
+  PipelineErrorType, ActiveBackend, BackendPreference, PipelineStats, PipelineStatus, ReadyInfo,
   BackgroundInput, Background, BlurInput, ColorInput, ImageInput, VideoInput,
   PresetName, ManualPreset, ModelName, ModelChoice,
   AudioMode, AudioInput, DenoiseOptions, DenoiseModel, DenoiseTier, DenoiseModelOption, AudioStats,
