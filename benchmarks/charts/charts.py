@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Render the README charts (horizontal bar SVGs, no dependencies).
 
-    python3 analysis/charts.py      # writes analysis/speed-360p.svg and analysis/quality-p3m.svg
+    python3 benchmarks/charts/charts.py   # writes benchmarks/charts/speed-360p.svg and quality-p3m.svg
 
-Numbers come from the results files linked in analysis/README.md; edit ROWS below when they change.
+Numbers come from the results files linked in benchmarks/README.md; edit ROWS below when they change.
 Style follows the selfie-segmentation chart in github.com/sb2702/webrtc-hacks-webgpu.
 """
 from html import escape

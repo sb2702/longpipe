@@ -44,12 +44,12 @@ await pipeline.ready                  // optional — resolves once the effect i
 
 Longpipe implements multiple downstream features (face effects, backgrounds) with one neural network, but if you want to compare it to another library, the closest would be the Mediapipe selfie model for background segmentation, from the [@mediapipe/tasks-vision](https://www.npmjs.com/package/@mediapipe/tasks-vision) library. 
 
-![Frames per second, 360p, Apple M4](analysis/speed-360p.svg)
+![Frames per second, 360p, Apple M4](benchmarks/charts/speed-360p.svg)
 
-![Matte error on P3M-500-P](analysis/quality-p3m.svg)
+![Matte error on P3M-500-P](benchmarks/charts/quality-p3m.svg)
 
 Methodology, caveats (including where MediaPipe's model is faster, on LiteRT.js), the 720p, WebGL and IoU results,
-and scripts to reproduce everything: **[full analysis](analysis/README.md)**.
+and scripts to reproduce everything: **[full analysis](benchmarks/README.md)**.
 
 ## Documentation
 
