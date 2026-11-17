@@ -107,7 +107,8 @@ class DenoiseProcessor extends AudioWorkletProcessor {
       }
     } catch (err) {
       const e = err as Error
-      this.post({ type: 'error', message: `denoise init failed: ${e.message ?? String(err)}${e.stack ? '\n' + e.stack : ''}` })
+      this.state = 0
+      this.post({ type: 'error', fatal: true, message: `denoise init failed: ${e.message ?? String(err)}${e.stack ? '\n' + e.stack : ''}` })
     }
 
     this.now = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : null
@@ -208,7 +209,9 @@ class DenoiseProcessor extends AudioWorkletProcessor {
     const n = outCh.length
 
     if (!inCh || !this.enabled || this.state === 0) {
-      if (inCh && !this.enabled) outCh.set(inCh)   // dry passthrough
+      // Dry passthrough when bypassed OR when the kernel failed to start
+      // (state 0): fail open with the original audio, never silence.
+      if (inCh) outCh.set(inCh)
       else outCh.fill(0)
       return true
     }

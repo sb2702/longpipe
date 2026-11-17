@@ -13,7 +13,9 @@ export type ToWorklet =
 export type FromWorklet =
   | { type: 'ready' }
   | { type: 'stats'; stats: AudioStats }
-  | { type: 'error'; message: string }
+  // fatal = the kernel can't run at all (wasm compile/instantiate failed);
+  // the processor passes input through and main drops it from the graph.
+  | { type: 'error'; message: string; fatal?: boolean }
 
 // Per-hop telemetry, surfaced via EffectsPipeline.getAudioStats().
 export interface AudioStats {
