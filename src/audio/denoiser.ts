@@ -217,13 +217,16 @@ export class AudioDenoiser {
 
   private endOutput(): void {
     if (this.destroyed) return
-    this.outputTrack.stop()
     this.destroy()
   }
 
+  // Ends the output track too: it's ours (a MediaStreamAudioDestinationNode
+  // track), and a closed context leaves it 'live' but silent, so a sender
+  // would keep transmitting silence after pipeline.destroy().
   destroy(): void {
     if (this.destroyed) return
     this.destroyed = true
+    this.outputTrack.stop()
     this.removeGestureListeners?.()
     this.removeEndedListener?.()
     try { this.node?.disconnect() } catch { /* already gone */ }
