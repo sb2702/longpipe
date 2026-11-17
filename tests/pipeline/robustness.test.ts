@@ -125,7 +125,11 @@ describe.each(TOPOLOGIES)('worker crash ($name)', ({ name, topology }) => {
     await pipeline.ready
     const track = pipeline.stream.getVideoTracks()[0]
     await pipeline._debug('terminate')
-    const e = await log.waitFor('worker-crash', 6000)
+    // Detection takes watchdogMs + up to one 1 s watchdog tick, plus any time
+    // the watchdog is paused by a heavy command still in flight after ready
+    // (busyCall): under a loaded suite that can exceed 6 s. A generous bound
+    // costs nothing when it passes.
+    const e = await log.waitFor('worker-crash', 15_000)
     expect(e.fatal).toBe(false)
     await waitUntil(() => recovered.length > 0, 10_000, 'onRecovered')
     expect(recovered[0]).toMatchObject({ reason: 'worker-crash' })
