@@ -36,7 +36,7 @@ From the repo root:
 ```bash
 npm install
 npm run e2e:assets   # optional: the test clip + local weights (needed for "test clip" input / weights=local)
-npm run example      # http://localhost:5180
+npm run example      # http://localhost:5287
 ```
 
 Click **Start**. "camera + mic" needs a camera; "test clip + tone/noise" doesn't (it loops a
@@ -68,13 +68,13 @@ To use it in your own project: copy `index.html`, `main.js`, `call.js` and `inpu
 ## Open it from your phone or another computer
 
 `getUserMedia` only works in a secure context: `https://` or `http://localhost`. Opening
-`http://192.168.x.y:5180` from a phone gives "camera not available". Three options:
+`http://192.168.x.y:5287` from a phone gives "camera not available". Three options:
 
 | Option | How | Tradeoffs |
 |---|---|---|
-| **LAN + self-signed HTTPS** (simplest) | `npm run example:lan`, then open the `https://192.168.x.y:5180` URL Vite prints | Every device shows a certificate warning once (Safari: "Show Details → visit this website"; Chrome: "Advanced → Proceed"). Same Wi-Fi only. No account, nothing leaves the LAN. |
-| **Tunnel** | `npm run example` in one terminal, `cloudflared tunnel --url http://localhost:5180` (or `ngrok http 5180`) in another, then `ALLOWED_HOSTS=<the-tunnel-host> npm run example` | Real HTTPS (no warning), works off-LAN. Video and weights go through a third party; the free URL changes each run. |
-| **USB / remote debugging** | Android: `chrome://inspect` → port forwarding `5180 → localhost:5180`, open `http://localhost:5180` on the phone. iOS: no equivalent, use one of the above | Counts as localhost, so no certificate at all. Needs a cable and desktop Chrome. |
+| **LAN + self-signed HTTPS** (simplest) | `npm run example:lan`, then open the `https://192.168.x.y:5287` URL Vite prints | Every device shows a certificate warning once (Safari: "Show Details → visit this website"; Chrome: "Advanced → Proceed"). Same Wi-Fi only. No account, nothing leaves the LAN. |
+| **Tunnel** | `npm run example` in one terminal, `cloudflared tunnel --url http://localhost:5287` (or `ngrok http 5287`) in another, then `ALLOWED_HOSTS=<the-tunnel-host> npm run example` | Real HTTPS (no warning), works off-LAN. Video and weights go through a third party; the free URL changes each run. |
+| **USB / remote debugging** | Android: `chrome://inspect` → port forwarding `5287 → localhost:5287`, open `http://localhost:5287` on the phone. iOS: no equivalent, use one of the above | Counts as localhost, so no certificate at all. Needs a cable and desktop Chrome. |
 
 On iOS every browser is WebKit, so this is also how to try "Safari" on a phone.
 

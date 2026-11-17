@@ -1,7 +1,7 @@
 // Vite config for the vanilla-WebRTC example.
 //
-//   npm run example        http://localhost:5180 (getUserMedia works on localhost)
-//   npm run example:lan    https://<this machine's LAN IP>:5180, self-signed cert
+//   npm run example        http://localhost:5287 (getUserMedia works on localhost)
+//   npm run example:lan    https://<this machine's LAN IP>:5287, self-signed cert
 //                          (open it from a phone / another computer; see README)
 //
 // By default `import ... from 'longpipe'` is compiled from this repo's src/,
@@ -67,7 +67,7 @@ export default defineConfig(({ mode }) => ({
         ],
   },
   server: {
-    port: Number(process.env.PORT ?? 5180),
+    port: Number(process.env.PORT ?? 5287),
     strictPort: true,
     host: mode === 'lan' ? true : 'localhost',
     // For a tunnel (cloudflared, ngrok…): ALLOWED_HOSTS=abc.trycloudflare.com npm run example
