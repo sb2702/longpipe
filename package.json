@@ -1,7 +1,7 @@
 {
   "name": "longpipe",
   "version": "0.0.19",
-  "description": "Open-source WebGPU/WebGL2 video effects SDK — virtual backgrounds, background blur, portrait matting in real time in the browser.",
+  "description": "Open-source WebGPU/WebGL2 video effects SDK \u2014 virtual backgrounds, background blur, portrait matting in real time in the browser.",
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
@@ -61,7 +61,8 @@
     "example": "vite --config examples/vanilla-webrtc/vite.config.js",
     "example:lan": "vite --config examples/vanilla-webrtc/vite.config.js --mode lan",
     "e2e:assets": "node tests/e2e/fetch_assets.mjs",
-    "test:e2e": "playwright test -c tests/e2e/playwright.config.mjs"
+    "test:e2e": "playwright test -c tests/e2e/playwright.config.mjs",
+    "example:tunnel": "vite --config examples/vanilla-webrtc/vite.config.js --mode tunnel"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

@@ -70,8 +70,13 @@ export default defineConfig(({ mode }) => ({
     port: Number(process.env.PORT ?? 5287),
     strictPort: true,
     host: mode === 'lan' ? true : 'localhost',
-    // For a tunnel (cloudflared, ngrok…): ALLOWED_HOSTS=abc.trycloudflare.com npm run example
-    allowedHosts: process.env.ALLOWED_HOSTS?.split(',') ?? [],
+    // Tunnels (ngrok, cloudflared) give real HTTPS, which iOS Safari needs for the camera.
+    // Common tunnel domains are allowed; add others with ALLOWED_HOSTS=host1,host2.
+    allowedHosts: ['.ngrok.dev', '.ngrok.app', '.ngrok-free.app', '.trycloudflare.com',
+      ...(process.env.ALLOWED_HOSTS?.split(',') ?? [])],
+    // `--mode tunnel`: the page is served over the tunnel's HTTPS on 443, so point
+    // Vite's live-reload websocket there too (otherwise it can't connect and keeps polling).
+    ...(mode === 'tunnel' ? { hmr: { clientPort: 443, protocol: 'wss' } } : {}),
     fs: { allow: [REPO] },
   },
   // Longpipe ships its own worker; don't let the dep optimizer touch it.
