@@ -1,0 +1,111 @@
+# DRAFT — not enabled yet. Cross-browser e2e smoke tests (tests/e2e/README.md).
+#
+# What this covers: the SDK inside a real RTCPeerConnection in headless
+# Chromium, Firefox and WebKit (Playwright's builds), on a software GPU
+# (SwiftShader / Mesa llvmpipe). WebGL2 effects on Chromium + Firefox; the
+# no-GPU fail-open path everywhere; audio denoise; GPU-loss recovery; teardown.
+# What it can't cover: WebGPU (headless Chromium destroys the device on the
+# first canvas present; Firefox/WebKit expose none headless), real Safari /
+# iOS, real GPUs, real cameras. See the BrowserStack outline at the bottom.
+name: e2e
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Browsers + their system libraries, cached by Playwright version.
+      - id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - run: npx playwright install --with-deps chromium firefox webkit
+
+      # Test clip + weights: pinned URLs + sha256 (tests/e2e/fetch_assets.mjs),
+      # cached by that file's hash. The script re-verifies hashes on a cache hit.
+      - uses: actions/cache@v4
+        with:
+          path: examples/vanilla-webrtc/public/assets
+          key: e2e-assets-${{ hashFiles('tests/e2e/fetch_assets.mjs') }}
+      - run: npm run e2e:assets
+
+      - name: Run e2e smoke tests
+        run: npm run test:e2e
+        env:
+          CI: '1'
+
+      - name: Results summary
+        if: always()
+        run: |
+          if [ -f tests/e2e/results/summary.md ]; then
+            cat tests/e2e/results/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No summary (the run didn't start?)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-report
+          path: |
+            tests/e2e/results/html
+            tests/e2e/results/summary.md
+            tests/e2e/results/summary.json
+            tests/e2e/results/results.json
+          retention-days: 14
+
+      # Traces + screenshots of failures only.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-failure-artifacts
+          path: tests/e2e/results/artifacts
+          retention-days: 7
+
+  # ── Later: real Safari / iOS on BrowserStack (outline, not wired up) ────────
+  #
+  # Needs repository secrets BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY.
+  # BrowserStack's Playwright SDK runs the same spec on real macOS Safari
+  # (WebGPU on Safari 26+, transfer-capture output) and real iOS devices, with
+  # a local tunnel to the Vite server. A browserstack.yml at the repo root lists
+  # the platforms, e.g.:
+  #   platforms:
+  #     - { os: OS X, osVersion: Tahoe, browserName: playwright-webkit, browserVersion: latest }
+  #     - { deviceName: iPhone 16, osVersion: 26, browserName: safari }
+  #   browserstackLocal: true
+  # Real-device runs can't use fake cameras; the clip input works everywhere.
+  #
+  # browserstack:
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'workflow_dispatch'
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with: { node-version: 22, cache: npm }
+  #     - run: npm ci && npm i -D browserstack-node-sdk
+  #     - run: npm run e2e:assets
+  #     - run: npx browserstack-node-sdk playwright test -c tests/e2e/playwright.config.mjs --project=webkit
+  #       env:
+  #         BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+  #         BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
