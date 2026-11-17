@@ -243,6 +243,39 @@ for (const backend of BACKENDS) {
 
 const checkBackendName = (s) => s.ready?.backend ?? 'none'
 
+// Regression: no VideoFrame may be left for the garbage collector. Chromium
+// reports one as "A VideoFrame was garbage collected without being closed" on
+// a ~10 s timer, so a leak used to fail whichever later test's teardown that
+// report happened to land in. Three pipelines on one page (create → ready →
+// worker restart → destroy, then a new one), the restart alternating GPU loss
+// and a killed worker, then GC and wait past the next report.
+test('no unclosed VideoFrames across restarts and destroy [auto]', async ({ call, page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'only Chromium reports unclosed VideoFrames')
+  const gc = async () => {
+    await page.evaluate(() => { for (let i = 0; i < 3; i++) globalThis.gc?.() })
+    for (const w of page.workers()) await w.evaluate(() => { globalThis.gc?.() }).catch(() => {})
+  }
+  await call.start({ bg: 'color', color: '#00ff00', denoise: 'off', backend: 'auto' })
+  for (let i = 0; i < 3; i++) {
+    if (i > 0) await call.eval(() => window.example.restartPipeline())   // destroy() + a new pipeline
+    const s = await call.settled()
+    checkBackend(call, s, 'auto')
+    // Headless Chromium's WebGPU device can still be lost (and the worker
+    // restarting) just after ready: wait for a running worker first.
+    await expect.poll(async () => (await call.state()).stats?.status, { timeout: 30_000 }).toBe('running')
+    const before = (await call.state()).recovered.length
+    await call.eval((a) => window.example.pipeline._debug(a), i % 2 ? 'terminate' : 'lose-backend')
+    await expect.poll(async () => (await call.state()).recovered.length, { timeout: 30_000 }).toBeGreaterThan(before)
+    await expectFramesFlow(call, 1500)
+  }
+  await call.eval(() => window.example.stop())
+  await gc()
+  await page.waitForTimeout(11_000)
+  await gc()
+  await page.waitForTimeout(500)
+  expect(call.consoleErrors.filter((m) => /VideoFrame/.test(m)), 'unclosed VideoFrames').toEqual([])
+})
+
 test('fail-open: no GPU (backend none) [none]', async ({ call }) => {
   await call.start({ bg: 'color', color: '#00ff00', denoise: 'off', backend: 'none' })
   const s = await call.settled()

@@ -61,6 +61,8 @@ export default defineConfig({
             '--autoplay-policy=no-user-gesture-required',
             '--use-fake-ui-for-media-stream',
             '--use-fake-device-for-media-stream',
+            // gc(): the unclosed-VideoFrame regression test forces collection.
+            '--js-flags=--expose-gc',
           ],
         },
       },

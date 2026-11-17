@@ -15,9 +15,12 @@ export function createTransferCaptureOutput(renderer: Renderer, onFrame: (entry?
   return new WritableStream<VideoFrame>({
     async write(frame) {
       const entry = frameEntryTime(frame, performance.now())
-      const src = await renderer.prepareSource(frame)
-      try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
-      frame.close()
+      try {
+        const src = await renderer.prepareSource(frame)
+        try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
+      } finally {
+        frame.close()
+      }
       onFrame(entry)
     },
   })

@@ -112,6 +112,7 @@ export function setupBitmapShuttleOutput(
         // transferFromImageBitmap can throw if the bitmap was somehow already
         // consumed; log + drop so the pipe doesn't stall.
         log.warn('transferFromImageBitmap failed:', err)
+        e.data.bmp.close()
       }
     }
     port.start()
@@ -162,7 +163,7 @@ export function setupBitmapShuttleOutput(
         resizeQuality: 'medium',
       }).then(bmp => {
         if (!rawActive || rawVideo !== video) { bmp.close(); return }
-        try { ctx.transferFromImageBitmap(bmp) } catch { /* drop */ }
+        try { ctx.transferFromImageBitmap(bmp) } catch { bmp.close() }
         schedule(tick)
       }).catch(() => {
         // createImageBitmap can fail mid-stream (e.g., paused source).

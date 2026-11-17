@@ -18,10 +18,13 @@ export function createBitmapShuttleOutput(
   return new WritableStream<VideoFrame>({
     async write(frame) {
       const entry = frameEntryTime(frame, performance.now())
-      const src = await renderer.prepareSource(frame)
-      try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
-      renderer.markSubmitted()
-      frame.close()
+      try {
+        const src = await renderer.prepareSource(frame)
+        try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
+        renderer.markSubmitted()
+      } finally {
+        frame.close()
+      }
       const bmp = renderer.canvas.transferToImageBitmap()
       port.postMessage({ bmp }, [bmp])
       onFrame(entry)

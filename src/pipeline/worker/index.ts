@@ -52,7 +52,7 @@ let renderer:  Renderer        | null = null
 let initData:  InitData        | null = null
 
 // Input pipe. The output sink lives for the worker's lifetime; the input
-// side can be swapped (setInput) — hence preventAbort/preventClose and a
+// side can be swapped (setInput) — hence pump() leaves the sink open, and a
 // generation counter so a superseded pipe's settle is ignored.
 let outputSink:  WritableStream<VideoFrame> | null = null
 let inputAbort:  AbortController | null = null
@@ -139,7 +139,7 @@ function startInputPipe(input: ReadableStream<VideoFrame>, sink: WritableStream<
   const gen = ++pipeGen
   const abort = new AbortController()
   inputAbort = abort
-  pipeDone = input.pipeTo(sink, { signal: abort.signal, preventAbort: true, preventClose: true })
+  pipeDone = pump(input, sink, abort.signal)
     .then(() => {
       if (gen !== pipeGen || shuttingDown) return
       log('pipe completed (input ended)')
@@ -157,6 +157,53 @@ function startInputPipe(input: ReadableStream<VideoFrame>, sink: WritableStream<
         source:  'worker',
       })
     })
+}
+
+// input → sink, one frame at a time. Instead of pipeTo() because every frame
+// must be closed whatever happens: pipeTo drops a chunk it has read but not
+// written when it is aborted or the sink errors (GPU lost mid-frame), and
+// camera frames carry the page's close auditor, so a frame dropped here is
+// reported in the app's console ("A VideoFrame was garbage collected without
+// being closed") and pins a capture buffer until GC. Leaves the sink open and
+// unlocked (camera switch reuses it); cancels the input when it stops.
+async function pump(input: ReadableStream<VideoFrame>, sink: WritableStream<VideoFrame>, signal: AbortSignal): Promise<void> {
+  const reader = input.getReader()
+  const writer = sink.getWriter()
+  const onAbort = () => { reader.cancel().catch(() => {}) }
+  signal.addEventListener('abort', onAbort)
+  let ended = false
+  try {
+    for (;;) {
+      await writer.ready
+      if (signal.aborted) return
+      const { value, done } = await reader.read()
+      if (done) { ended = true; return }
+      if (signal.aborted) { value.close(); return }
+      try {
+        await writer.write(value)
+      } catch (err) {
+        value.close()   // no-op if the sink already closed it
+        throw err
+      }
+    }
+  } finally {
+    signal.removeEventListener('abort', onAbort)
+    if (!ended) await reader.cancel().catch(() => {})
+    reader.releaseLock()
+    writer.releaseLock()
+  }
+}
+
+// Release an input this worker won't pump. Chromium: a transferred
+// MediaStreamTrackProcessor readable that is cancelled (or whose worker dies)
+// without ever having been read leaks a VideoFrame, reported in the page's
+// console. Reading one frame first (closed at once) avoids it.
+async function discardInput(input: ReadableStream<VideoFrame> | undefined): Promise<void> {
+  if (!input || input.locked) return
+  const reader = input.getReader()
+  const first = reader.read().then((r) => { r.value?.close() }, () => {})
+  await Promise.race([first, new Promise((r) => setTimeout(r, 200))])
+  await reader.cancel().catch(() => {})
 }
 
 function stopInputPipe(): void {
@@ -204,6 +251,13 @@ async function handleInit(data: InitData): Promise<InitResponse> {
     }
   }
 
+  // Destroyed while the backend was being set up: handleDestroy released
+  // the input; don't build a renderer on a worker that is about to go.
+  if (shuttingDown) {
+    setup?.backend.destroy()
+    throw new Error('handleInit: worker destroyed during init')
+  }
+
   const input = createInputStream(data)
 
   if (!setup) {
@@ -216,7 +270,7 @@ async function handleInit(data: InitData): Promise<InitResponse> {
       startInputPipe(input, rawSink)
     } else {
       // Main side provides raw (relay / main canvas). Release our input.
-      void input.cancel().catch(() => {})
+      void discardInput(input)
     }
     resolvedPreset = null
     return {
@@ -343,7 +397,7 @@ async function handleSetInput(data: CmdDataMap['setInput']): Promise<void> {
   initData = next
   if (!outputSink) {
     // No-GPU on a main-raw path: nothing reads input here.
-    void input.cancel().catch(() => {})
+    void discardInput(input)
     return
   }
   const prev = pipeDone
@@ -393,7 +447,20 @@ async function handleDestroy(): Promise<void> {
   shuttingDown = true
   if (heartbeat) clearInterval(heartbeat)
   heartbeat = null
+  // Let the frame being written finish (its sink closes it) and the input be
+  // cancelled (queued frames closed) before the backend goes away; main
+  // terminates this worker once we answer.
+  const pipe = pipeDone
   stopInputPipe()
+  await Promise.race([
+    Promise.all([
+      pipe?.catch(() => {}),
+      // Destroyed before init got to start the pipe (e.g. while the backend
+      // was still being set up): the camera readable was never read.
+      discardInput(initData?.inputReadable),
+    ]),
+    new Promise((r) => setTimeout(r, 300)),
+  ])
   renderer?.destroy()
   renderer = null
   resolvedPreset = null

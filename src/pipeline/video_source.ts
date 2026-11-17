@@ -99,10 +99,12 @@ export async function setupVideoSource(input: VideoSourceInput, opts: VideoSourc
   if (rvfc) {
     const tick: RVFCCallback = (_now, meta) => {
       if (stopped) return
+      let frame: VideoFrame | null = null
       try {
-        const frame = new VideoFrame(video, { timestamp: meta.mediaTime * 1_000_000 })
+        frame = new VideoFrame(video, { timestamp: meta.mediaTime * 1_000_000 })
         mainPort.postMessage({ frame }, [frame])
       } catch {
+        frame?.close()
         // VideoFrame() can fail if the underlying media frame isn't
         // ready for this tick (rare but possible). Skip; next rVFC
         // invocation will retry.
@@ -115,10 +117,12 @@ export async function setupVideoSource(input: VideoSourceInput, opts: VideoSourc
     // (couples to display refresh, not video decode) but functional.
     const tick = () => {
       if (stopped) return
+      let frame: VideoFrame | null = null
       try {
-        const frame = new VideoFrame(video, { timestamp: performance.now() * 1000 })
+        frame = new VideoFrame(video, { timestamp: performance.now() * 1000 })
         mainPort.postMessage({ frame }, [frame])
       } catch {
+        frame?.close()
         // skip — see above
       }
       requestAnimationFrame(tick)

@@ -74,16 +74,19 @@ export function setupPostMessageInput(inputStream: MediaStream): PostMessageInpu
     if (stopped) return
     ticks++
     presented = meta.presentedFrames ?? ticks
+    let frame: VideoFrame | null = null
     try {
       // VideoFrame.timestamp is microseconds; rVFC's mediaTime is seconds.
-      const frame = new VideoFrame(video, { timestamp: meta.mediaTime * 1_000_000 })
+      frame = new VideoFrame(video, { timestamp: meta.mediaTime * 1_000_000 })
       const orientation = TUNING.simulateHiddenOrientation ?? probe?.measure(frame)
       // sentAt: absolute time (worker clocks have their own timeOrigin) — the
       // start of getStats().latencyMs.
       mainPort.postMessage({ frame, orientation, sentAt: performance.timeOrigin + performance.now() }, [frame])
     } catch (err) {
       // VideoFrame() can throw if the video isn't ready yet for this tick;
-      // safe to skip — next rVFC will retry.
+      // safe to skip — next rVFC will retry. If it was the probe or the post
+      // that threw, the frame is still ours: close it.
+      frame?.close()
       log.warn('VideoFrame() failed; skipping frame:', err)
     }
     rvfc(tick)

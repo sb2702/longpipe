@@ -15,10 +15,16 @@ export function createMstgOutput(renderer: Renderer, port: MessagePort, onFrame:
   return new WritableStream<VideoFrame>({
     async write(frame) {
       const entry = frameEntryTime(frame, performance.now())
-      const src = await renderer.prepareSource(frame)
-      try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
-      const out = new VideoFrame(renderer.canvas, { timestamp: frame.timestamp })
-      frame.close()
+      let out: VideoFrame
+      try {
+        const src = await renderer.prepareSource(frame)
+        try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
+        out = new VideoFrame(renderer.canvas, { timestamp: frame.timestamp })
+      } finally {
+        // Closed even when processing throws (GPU lost mid-frame): an unclosed
+        // camera frame pins a capture buffer until GC.
+        frame.close()
+      }
       port.postMessage({ frame: out }, [out])
       onFrame(entry)
     },

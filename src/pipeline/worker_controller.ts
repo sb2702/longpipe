@@ -128,15 +128,47 @@ export class WorkerController {
 
   // Terminate the worker and reject every in-flight request with
   // 'worker-crash' (the caller is restarting or destroying).
-  terminate(reason = 'worker terminated'): void {
+  //
+  // graceMs > 0: the worker first gets a 'destroy' command so it can release
+  // the camera frames it holds (pipe, pending slot, stream queues) and is
+  // killed once it answers, or after graceMs (hung / already dead). Killing it
+  // outright destroys those VideoFrames unclosed; Chromium then reports "A
+  // VideoFrame was garbage collected without being closed" in the PAGE's
+  // console (a frame keeps the close auditor of the context that created it).
+  // Either way the controller is finished at once: nothing it does in the
+  // grace period reaches the pipeline.
+  terminate(reason = 'worker terminated', graceMs = 0): void {
     if (this.terminated) return
     this.terminated = true
-    this.worker.terminate()
+    if (graceMs > 0) this.retire(graceMs)
+    else this.worker.terminate()
     for (const [, p] of this.pending) {
       if (p.timer) clearTimeout(p.timer)
       p.reject(new LongpipeError('worker-crash', `${p.cmd}: ${reason}`))
     }
     this.pending.clear()
     this.persistent.clear()
+  }
+
+  private retire(graceMs: number): void {
+    const worker = this.worker
+    const request_id = crypto.randomUUID()
+    let done = false
+    const kill = () => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      worker.removeEventListener('message', onMessage)
+      worker.terminate()
+    }
+    const onMessage = (e: MessageEvent<{ request_id?: string }>) => { if (e.data?.request_id === request_id) kill() }
+    const timer = setTimeout(kill, graceMs)
+    worker.addEventListener('message', onMessage)
+    try {
+      const message: WorkerRequest<'destroy'> = { cmd: 'destroy', data: {} as Record<string, never>, request_id }
+      worker.postMessage(message)
+    } catch {
+      kill()
+    }
   }
 }

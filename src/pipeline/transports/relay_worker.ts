@@ -31,7 +31,8 @@ export const RELAY_SOURCE = `
 const HANDOFF_AT_FRAME = 3;
 let writer = null;
 let busy = false;
-let raw = null;        // active raw reader
+let raw = null;        // reader on the camera (kept across raw ↔ worker switches)
+let rawOn = false;     // raw frames go to the output (else they're dropped)
 let port = null;       // active GPU-worker frame port
 let workerFrames = 0;
 let framesOut = 0;
@@ -44,26 +45,39 @@ function write(frame) {
   writer.write(frame).then(() => { busy = false; }, () => { busy = false; });
 }
 
-function stopRaw() {
+function stopReader() {
+  rawOn = false;
   if (!raw) return;
   const r = raw; raw = null;
   r.cancel().catch(() => {});
 }
 
-async function runRaw(readable) {
-  stopRaw();
-  const reader = readable.getReader();
-  raw = reader;
-  workerFrames = 0;
-  postMessage({ type: 'mode', mode: 'raw' });
+// One reader per camera track for the relay's lifetime. It keeps reading (and
+// closing) while the GPU worker owns the output: cancelling a transferred
+// camera readable and transferring a fresh one on every restart is what left
+// unclosed VideoFrames behind in the page (Chromium), and an unread reader
+// would pin camera buffers.
+async function pump(reader) {
   for (;;) {
     let res;
     try { res = await reader.read(); } catch (e) { break; }
     if (res.done) break;
-    if (raw === reader) write(res.value);
-    else { res.value.close(); break; }
+    if (raw === reader && rawOn) write(res.value);
+    else res.value.close();
+    if (raw !== reader) break;
   }
-  if (raw === reader) raw = null;
+  if (raw === reader) { raw = null; rawOn = false; }
+}
+
+function startRaw(readable) {
+  if (readable) {
+    stopReader();
+    raw = readable.getReader();
+    pump(raw);
+  }
+  rawOn = !!raw;
+  workerFrames = 0;
+  postMessage({ type: 'mode', mode: 'raw' });
 }
 
 function detach() {
@@ -76,7 +90,7 @@ onmessage = (e) => {
     writer = d.writable.getWriter();
   } else if (d.type === 'raw') {
     if (d.detach) detach();
-    runRaw(d.readable);
+    startRaw(d.readable);
   } else if (d.type === 'worker') {
     detach();
     const p = d.port;
@@ -85,21 +99,22 @@ onmessage = (e) => {
     p.onmessage = (ev) => {
       const frame = ev.data.frame;
       if (port !== p) { frame.close(); return; }
-      if (raw) {
+      if (rawOn) {
         if (++workerFrames < HANDOFF_AT_FRAME) { frame.close(); return; }
-        stopRaw();
+        rawOn = false;
         postMessage({ type: 'mode', mode: 'worker' });
       }
       write(frame);
     };
     p.start();
   } else if (d.type === 'stats') {
-    postMessage({ type: 'stats', framesOut, mode: raw ? 'raw' : (port ? 'worker' : 'idle') });
+    postMessage({ type: 'stats', framesOut, mode: rawOn ? 'raw' : (port ? 'worker' : 'idle') });
   } else if (d.type === 'close') {
-    stopRaw();
+    stopReader();
     detach();
     if (writer) writer.close().catch(() => {});
     writer = null;
+    postMessage({ type: 'closed' });
   }
 };
 `

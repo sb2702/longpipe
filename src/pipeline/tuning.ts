@@ -19,6 +19,9 @@ export const TUNING = {
   // command (startRender / setPreset) is in flight.
   heartbeatMs:      1_000,
   watchdogMs:       5_000,
+  // A worker being replaced or destroyed gets this long to release its
+  // frames (and answer 'destroy') before it is terminated.
+  retireGraceMs:    500,
   // Frames stalled: input advanced while worker output didn't, for this long.
   stallMs:          3_000,
   // Automatic restarts (worker crash / backend lost) before giving up, and the

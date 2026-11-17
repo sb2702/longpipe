@@ -802,7 +802,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     this.gen++
     this.adaptive?.stop()
     this.adaptive = null
-    this.controller?.terminate(type === 'backend-lost' ? 'GPU backend lost' : 'worker restarted')
+    this.controller?.terminate(type === 'backend-lost' ? 'GPU backend lost' : 'worker restarted', TUNING.retireGraceMs)
     this.input?.cleanup()
     this.input = null
     if (this.restartTimer) clearTimeout(this.restartTimer)
@@ -949,7 +949,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     this.restartTimer = null
     this.adaptive?.stop()
     this.adaptive = null
-    this.controller?.terminate('camera ended')
+    this.controller?.terminate('camera ended', TUNING.retireGraceMs)
     this.controller = null
     this.input?.cleanup()
     this.input = null
@@ -1416,11 +1416,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
     this.bgCleanup = null
     this.previewBgCleanup?.()
     this.previewBgCleanup = null
-    const controller = this.controller
-    if (controller && !controller.isTerminated) {
-      void controller.sendMessage('destroy', {} as Record<string, never>).catch(() => {})
-      controller.terminate('pipeline destroyed')
-    }
+    // The worker gets a 'destroy' (releases its frames + GPU) before it's killed.
+    this.controller?.terminate('pipeline destroyed', TUNING.retireGraceMs)
     this.controller = null
     this.input?.cleanup()
     this.pendingInput?.cleanup()
