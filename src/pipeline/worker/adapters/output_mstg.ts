@@ -12,8 +12,9 @@ import type { Renderer } from '../renderer'
 
 export function createMstgOutput(renderer: Renderer, port: MessagePort, onFrame: () => void): WritableStream<VideoFrame> {
   return new WritableStream<VideoFrame>({
-    write(frame) {
-      renderer.process(frame)
+    async write(frame) {
+      const src = await renderer.prepareSource(frame)
+      try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
       const out = new VideoFrame(renderer.canvas, { timestamp: frame.timestamp })
       frame.close()
       port.postMessage({ frame: out }, [out])

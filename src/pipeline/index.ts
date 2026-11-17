@@ -814,9 +814,10 @@ export class Pipeline implements PromiseLike<Pipeline> {
     // workerBackendKind, not backendKind: a device lost during startup (before
     // startRender finished) must count too, or a GPU that dies on its first
     // frame retries WebGPU until recovery gives up instead of moving to WebGL2.
-    if (type === 'backend-lost' && this.workerBackendKind === 'webgpu') {
+    // Any failure while on WebGPU counts (device loss, or a worker/pipe crash
+    // such as an unsupported WebGPU feature): after two, use WebGL2.
+    if (this.workerBackendKind === 'webgpu' && (type === 'backend-lost' || type === 'worker-crash')) {
       this.webgpuLosses++
-      // Lost WebGPU twice: stop trying it, use WebGL2.
       if (this.webgpuLosses >= 2) this.preferBackend = 'webgl'
     }
 

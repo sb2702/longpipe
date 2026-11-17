@@ -272,12 +272,34 @@ export class Renderer {
   // main output is passthrough (matrix cell b).
   // On WebGPU the whole frame (model, flow, stabiliser, composite) is recorded
   // into one command buffer and submitted once (see Backend.batch).
-  process(frame: VideoFrame): void {
-    runBatched(this.backend, () => this.processFrame(frame))
+  process(frame: VideoFrame, source: VideoFrame | ImageBitmap = frame): void {
+    runBatched(this.backend, () => this.processFrame(frame, source))
   }
 
-  private processFrame(frame: VideoFrame): void {
-    this.renderOp.setSource(frame)
+  // Firefox ships WebGPU with external textures disabled (importExternalTexture
+  // throws NotSupportedError) and its copyExternalImageToTexture rejects
+  // VideoFrames, so there VideoFrames must become ImageBitmaps first. Probed once
+  // per renderer with a real frame (same approach as WebSR's
+  // externalTexturesSupported). Returns the frame itself when no copy is needed;
+  // otherwise a bitmap the caller must close().
+  private externalOk: boolean | undefined
+  async prepareSource(frame: VideoFrame): Promise<VideoFrame | ImageBitmap> {
+    if (this.backendKind !== 'webgpu') return frame
+    if (this.externalOk === undefined) {
+      const device = (this.backend as unknown as { device?: GPUDevice }).device
+      try {
+        device?.importExternalTexture({ source: frame })
+        this.externalOk = true
+      } catch (err) {
+        this.externalOk = false
+        console.warn('[longpipe] WebGPU external textures unavailable; copying frames as ImageBitmaps:', (err as Error)?.message ?? err)
+      }
+    }
+    return this.externalOk ? frame : await createImageBitmap(frame)
+  }
+
+  private processFrame(frame: VideoFrame, source: VideoFrame | ImageBitmap = frame): void {
+    this.renderOp.setSource(source)
     const now = performance.now()
 
     const hasNet        = this.renderOp.hasNetwork()

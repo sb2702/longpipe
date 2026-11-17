@@ -73,21 +73,37 @@ export class InputWebGPU implements InputOp {
     if (!this.source) throw new Error("InputWebGPU.run() called before setSource()");
 
     if (IS_VIDEO_FRAME(this.source)) {
-      this.runExternal(this.source);
+      if (!this.externalUnsupported) {
+        try {
+          this.runExternal(this.source);
+          return;
+        } catch (err) {
+          // Some WebGPU implementations (e.g. Firefox, where external textures
+          // are behind a pref) reject importExternalTexture. Fall back to the
+          // copy path for the rest of this op's life.
+          this.externalUnsupported = true;
+          console.warn("[longpipe] importExternalTexture unavailable, using copyExternalImageToTexture:", (err as Error)?.message ?? err);
+        }
+      }
+      this.run2d(this.source);
     } else {
       this.run2d(this.source);
     }
   }
 
-  private run2d(src: ImageBitmap): void {
-    this.ensureStagingTexture(src.width, src.height);
+  private externalUnsupported = false;
+
+  private run2d(src: ImageBitmap | VideoFrame): void {
+    const w = IS_VIDEO_FRAME(src) ? src.displayWidth : src.width;
+    const h = IS_VIDEO_FRAME(src) ? src.displayHeight : src.height;
+    this.ensureStagingTexture(w, h);
     // Queue-timeline copy: submit any batched work first so it stays ordered
     // (earlier recorded passes may still read the staging texture).
     this.backend.flush();
     this.device.queue.copyExternalImageToTexture(
       { source: src, flipY: false },
       { texture: this.stagingTex! },
-      [src.width, src.height],
+      [w, h],
     );
     const bindGroup = this.device.createBindGroup({
       layout: this.pipeline2d!.getBindGroupLayout(0),
@@ -102,6 +118,7 @@ export class InputWebGPU implements InputOp {
   }
 
   private runExternal(src: VideoFrame): void {
+    if (typeof this.device.importExternalTexture !== "function") throw new Error("importExternalTexture not supported");
     if (!this.pipelineExternal) {
       this.pipelineExternal = this.buildPipeline(
         this.dtype === "f16" ? inputExternalF16Src : inputExternalF32Src,
