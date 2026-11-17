@@ -59,6 +59,7 @@ const test = base.extend({
     // Teardown: destroy() (via the example's stop) must be clean.
     const before = consoleErrors.length
     const ended = await page.evaluate(async () => {
+      if (!window.example) return []   // test skipped before the example loaded
       const tracks = window.example.pipeline?.stream.getTracks() ?? []
       await window.example.stop()
       await new Promise((r) => setTimeout(r, 1500))
