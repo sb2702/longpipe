@@ -8,21 +8,23 @@
 // Universal fallback — works on every browser we tested.
 
 import type { Renderer } from '../renderer'
+import { frameEntryTime } from '../latency'
 
 export function createBitmapShuttleOutput(
   renderer: Renderer,
   port:     MessagePort,
-  onFrame:  () => void = () => {},
+  onFrame:  (entry?: number) => void = () => {},
 ): WritableStream<VideoFrame> {
   return new WritableStream<VideoFrame>({
     async write(frame) {
+      const entry = frameEntryTime(frame, performance.now())
       const src = await renderer.prepareSource(frame)
       try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
       renderer.markSubmitted()
       frame.close()
       const bmp = renderer.canvas.transferToImageBitmap()
       port.postMessage({ bmp }, [bmp])
-      onFrame()
+      onFrame(entry)
       // Firefox (this path) + WebGPU: don't take the next frame until the GPU has
       // finished this one, so latency can't build up (stale input frames drop instead).
       await renderer.waitForGpu(1)

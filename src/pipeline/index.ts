@@ -1329,6 +1329,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
       skipped:    worker?.skipped ?? 0,
       preset:     worker?.preset ?? 'none',
       skipFrames: worker?.skipFrames ?? 0,
+      latencyMs:  mainRaw ? 0 : worker?.latencyMs ?? 0,
       enabled:    worker?.enabled ?? false,
       inputPath:  this.topology.input,
       outputPath: this.output.path,

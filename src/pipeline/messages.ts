@@ -158,6 +158,14 @@ export interface RendererStats {
   inputPath:     string    // 'mstp' | 'rvfc-postmessage'
   outputPath:    string    // 'mstg' | 'transfer-capture' | 'bitmap-shuttle'
   backend:       ActiveBackend
+
+  // Pipeline latency (ms, rolling mean over ~1 s): an input frame entering the
+  // pipeline → its output frame submitted to the output transport. Starts when
+  // main grabs the frame (rvfc-postmessage) or when the worker takes it from
+  // MSTP (mstp); ends before GPU completion / the browser's capture step. See
+  // worker/latency.ts. 0 when no frames are flowing through the worker (e.g.
+  // while main serves raw passthrough).
+  latencyMs:     number
 }
 
 export type PipelineStatus =

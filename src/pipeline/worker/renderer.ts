@@ -946,7 +946,7 @@ export class Renderer {
     this.backend.destroy()
   }
 
-  getStats(): RendererStats {
+  getStats(): Omit<RendererStats, 'latencyMs'> {
     const now = performance.now()
     this.trimRecent(this.framesRenderedAt, now)
     this.trimSamplesAt(this.modelRunSamples,   now)

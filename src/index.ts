@@ -2,6 +2,9 @@
 // the import site reads as what it does (`import { EffectsPipeline } from
 // 'longpipe'`). Internal code keeps the shorter `Pipeline` name.
 export { Pipeline as EffectsPipeline, LongpipeError } from '~/pipeline/index.ts'
+// The fixed model tiers, cheapest first (xs, small, medium, large, xl). Pass one
+// as `preset` or to `setPreset()` to pin a tier. Read-only.
+export { PRESETS } from '~/pipeline/presets.ts'
 export type {
   PipelineOptions, TouchupOptions, RecoveredInfo, TrackChange,
   PipelineErrorType, ActiveBackend, BackendPreference, PipelineStats, PipelineStatus, ReadyInfo,

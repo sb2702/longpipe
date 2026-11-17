@@ -46,6 +46,7 @@ import { setupBackend }     from './setup_backend'
 import { resolvePreset }    from './resolve_preset'
 import { createInputStream } from './create_input'
 import { createOutputSink, createRawOutputSink } from './create_output'
+import { recordLatency, meanLatencyMs } from './latency'
 
 let renderer:  Renderer        | null = null
 let initData:  InitData        | null = null
@@ -69,8 +70,9 @@ let noneMode = false
 // Frames written to the output (effect or raw) — reported in the heartbeat.
 let framesOut = 0
 const frameTimes: number[] = []
-const onFrame = () => {
+const onFrame = (entry?: number) => {
   framesOut++
+  recordLatency(entry)
   if (noneMode) {
     const now = performance.now()
     frameTimes.push(now)
@@ -352,7 +354,7 @@ async function handleSetInput(data: CmdDataMap['setInput']): Promise<void> {
 }
 
 function getStats(): RendererStats | null {
-  if (renderer) return renderer.getStats()
+  if (renderer) return { ...renderer.getStats(), latencyMs: meanLatencyMs() }
   if (!initData) return null
   const now = performance.now()
   while (frameTimes.length && now - frameTimes[0] > 1000) frameTimes.shift()
@@ -360,7 +362,7 @@ function getStats(): RendererStats | null {
     fps: frameTimes.length, modelFps: 0, modelMs: 0, displayMs: 0, skipped: 0,
     preset: 'none', skipFrames: 0, enabled: false,
     inputPath: initData.topology.input, outputPath: initData.topology.output,
-    backend: 'none',
+    backend: 'none', latencyMs: meanLatencyMs(),
   }
 }
 

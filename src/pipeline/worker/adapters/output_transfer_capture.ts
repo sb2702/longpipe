@@ -9,14 +9,16 @@
 // no downstream queue.
 
 import type { Renderer } from '../renderer'
+import { frameEntryTime } from '../latency'
 
-export function createTransferCaptureOutput(renderer: Renderer, onFrame: () => void = () => {}): WritableStream<VideoFrame> {
+export function createTransferCaptureOutput(renderer: Renderer, onFrame: (entry?: number) => void = () => {}): WritableStream<VideoFrame> {
   return new WritableStream<VideoFrame>({
     async write(frame) {
+      const entry = frameEntryTime(frame, performance.now())
       const src = await renderer.prepareSource(frame)
       try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
       frame.close()
-      onFrame()
+      onFrame(entry)
     },
   })
 }

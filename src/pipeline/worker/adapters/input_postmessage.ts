@@ -1,4 +1,5 @@
 import { tagFrameOrientation, type Orientation } from '~/model/orientation.ts'
+import { tagFrameEntry } from '../latency'
 
 // Per-frame postMessage input adapter.
 //
@@ -13,8 +14,10 @@ export function createPostMessageInput(port: MessagePort): ReadableStream<VideoF
   let pending: VideoFrame | null = null
   let resolvePull: ((frame: VideoFrame) => void) | null = null
 
-  port.onmessage = (e: MessageEvent<{ frame: VideoFrame; orientation?: Orientation }>) => {
-    const { frame, orientation } = e.data
+  port.onmessage = (e: MessageEvent<{ frame: VideoFrame; orientation?: Orientation; sentAt?: number }>) => {
+    const { frame, orientation, sentAt } = e.data
+    // When main created the frame: the start of getStats().latencyMs.
+    tagFrameEntry(frame, sentAt)
     // Main measured the display orientation the frame still needs (Safari's
     // hidden camera rotation); the renderer looks it up per frame.
     tagFrameOrientation(frame, orientation)

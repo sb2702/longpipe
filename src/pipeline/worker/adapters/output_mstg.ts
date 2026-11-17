@@ -9,16 +9,18 @@
 // hasn't accepted the previous one yet, so there's no queue to grow.
 
 import type { Renderer } from '../renderer'
+import { frameEntryTime } from '../latency'
 
-export function createMstgOutput(renderer: Renderer, port: MessagePort, onFrame: () => void): WritableStream<VideoFrame> {
+export function createMstgOutput(renderer: Renderer, port: MessagePort, onFrame: (entry?: number) => void): WritableStream<VideoFrame> {
   return new WritableStream<VideoFrame>({
     async write(frame) {
+      const entry = frameEntryTime(frame, performance.now())
       const src = await renderer.prepareSource(frame)
       try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
       const out = new VideoFrame(renderer.canvas, { timestamp: frame.timestamp })
       frame.close()
       port.postMessage({ frame: out }, [out])
-      onFrame()
+      onFrame(entry)
     },
     close() {
       port.close()

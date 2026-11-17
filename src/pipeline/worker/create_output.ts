@@ -8,7 +8,8 @@
 //   'bitmap-shuttle'   → terminal sink that ships ImageBitmaps via
 //                         InitData.outputPort
 //
-// `onFrame` counts frames written to the output (heartbeat → main watchdog).
+// `onFrame(entry)` counts frames written to the output (heartbeat → main
+// watchdog) and gets the frame's entry time for getStats().latencyMs (latency.ts).
 //
 // createRawOutputSink() is the no-GPU variant: on transfer-capture the worker
 // owns the only drawable surface, so it draws raw frames with a 2D context.
@@ -17,6 +18,7 @@
 import type { InitData } from '../messages'
 import { frameResidualOrientation, uprightSize, isIdentity } from '~/model/orientation.ts'
 import type { Renderer } from './renderer'
+import { frameEntryTime } from './latency'
 import { createMstgOutput }            from './adapters/output_mstg'
 import { createTransferCaptureOutput } from './adapters/output_transfer_capture'
 import { createBitmapShuttleOutput }   from './adapters/output_bitmap_shuttle'
@@ -24,7 +26,7 @@ import { createBitmapShuttleOutput }   from './adapters/output_bitmap_shuttle'
 export function createOutputSink(
   data:     InitData,
   renderer: Renderer,
-  onFrame:  () => void,
+  onFrame:  (entry?: number) => void,
 ): WritableStream<VideoFrame> {
   switch (data.topology.output) {
     case 'mstg': {
@@ -49,7 +51,7 @@ export function createOutputSink(
 // Raw (no GPU) sink for transfer-capture. Returns null when the canvas can't
 // take a 2D context (a failed WebGPU/WebGL attempt may already own it) — main
 // then moves the output to a canvas it controls.
-export function createRawOutputSink(data: InitData, onFrame: () => void): WritableStream<VideoFrame> | null {
+export function createRawOutputSink(data: InitData, onFrame: (entry?: number) => void): WritableStream<VideoFrame> | null {
   if (data.topology.output !== 'transfer-capture' || !data.outputCanvas) return null
   const canvas = data.outputCanvas
   let ctx: OffscreenCanvasRenderingContext2D | null = null
@@ -58,8 +60,9 @@ export function createRawOutputSink(data: InitData, onFrame: () => void): Writab
   const c = ctx
   return new WritableStream<VideoFrame>({
     write(frame) {
+      const entry = frameEntryTime(frame, performance.now())
       try { drawOriented(c, canvas, frame) } finally { frame.close() }
-      onFrame()
+      onFrame(entry)
     },
   })
 }
