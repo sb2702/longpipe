@@ -290,7 +290,15 @@ export class WebGPUBackend implements Backend {
   getCurrentDisplayTexture(target: RenderTarget = "main"): GPUTexture {
     const ctx = this.contexts.get(target);
     if (!ctx) throw new Error(`getCurrentDisplayTexture: no canvas attached for target '${target}'`);
-    return ctx.getCurrentTexture();
+    try {
+      return ctx.getCurrentTexture();
+    } catch (err) {
+      // Firefox drops an OffscreenCanvas's WebGPU configuration after
+      // transferToImageBitmap() (the bitmap-shuttle output path), so
+      // getCurrentTexture() throws "Canvas not configured". Reconfigure and retry once.
+      this.configureContext(ctx);
+      return ctx.getCurrentTexture();
+    }
   }
 
   tensor(h: number, w: number, c: number, data?: DataView_): WebGPUTensor {

@@ -423,6 +423,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // answers, before weights/startRender, so a GPU lost during startup is
   // attributed to the right backend (backendKind is only set once running).
   private workerBackendKind: BackendKind | null = null
+  // Backend requested for the current worker attempt (known before init replies).
+  private attemptBackend: InitData['backend'] | null = null
 
   // Recovery bookkeeping.
   private restarts = 0
@@ -637,7 +639,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
         preset,
         background:  norm.background,
         enabled:     this.desired.enabled,
-        backend:     TUNING.forceBackend ?? workerBackend(this.opts.backend, this.preferBackend),
+        backend:     (this.attemptBackend = TUNING.forceBackend ?? workerBackend(this.opts.backend, this.preferBackend)),
         dtype:       this.opts.dtype ?? 'f16',
         canvasSize:  this.outputSize,
         debug:       this.opts.debug,
@@ -816,7 +818,11 @@ export class Pipeline implements PromiseLike<Pipeline> {
     // frame retries WebGPU until recovery gives up instead of moving to WebGL2.
     // Any failure while on WebGPU counts (device loss, or a worker/pipe crash
     // such as an unsupported WebGPU feature): after two, use WebGL2.
-    if (this.workerBackendKind === 'webgpu' && (type === 'backend-lost' || type === 'worker-crash')) {
+    // A crash can arrive before init replies (frames already flow through the
+    // boot renderer), so also count attempts that requested something other than WebGL.
+    const onWebGPU = this.workerBackendKind === 'webgpu' ||
+      (this.workerBackendKind === null && this.attemptBackend !== null && this.attemptBackend !== 'webgl' && this.attemptBackend !== 'none')
+    if (onWebGPU && (type === 'backend-lost' || type === 'worker-crash')) {
       this.webgpuLosses++
       if (this.webgpuLosses >= 2) this.preferBackend = 'webgl'
     }
