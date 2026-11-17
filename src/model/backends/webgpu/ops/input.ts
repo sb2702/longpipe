@@ -5,6 +5,7 @@ import input2dF32Src        from "~/model/backends/webgpu/shaders/input_2d.wgsl"
 import input2dF16Src        from "~/model/backends/webgpu/shaders/input_2d_f16.wgsl";
 import inputExternalF32Src  from "~/model/backends/webgpu/shaders/input_external.wgsl";
 import inputExternalF16Src  from "~/model/backends/webgpu/shaders/input_external_f16.wgsl";
+import { orientationUvMatrix, sameOrientation, type Orientation } from "~/model/orientation.ts";
 
 const IS_VIDEO_FRAME = (s: ImageSource): s is VideoFrame =>
   typeof VideoFrame !== "undefined" && s instanceof VideoFrame;
@@ -32,6 +33,10 @@ export class InputWebGPU implements InputOp {
   private stagingH = 0;
 
   private source: ImageSource | null = null;
+  private readonly outW: number;
+  private readonly outH: number;
+  // Orientation currently in the uniform buffer (null = identity).
+  private orientation: Orientation | null = null;
 
   constructor(backend: WebGPUBackend, h: number, w: number) {
     this.backend = backend;
@@ -47,12 +52,12 @@ export class InputWebGPU implements InputOp {
     });
 
     this.uniformBuffer = this.device.createBuffer({
-      size: 16, // out_w u32 + out_h u32 + 8 padding
+      size: 48, // out_w u32 + out_h u32 + 8 padding + uv_x vec4 + uv_y vec4
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    const ab = new ArrayBuffer(16);
-    new Uint32Array(ab, 0, 2).set([w, h]);
-    this.device.queue.writeBuffer(this.uniformBuffer, 0, ab);
+    this.outW = w;
+    this.outH = h;
+    this.writeParams(null);
 
     this.dispatch = [Math.ceil(w / 8), Math.ceil(h / 8), 1];
 
@@ -65,8 +70,23 @@ export class InputWebGPU implements InputOp {
     );
   }
 
-  setSource(src: ImageSource): void {
+  // `orientation`: the display transform still to apply to `src` (rotation /
+  // flip the browser's upload path won't apply — see model/orientation.ts).
+  // Applied in the sampling shader; omitted = identity.
+  setSource(src: ImageSource, orientation?: Orientation | null): void {
     this.source = src;
+    if (!sameOrientation(orientation, this.orientation)) this.writeParams(orientation ?? null);
+  }
+
+  // The uniform write is queue-timeline, ahead of the (batched) dispatch that
+  // reads it, and only happens when the orientation changes.
+  private writeParams(o: Orientation | null): void {
+    const ab = new ArrayBuffer(48);
+    new Uint32Array(ab, 0, 2).set([this.outW, this.outH]);
+    const m = orientationUvMatrix(o);
+    new Float32Array(ab, 16, 8).set([m[0], m[1], m[2], 0, m[3], m[4], m[5], 0]);
+    this.device.queue.writeBuffer(this.uniformBuffer, 0, ab);
+    this.orientation = o;
   }
 
   run(): void {

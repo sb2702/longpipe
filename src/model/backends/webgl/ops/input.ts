@@ -2,6 +2,7 @@ import type { ImageSource, InputOp } from '~/model/backend.ts'
 import type { WebGLBackend } from '~/model/backends/webgl/index.ts'
 import type { WebGLTensor } from '~/model/backends/webgl/base_webgl_op.ts'
 import inputSrc from '~/model/backends/webgl/shaders/input.glsl'
+import { orientationUvMatrix, type Orientation } from '~/model/orientation.ts'
 
 const QUAD_VERT = `#version 300 es
 const vec2 VERTS[6] = vec2[6](
@@ -24,6 +25,9 @@ export class InputWebGL implements InputOp {
   private readonly uOutW: WebGLUniformLocation
   private readonly uOutH: WebGLUniformLocation
   private readonly uSrc:  WebGLUniformLocation
+  private readonly uUvX:  WebGLUniformLocation
+  private readonly uUvY:  WebGLUniformLocation
+  private orientation: Orientation | null = null
 
   private source: ImageSource | null = null
 
@@ -58,10 +62,15 @@ export class InputWebGL implements InputOp {
     this.uSrc  = gl.getUniformLocation(this.program, 'u_src')!
     this.uOutW = gl.getUniformLocation(this.program, 'u_out_w')!
     this.uOutH = gl.getUniformLocation(this.program, 'u_out_h')!
+    this.uUvX  = gl.getUniformLocation(this.program, 'u_uv_x')!
+    this.uUvY  = gl.getUniformLocation(this.program, 'u_uv_y')!
   }
 
-  setSource(src: ImageSource): void {
+  // `orientation`: display transform still to apply (see model/orientation.ts);
+  // applied while sampling. Omitted = identity.
+  setSource(src: ImageSource, orientation?: Orientation | null): void {
     this.source = src
+    this.orientation = orientation ?? null
   }
 
   run(): void {
@@ -81,6 +90,9 @@ export class InputWebGL implements InputOp {
     gl.uniform1i(this.uSrc, 0)
     gl.uniform1i(this.uOutW, this.output.w)
     gl.uniform1i(this.uOutH, this.output.h)
+    const m = orientationUvMatrix(this.orientation)
+    gl.uniform3f(this.uUvX, m[0], m[1], m[2])
+    gl.uniform3f(this.uUvY, m[3], m[4], m[5])
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.backend.fbo)
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.output.texture, 0)

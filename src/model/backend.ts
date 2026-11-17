@@ -1,3 +1,4 @@
+import type { Orientation } from '~/model/orientation.ts';
 import type { Conv2DWeights, DepthwiseWeights } from '~/model/weights.ts'
 
 export type Dtype = 'f32' | 'f16'
@@ -228,7 +229,9 @@ export type ImageSource = ImageBitmap | VideoFrame;
 // then downstream ops read inputOp.output.
 export interface InputOp {
   readonly output: Tensor;
-  setSource(src: ImageSource): void;
+  // `orientation`: display transform (rotation, flip) the source still needs,
+  // applied while sampling so `output` is upright. Omitted = identity.
+  setSource(src: ImageSource, orientation?: Orientation | null): void;
   run(): void;
 }
 

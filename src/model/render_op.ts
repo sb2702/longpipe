@@ -1,4 +1,5 @@
 import { runBatched, type Backend, type Tensor, type InputOp, type ImageSource, type RenderTarget } from '~/model/backend.ts'
+import type { Orientation } from '~/model/orientation.ts'
 import { BilinearUpscaler } from '~/model/effects/upscale_bilinear.ts'
 import { BicubicUpscaler  } from '~/model/effects/upscale_bicubic.ts'
 import { CompositorSolid } from '~/model/effects/compositor_solid.ts'
@@ -135,9 +136,12 @@ export class RenderOp<N extends NetworkLike = NetworkLike> {
   // frame — the network downsamples to its native input resolution, the
   // display path resamples to canvas resolution. networkInput is optional
   // before attachNetwork so passthrough still works.
-  setSource(src: ImageSource): void {
-    this.networkInput?.setSource(src)
-    this.displayInput.setSource(src)
+  // `orientation`: the display transform the source still needs (see
+  // model/orientation.ts). Both inputs apply it, so the network, the alpha and
+  // the composited image all live in the same upright space.
+  setSource(src: ImageSource, orientation?: Orientation | null): void {
+    this.networkInput?.setSource(src, orientation)
+    this.displayInput.setSource(src, orientation)
     this.displayDirty = true
   }
 
