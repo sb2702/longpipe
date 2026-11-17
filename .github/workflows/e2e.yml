@@ -1,4 +1,4 @@
-# DRAFT — not enabled yet. Cross-browser e2e smoke tests (tests/e2e/README.md).
+# Cross-browser e2e smoke tests (tests/e2e/README.md). Manual trigger only for now (Actions → e2e → Run workflow).
 #
 # What this covers: the SDK inside a real RTCPeerConnection in headless
 # Chromium, Firefox and WebKit (Playwright's builds), on a software GPU
@@ -10,9 +10,10 @@
 name: e2e
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  # Manual only for now. To run on every push/PR, add:
+  #   pull_request:
+  #   push:
+  #     branches: [main]
   workflow_dispatch:
 
 concurrency:

@@ -121,8 +121,7 @@ fp32, one thread per worker process).
 
 ### Results (2026-11-15)
 
-Full tables: [`quality/results/2026-11-15-p3m.md`](quality/results/2026-11-15-p3m.md)
-(standard) and [`quality/results/2026-11-15-p3m-legacy.md`](quality/results/2026-11-15-p3m-legacy.md).
+Full tables: [`quality/results/2026-11-15-p3m.md`](quality/results/2026-11-15-p3m.md).
 
 | Method | P3M-500-P MAD | P3M-500-P IoU | P3M-500-NP MAD | P3M-500-NP IoU | All MAD | All IoU | All Grad | All MAD (unknown) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -155,38 +154,15 @@ What this shows:
 
 ### Relation to the old README chart
 
-An earlier version of the README showed a bar chart, "Mean Absolute Error,
-Background Segmentation (P3M 10k Validation set)": XL 0.0077, L 0.0108, M 0.0109,
-S 0.0125, XS 0.0139, MediaPipe Selfie 0.0307, described as the "average alpha
-error on the P3M-10K validation set (499 images)… every Longpipe variant beats
-MediaPipe on both MAD and IoU". It was later replaced by a scatter plot
-(accuracy as 1 − MAE against "FPS throughput on Intel i380 graphics", with
-MediaPipe and Banuba points) that had no stated scale and no published data
-behind it; the README now shows the tables from this directory instead.
+An earlier README chart (May 2026 models, private harness) used only the 499
+landscape images of P3M-500-P/NP, centre-cropped to 16:9, against MediaPipe's
+landscape model. `--protocol legacy-readme` reproduces it: MediaPipe's numbers match
+exactly (0.0306 MAD / 0.919 IoU), the shipped xl–small match or beat the old chart,
+and the shipped xs is worse than the chart's xs (0.0176 vs 0.0139 MAD). That protocol
+wasn't disclosed and favours Longpipe (it drops the portrait images where MediaPipe's
+square model does best), so the standard protocol above is the headline.
 
-That chart came from `training/benchmark_accuracy.py` in the (private) training
-repo, run in May 2026 (results file `benchmark_accuracy.json`, removed from that
-repo in a later reorganisation). Its protocol:
-
-- **499 images = the landscape images of P3M-500-P + P3M-500-NP** (246 + 253 with
-  w/h > 1.05), not a 500-image set with one image missing. Portrait and square
-  images were excluded "since `selfie_segmenter_landscape` is the model an end
-  user actually picks for webcam input".
-- Each image (and its mask) **centre-cropped to 16:9**, then resized to the model
-  input; scored at the cropped resolution.
-- **MediaPipe landscape model only.** MAD and IoU@0.5.
-- **The Longpipe models of May 2026**, as PyTorch checkpoints, at that era's preset
-  definitions: xl at 512×288, large/medium/compact/small at 256×144 (medium =
-  large's checkpoint in fp16), xs at 192×108, plus xxs and compact presets that no
-  longer exist. The chart's "M 0.0109" matches the `compact` row (medium was
-  0.0108). The shipped models have been retrained and re-architected since
-  (U-Net wrapper, new canvas sizes: see `TIER_CONFIG`).
-
-Re-running that protocol today (`--protocol legacy-readme`) with the shipped ONNX
-models:
-
-| | old chart (May 2026 models) | legacy protocol, shipped models | standard protocol, all 1,000 images |
-|---|---|---|---|
+---|---|---|---|
 | | MAD / IoU | MAD / IoU | MAD / IoU |
 | xl | 0.0077 / 0.979 | 0.0062 / 0.979 | 0.0075 / 0.978 |
 | large | 0.0108 / 0.969 | 0.0087 / 0.974 | 0.0106 / 0.968 |
@@ -425,11 +401,10 @@ outputs were inspected visually.
 
 ### Results (2026-11-15 v2, Apple M4, Chrome 157)
 
-Full tables (min–max, diagnostics, old output path), conditions and the
-worker-activity log: [`performance/results/2026-11-15-apple-m4-v2.md`](performance/results/2026-11-15-apple-m4-v2.md).
-All Longpipe rows f16 unless marked (the SDK default). The first run,
-[`2026-11-15-apple-m4.md`](performance/results/2026-11-15-apple-m4.md), is kept
-as published; its transcode numbers were capped by the old output path.
+Full tables (min–max, diagnostics, old output path) and conditions:
+[`performance/results/2026-11-15-apple-m4-v2.md`](performance/results/2026-11-15-apple-m4-v2.md).
+All Longpipe rows f16 unless marked (the SDK default). An earlier first run was
+capped by the old output path and has been removed.
 
 Transcode FPS, median of 5 interleaved runs, **session 1 / session 2**, **360p · 720p**:
 

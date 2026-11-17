@@ -174,7 +174,7 @@ async function longpipe(kind, tier, { width, height }, requested = 'f16') {
 // no frame skipping, no flow; RenderOp.runModel + runDisplay every frame).
 // Weights: Longpipe's conversion of the same .tflite files (f16 packs from
 // DEFAULT_MEDIAPIPE_WEIGHTS_BASE_URL), at the SDK's default backend precision.
-// Adapted from the 0.0.17 MediaPipe work's bench patch (docs-drafts/bench/).
+// MediaPipe selfie on Longpipe's engine (added with 0.0.17).
 async function longpipeMediaPipe(kind, variant, { width, height }, requested = 'f16') {
   const cfg = MEDIAPIPE_SELFIE_CONFIG[variant]
   let dtype = requested

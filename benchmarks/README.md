@@ -15,93 +15,19 @@ hardware, and every individual measurement.
   these numbers relate to the charts previously shown in the README. **Read it
   before quoting any number.**
 
-## Headline results
+## Results
 
-### Quality: P3M-10k validation, 2026-11-15
+The current headline numbers (Longpipe 0.0.18: speed charts, the P3M quality table and
+what each row means) are in [`analysis/README.md`](../analysis/README.md), which the
+main README and longpipe.dev/docs/benchmarks summarise. Full result files:
 
-Mean absolute alpha error (MAD, lower is better) and IoU of the mask at 0.5
-(higher is better), at ground-truth resolution, all 1,000 images (portraits
-included). Full metrics (SAD, MSE, Grad, Conn, trimap-unknown band) and
-per-orientation breakdowns: [`quality/results/2026-11-15-p3m.md`](quality/results/2026-11-15-p3m.md).
+- Quality: [`quality/results/2026-11-15-p3m.md`](quality/results/2026-11-15-p3m.md)
+  (all metrics, per-orientation breakdowns) and its per-image CSV.
+- Performance (0.0.17, model × engine × pipeline, 360p/720p, min–max):
+  [`performance/results/2026-11-15-apple-m4-v2.md`](performance/results/2026-11-15-apple-m4-v2.md);
+  0.0.18 command-buffer A/B: [`performance/results/2026-11-15-apple-m4-engine-perf-ab-transcode.json`](performance/results/2026-11-15-apple-m4-engine-perf-ab-transcode.json).
 
-| Method | Mask res. | P3M-500-P MAD | P3M-500-P IoU | P3M-500-NP MAD | P3M-500-NP IoU |
-|---|---|---:|---:|---:|---:|
-| Longpipe xs | 384×240 | 0.0210 | 0.9229 | 0.0233 | 0.9262 |
-| Longpipe small | 384×224 | 0.0170 | 0.9365 | 0.0155 | 0.9536 |
-| Longpipe medium | 512×320 | 0.0106 | 0.9657 | 0.0102 | 0.9716 |
-| Longpipe large | 640×400 | 0.0111 | 0.9632 | 0.0100 | 0.9720 |
-| Longpipe xl | 1280×768 | **0.0071** | **0.9770** | **0.0080** | **0.9787** |
-| MediaPipe selfie (square) | 256×256 | 0.0304 | 0.9228 | 0.0249 | 0.9398 |
-| MediaPipe selfie (landscape) | 256×144 | 0.0322 | 0.9173 | 0.0276 | 0.9340 |
-
-Every Longpipe preset has lower MAD than MediaPipe on both sets. On IoU,
-MediaPipe (square) beats Longpipe **xs** on P3M-500-NP and ties it on P3M-500-P;
-small and up beat it. P3M-500-NP is the cleaner comparison: Longpipe trained on
-P3M-10k's (face-blurred) training split and selects checkpoints on a validation
-set that includes P3M-500-P. See [METHODOLOGY.md](METHODOLOGY.md#caveats).
-
-### Performance: Apple M4 MacBook Pro, Chrome 157 (v2)
-
-Background replacement on a 192-frame webcam clip, organised as **model ×
-engine × pipeline**: MediaPipe's selfie model on three engines (MediaPipe Tasks,
-LiteRT.js, Longpipe's), and Longpipe's model with the network on every frame and
-**as shipped** (the SDK's own renderer: full network on key frames, a learned
-optical-flow network on the frames in between, a temporal stabiliser on every
-frame). Headline metric: **transcode FPS**, WebCodecs decode → effect → H.264
-encode → MP4, the same output path for every pipeline. Full results and
-conditions: [`performance/results/2026-11-15-apple-m4-v2.md`](performance/results/2026-11-15-apple-m4-v2.md).
-
-> **Longpipe 0.0.18** batches GPU work into one command buffer per model run and frame. Same-session A/B
-> (3 rounds, [`engine-perf-ab-transcode.json`](performance/results/2026-11-15-apple-m4-engine-perf-ab-transcode.json)),
-> 360p WebGPU transcode: MediaPipe landscape on Longpipe 198 → 379 fps (LiteRT.js 433), shipped xs 282 → 344,
-> small 274 → 332, medium 225 → 250, large 135 → 158, xl 83 → 83; WebGL unchanged. The tables below are v2 (0.0.17).
-
-Transcode FPS, median of 5 interleaved runs, **session 1 / session 2**, **360p · 720p**:
-
-| Model | Engine | Pipeline | Mask | FPS (360p · 720p) |
-|---|---|---|---|---:|
-| – (no model) | – | passthrough (decode → encode) | – | 789 / 739 · 249 / 263 |
-| – (no model) | WebGPU | canvas copy | – | 586 / 551 · 224 / 228 |
-| – (no model) | WebGL2 | canvas copy | – | 451 / 427 · 185 / 195 |
-| MediaPipe square | MediaPipe Tasks, GPU delegate | every frame | 256×256 | 118 / 114 · 93 / 94 |
-| MediaPipe landscape | MediaPipe Tasks, GPU delegate | every frame | 256×144 | 123 / 120 · 93 / 97 |
-| MediaPipe square | MediaPipe Tasks, CPU delegate | every frame | 256×256 | 117 / 114 · 69 / 70 |
-| MediaPipe landscape | MediaPipe Tasks, CPU delegate | every frame | 256×144 | 150 / 153 · 81 / 82 |
-| MediaPipe square | LiteRT.js, WebGPU | every frame | 256×256 | 380 / 381 · 201 / 196 |
-| MediaPipe landscape | LiteRT.js, WebGPU | every frame | 256×144 | 414 / 411 · 196 / 204 |
-| MediaPipe square | Longpipe, WebGPU | every frame | 256×256 | 206 / 192 · 132 / 130 |
-| MediaPipe landscape | Longpipe, WebGPU | every frame | 256×144 | 209 / 205 · 130 / 132 |
-| MediaPipe square | Longpipe, WebGL2 | every frame | 256×256 | 125 / 123 · 90 / 90 |
-| MediaPipe landscape | Longpipe, WebGL2 | every frame | 256×144 | 122 / 123 · 88 / 92 |
-
-| Longpipe model, Longpipe engine | xs (384×240) | small (384×224) | medium (512×320) | large (640×400) | xl (1280×768) |
-|---|---:|---:|---:|---:|---:|
-| **As shipped**, WebGPU | 308 / 288 · 159 / 161 | 291 / 298 · 155 / 162 | 241 / 237 · 140 / 146 | 150 / 157 · 104 / 108 | 91 / 88 · 69 / 69 |
-| **As shipped**, WebGL2 | 205 / 192 · 122 / 129 | 195 / 189 · 121 / 125 | 154 / 159 · 104 / 105 | 102 / 101 · 76 / 78 | 63 / 60 · 49 / 52 |
-| Network every frame, WebGPU | 273 / 280 · 154 / 157 | 261 / 277 · 145 / 156 | 217 / 216 · 133 / 141 | 203 / 199 · 129 / 132 | 119 / 121 · 89 / 93 |
-| Network every frame, WebGL2 | 189 / 191 · 124 / 129 | 190 / 183 · 122 / 121 | 149 / 139 · 103 / 106 | 137 / 134 · 100 / 100 | 85 / 84 · 68 / 68 |
-| Network every frame, WebGPU, f32 | | | | 162 / 162 · 107 / 110 | 82 / 82 · 64 / 66 |
-| Network every frame, WebGL2, f32 | | | | 128 / 121 · 88 / 89 | 70 / 69 · 55 / 54 |
-
-On this machine:
-
-- **MediaPipe's model on LiteRT.js (WebGPU) is the fastest pipeline tested**,
-  faster than every Longpipe preset. On the same model, LiteRT.js is 1.8–2.0×
-  faster than Longpipe's engine on WebGPU, which is ~1.7× faster than MediaPipe
-  Tasks.
-- **Longpipe as shipped vs MediaPipe Tasks**: on WebGPU, xs–medium are faster
-  than every Tasks configuration, large is level (360p) or faster (720p), xl is
-  slower than Tasks' best configuration. On WebGL2, xs/small are faster, medium
-  level, large and xl slower than Tasks' best.
-- **The shipped flow schedule barely pays for itself in speed**: xs–medium are
-  0–14% faster than the network on every frame; large/xl are 18–27% slower
-  (they run the flow network on every frame too). Its purpose, temporal
-  stability, is not measured here.
-- One machine, in use while measured (a production GPU worker, whose jobs were
-  detected and excluded, and other apps). Read [METHODOLOGY.md](METHODOLOGY.md#performance)
-  for what each row runs, the output-path investigation, and caveats. The first
-  run ([`2026-11-15-apple-m4.md`](performance/results/2026-11-15-apple-m4.md)) is
-  kept as published; its transcode numbers were capped by the old output path.
+Read [METHODOLOGY.md](METHODOLOGY.md) before quoting any number.
 
 ## Quick start
 

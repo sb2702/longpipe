@@ -54,18 +54,6 @@
         <a href="/loop-video.html">Pipeline: looped video → Pipeline → video element</a>
         <span class="desc">Full SDK end-to-end. Looped video file feeds <code>captureStream()</code> as the input MediaStream; the output MediaStream drives a second video element. Real-world device test target.</span>
       </li>
-      <li>
-        <a href="/transfer-capture.html">transferControlToOffscreen + captureStream</a>
-        <span class="desc">Pipeline plumbing test. Does a canvas's <code>captureStream()</code> keep emitting frames after its drawing control is transferred to a worker? Chromium yes, Firefox no.</span>
-      </li>
-      <li>
-        <a href="/bitmap-shuttle.html">Bitmap shuttle (worker → ImageBitmap → main canvas → captureStream)</a>
-        <span class="desc">Universal-fallback path test. Worker renders to its own OffscreenCanvas, ships an ImageBitmap to main per frame, main draws it into a bitmaprenderer canvas that's captured.</span>
-      </li>
-      <li>
-        <a href="/mstg.html">MediaStreamTrackGenerator (worker writes VideoFrames)</a>
-        <span class="desc">Best-path test for the output side. Main creates a generator and transfers its writable to the worker; worker writes <code>VideoFrame</code>s; main wraps the generator in a <code>MediaStream</code>.</span>
-      </li>
     </ul>
   </body>
 </html>

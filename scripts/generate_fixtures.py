@@ -1,11 +1,11 @@
 """
 Generate op-level test fixtures for the Longpipe SDK.
 
-Outputs JSON files to sdk/tests/fixtures/ containing small deterministic
+Outputs JSON files to tests/fixtures/ containing small deterministic
 inputs and PyTorch-computed expected outputs for each op type.
 
 Usage:
-    python sdk/scripts/generate_fixtures.py
+    python scripts/generate_fixtures.py
 """
 
 import json
