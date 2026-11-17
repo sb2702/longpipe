@@ -283,6 +283,21 @@ export class Renderer {
   // externalTexturesSupported). Returns the frame itself when no copy is needed;
   // otherwise a bitmap the caller must close().
   private externalOk: boolean | undefined
+
+  // Frame pacing for WebGPU: nothing else stops the worker from submitting
+  // frames faster than the GPU finishes them (the bitmap-shuttle path has no
+  // consumer-side backpressure), so latency would grow without bound. Keep at
+  // most `maxInFlight` frames queued on the GPU; the input drops stale frames.
+  private inFlight: Promise<unknown>[] = []
+  async waitForGpu(maxInFlight = 1): Promise<void> {
+    if (this.backendKind !== 'webgpu') return
+    while (this.inFlight.length >= maxInFlight) await this.inFlight.shift()
+  }
+  markSubmitted(): void {
+    if (this.backendKind !== 'webgpu') return
+    const device = (this.backend as unknown as { device?: GPUDevice }).device
+    if (device) this.inFlight.push(device.queue.onSubmittedWorkDone().catch(() => {}))
+  }
   async prepareSource(frame: VideoFrame): Promise<VideoFrame | ImageBitmap> {
     if (this.backendKind !== 'webgpu') return frame
     if (this.externalOk === undefined) {

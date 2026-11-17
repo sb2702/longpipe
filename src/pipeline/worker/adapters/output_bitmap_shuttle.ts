@@ -18,10 +18,14 @@ export function createBitmapShuttleOutput(
     async write(frame) {
       const src = await renderer.prepareSource(frame)
       try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
+      renderer.markSubmitted()
       frame.close()
       const bmp = renderer.canvas.transferToImageBitmap()
       port.postMessage({ bmp }, [bmp])
       onFrame()
+      // Firefox (this path) + WebGPU: don't take the next frame until the GPU has
+      // finished this one, so latency can't build up (stale input frames drop instead).
+      await renderer.waitForGpu(1)
     },
     close() {
       port.close()
