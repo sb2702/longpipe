@@ -49,6 +49,7 @@ const state = {
   errors: [],           // every onError, in order
   recovered: [],        // every onRecovered
   trackChanges: 0,      // onTrackChanged count
+  audioTrackChanges: [], // onAudioTrackChanged calls ({ denoised })
   stats: null,          // last pipeline.getStats() (null while bypassed)
   audioStats: null,     // last pipeline.getAudioStats()
   rtp: null,            // last callStats()
@@ -149,6 +150,14 @@ function startPipeline(cfg, stream, background) {
       $('local').srcObject = p.stream
       log(`onTrackChanged (${reason}): replaced the sender's video track`)
     },
+    // Denoise only, and only if the AudioContext couldn't start (no user
+    // gesture left, see unlockAudio() in start()): the output audio moves to
+    // the original mic audio, then back to the denoised track once it runs.
+    onAudioTrackChanged: ({ audioTrack, denoised }) => {
+      state.audioTrackChanges.push({ denoised })
+      call?.senders.audio?.replaceTrack(audioTrack)?.catch(() => {})
+      log(`onAudioTrackChanged: ${denoised ? 'denoised' : 'original audio (AudioContext not running)'}`)
+    },
   })
   // `pipeline.stream` is usable right away (raw camera until the effect is
   // live); `ready` says when it is, and which backend it got.
@@ -163,8 +172,11 @@ function startPipeline(cfg, stream, background) {
 
 async function start() {
   if (state.running) return
+  // Still inside the click: let the denoise AudioContext start now. By the time
+  // getUserMedia resolves (and the pipeline exists) the gesture has expired.
+  EffectsPipeline.unlockAudio()
   const cfg = readConfig()
-  Object.assign(state, { running: true, config: cfg, ready: null, readyError: null, errors: [], recovered: [], trackChanges: 0, replaceTracks: [], readyMs: null, bypass: cfg.bypass, model: null, livePreset: null, latency: null })
+  Object.assign(state, { running: true, config: cfg, ready: null, readyError: null, errors: [], recovered: [], trackChanges: 0, replaceTracks: [], audioTrackChanges: [], readyMs: null, bypass: cfg.bypass, model: null, livePreset: null, latency: null })
   $('start').disabled = true
   try {
     input = cfg.input === 'clip' ? await clipInput(CLIP_URL) : await cameraInput({ facingMode: CAMERA_FACING })

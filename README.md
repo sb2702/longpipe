@@ -17,6 +17,7 @@ npm install longpipe
 ```ts
 import { EffectsPipeline } from 'longpipe'
 
+EffectsPipeline.unlockAudio()   // in your click handler, before any await: lets denoise start
 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
 
 const pipeline = new EffectsPipeline(stream, {

@@ -230,7 +230,9 @@ const STEPS = [
 ]
 
 export async function runSelfTest({ example, form, onProgress = () => {} }) {
-  const result = { kind: 'longpipe-selftest', v: 1, startedAt: new Date().toISOString(), page: location.pathname + location.search, steps: {} }
+  // ?label=… tags a run (e.g. label=headless for automated runs, so the table can leave them out).
+  const label = new URLSearchParams(location.search).get('label')
+  const result = { kind: 'longpipe-selftest', v: 1, startedAt: new Date().toISOString(), page: location.pathname + location.search, ...(label ? { label } : {}), steps: {} }
   const t0 = performance.now()
   const st = example.state
 
@@ -321,7 +323,7 @@ export async function runSelfTest({ example, form, onProgress = () => {} }) {
     const b = await rtp(example)
     const samples = (b.audio.totalSamplesReceived ?? 0) - (a.audio.totalSamplesReceived ?? 0)
     const as = example.pipeline?.getAudioStats() ?? null
-    const audioErr = st.errors.find((e) => e.type === 'audio')
+    const audioErr = st.errors.find((e) => e.type === 'audio' || e.type === 'audio-suspended')
     let remoteRms = null
     try { remoteRms = (await withTimeout(example.audioLevels(), 3000, 'audio level')).remote } catch { /* optional */ }
     return {
@@ -332,6 +334,8 @@ export async function runSelfTest({ example, form, onProgress = () => {} }) {
       denoiseModel: as?.model ?? null,
       denoiseActive: as?.active ?? false,
       sampleRate: as?.sampleRate ?? null,
+      contextState: example.pipeline?.denoiser?.state ?? null,   // internal; 'running' expected
+      audioTrackChanges: [...(st.audioTrackChanges ?? [])],
       ...(audioErr ? { error: errText(audioErr) } : {}),
     }
   }, 20_000)

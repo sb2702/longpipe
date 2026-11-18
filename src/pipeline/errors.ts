@@ -24,7 +24,7 @@ export type PipelineErrorType =
   | 'control-timeout'  // a setX() call got no answer in time → previous settings kept
   | 'adaptive'         // adaptive preset swap failed → stays on the current preset
   | 'audio'            // audio denoise failed → original audio passes through
-  | 'audio-suspended'  // AudioContext suspended by autoplay policy → call resumeAudio() from a gesture
+  | 'audio-suspended'  // AudioContext suspended by autoplay policy → original audio (new track) until resumeAudio() / a gesture
 
 // Where it happened (coarse; kept from 0.0.18 for compatibility).
 export type ErrorSource =

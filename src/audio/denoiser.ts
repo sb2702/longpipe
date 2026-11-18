@@ -11,6 +11,11 @@
 // instantiate inside the worklet, an exception in process()), the graph goes
 // back to source → destination, so the output carries the ORIGINAL audio —
 // never silence — and onError says why.
+//
+// A context that isn't running (autoplay policy, iOS interruption) passes no
+// audio at all, so then the output track switches to a clone of the mic track
+// (original audio), and back to the context's track once it runs. That is the
+// one case where `outputTrack` changes; onOutputTrackChanged says so.
 
 import {
   KERNELS, SAMPLE_RATE, resolveModel,
@@ -31,17 +36,52 @@ export interface AudioDenoiserOptions {
   onReady?:        () => void
   onError?:        (message: string) => void
   // The AudioContext is suspended (autoplay policy) and couldn't be resumed
-  // without a user gesture: output is silent until resume() or the next
-  // gesture (the denoiser listens for one and resumes by itself).
+  // without a user gesture. The output is the original mic audio (see
+  // onOutputTrackChanged) until resume() or the next gesture (the denoiser
+  // listens for one and resumes by itself).
   onSuspended?:    () => void
+  // `outputTrack` was replaced: `denoised` false = the context stopped running
+  // and the output is now a clone of the mic track (original audio); true = it
+  // runs again and the output is back on the denoiser's track. Put the new
+  // track on your sender (RTCRtpSender.replaceTrack).
+  onOutputTrackChanged?: (track: MediaStreamTrack, previous: MediaStreamTrack, denoised: boolean) => void
 }
 
 const DEFAULT_BETA = 0.03
 const DEFAULT_GRU_LEAK = 0.995
 const GESTURES = ['pointerdown', 'keydown', 'touchend'] as const
+// How long the context may stay not-running before the output falls back to
+// the original audio (a context created while allowed starts within a few ms).
+const SUSPEND_GRACE_MS = 250
+// An unlocked context nobody adopts is closed after this long.
+const UNLOCK_TTL_MS = 60_000
+
+// A context created (and resumed) inside a user gesture by unlock(), waiting
+// for the next AudioDenoiser to adopt it.
+let unlocked: { ctx: AudioContext; timer: ReturnType<typeof setTimeout> } | null = null
 
 export class AudioDenoiser {
-  readonly outputTrack: MediaStreamTrack
+  // Create (or resume) the AudioContext the next AudioDenoiser will use, NOW.
+  // Call it synchronously in the click handler that starts your call, before
+  // any await (getUserMedia, fetches): browsers only let an AudioContext start
+  // during a user gesture, and the gesture has expired by the time the stream
+  // arrives. Safe to call repeatedly or without a gesture (it does nothing
+  // useful then). Unused, the context is closed after a minute.
+  static unlock(): void {
+    if (typeof AudioContext === 'undefined') return
+    if (unlocked && unlocked.ctx.state !== 'closed') { void unlocked.ctx.resume().catch(() => {}); return }
+    let ctx: AudioContext
+    try { ctx = new AudioContext({ sampleRate: SAMPLE_RATE }) } catch {
+      try { ctx = new AudioContext() } catch { return }
+    }
+    void ctx.resume().catch(() => {})
+    const entry = {
+      ctx,
+      timer: setTimeout(() => { if (unlocked === entry) { unlocked = null; void ctx.close().catch(() => {}) } }, UNLOCK_TTL_MS),
+    }
+    unlocked = entry
+  }
+
   // Resolves true once the denoise worklet is spliced in; false if init failed
   // (or the denoiser was destroyed first) and the graph stayed in passthrough.
   // Never rejects — audio keeps flowing either way; onError carries the reason.
@@ -50,6 +90,13 @@ export class AudioDenoiser {
   private ctx: AudioContext
   private source: MediaStreamAudioSourceNode
   private dest: MediaStreamAudioDestinationNode
+  // The context's output (denoised / passthrough) and, while the context isn't
+  // running, a clone of the mic track carrying the original audio.
+  private readonly destTrack: MediaStreamTrack
+  private rawTrack: MediaStreamTrack | null = null
+  private current: MediaStreamTrack
+  private suspendTimer: ReturnType<typeof setTimeout> | null = null
+  private removeStateListener: (() => void) | null = null
   private node: AudioWorkletNode | null = null
   private model: DenoiseModel | null = null
   private latestStats: AudioStats | null = null
@@ -60,29 +107,38 @@ export class AudioDenoiser {
 
   // Throws only if no AudioContext graph can be built at all (the caller then
   // passes the original track through).
-  constructor(inputTrack: MediaStreamTrack, private opts: AudioDenoiserOptions = {}) {
+  constructor(private inputTrack: MediaStreamTrack, private opts: AudioDenoiserOptions = {}) {
     // Request 48 kHz; the browser resamples the mic into the context rate for
     // free when it honors this. If it doesn't, the worklet engages its own
     // resamplers (see worklet/processor.ts). Some engines (historically
     // Firefox) refuse to connect a mic whose rate differs from the context's:
     // retry with the device's default rate before giving up.
-    let built = buildGraph(inputTrack, SAMPLE_RATE)
+    // A context unlock() created inside a gesture is adopted if it got to run;
+    // otherwise build one here (the constructor may itself run in a gesture).
+    let built = adoptUnlocked(inputTrack)
+    if (!built.ok) built = buildGraph(inputTrack, SAMPLE_RATE)
     if (!built.ok) built = buildGraph(inputTrack, undefined)
     if (!built.ok) throw built.error
     this.ctx = built.ctx
     this.source = built.source
     this.dest = this.ctx.createMediaStreamDestination()
-    this.outputTrack = this.dest.stream.getAudioTracks()[0]
+    this.destTrack = this.dest.stream.getAudioTracks()[0]
+    this.current = this.destTrack
 
     // Passthrough immediately; denoise splices in when ready.
     this.source.connect(this.dest)
 
-    // Autoplay policy can start the context suspended (Safari, or Chrome before
-    // any user interaction) — and a suspended context passes NO audio, not even
-    // passthrough. Try to resume now; if the browser refuses, resume on the
-    // first user gesture and tell the caller.
-    void this.resume().catch(() => { /* handled by the state check below */ })
-    queueMicrotask(() => this.watchSuspended())
+    // Autoplay policy can start the context suspended (Safari, Firefox or
+    // Chrome without a recent user gesture) — and a suspended context passes NO
+    // audio, not even passthrough. Try to resume now (synchronously: this keeps
+    // a gesture the constructor runs in); if the browser refuses, the output
+    // falls back to the original mic audio, resumes on the next user gesture,
+    // and the caller is told.
+    void this.resume().catch(() => { /* handled by the state watcher */ })
+    const onState = () => this.onStateChange()
+    this.ctx.addEventListener('statechange', onState)
+    this.removeStateListener = () => this.ctx.removeEventListener('statechange', onState)
+    this.onStateChange()
 
     // Mic ended (unplugged / stopped) → end our output too.
     const onEnded = () => this.endOutput()
@@ -96,24 +152,56 @@ export class AudioDenoiser {
     })
   }
 
-  private watchSuspended(): void {
-    if (this.destroyed || this.ctx.state !== 'suspended') return
-    // Give the constructor's resume() a moment; still suspended → gesture.
-    setTimeout(() => {
-      if (this.destroyed || this.ctx.state !== 'suspended') return
+  // The current output track: the context's (denoised, or passthrough while
+  // the worklet loads / after a failure), or the original mic audio while the
+  // context isn't running.
+  get outputTrack(): MediaStreamTrack { return this.current }
+
+  // Context running → output on the context's track. Not running for
+  // SUSPEND_GRACE_MS → original audio on a clone of the mic track, a
+  // non-fatal onSuspended, and a resume on the next user gesture.
+  private onStateChange(): void {
+    if (this.destroyed) return
+    const state = this.ctx.state as string
+    if (state === 'closed') return
+    if (state === 'running') {
+      if (this.suspendTimer) { clearTimeout(this.suspendTimer); this.suspendTimer = null }
+      this.removeGestureListeners?.()
+      this.setOutput(this.destTrack)
+      return
+    }
+    if (this.suspendTimer) return
+    this.suspendTimer = setTimeout(() => {
+      this.suspendTimer = null
+      if (this.destroyed || (this.ctx.state as string) === 'running' || this.ctx.state === 'closed') return
+      this.setOutput(this.originalTrack())
       this.opts.onSuspended?.()
-      if (typeof window === 'undefined' || this.removeGestureListeners) return
-      const onGesture = () => {
-        void this.ctx.resume().then(() => {
-          if (this.ctx.state === 'running') this.removeGestureListeners?.()
-        }).catch(() => {})
-      }
-      for (const g of GESTURES) window.addEventListener(g, onGesture, { capture: true })
-      this.removeGestureListeners = () => {
-        for (const g of GESTURES) window.removeEventListener(g, onGesture, { capture: true })
-        this.removeGestureListeners = null
-      }
-    }, 250)
+      this.listenForGesture()
+    }, SUSPEND_GRACE_MS)
+  }
+
+  private originalTrack(): MediaStreamTrack {
+    if (!this.rawTrack || this.rawTrack.readyState === 'ended') this.rawTrack = this.inputTrack.clone()
+    return this.rawTrack
+  }
+
+  private setOutput(track: MediaStreamTrack): void {
+    if (track === this.current) return
+    const previous = this.current
+    this.current = track
+    try { this.opts.onOutputTrackChanged?.(track, previous, track === this.destTrack) } catch (err) {
+      console.error('[longpipe/audio] onOutputTrackChanged threw:', err)
+    }
+  }
+
+  private listenForGesture(): void {
+    if (typeof window === 'undefined' || this.removeGestureListeners) return
+    const onGesture = () => { void this.ctx.resume().catch(() => {}) }
+    for (const g of GESTURES) window.addEventListener(g, onGesture, { capture: true })
+    this.removeGestureListeners = () => {
+      for (const g of GESTURES) window.removeEventListener(g, onGesture, { capture: true })
+      this.removeGestureListeners = null
+    }
   }
 
   // Explicit model/tier choice (NOT 'auto') → resolve, with a SIMD fallback.
@@ -210,9 +298,9 @@ export class AudioDenoiser {
   // handler (e.g. your join / unmute button) to be safe. No-op when already
   // running or after destroy().
   async resume(): Promise<void> {
-    if (this.destroyed || this.ctx.state !== 'suspended') return
+    if (this.destroyed || this.ctx.state === 'running' || this.ctx.state === 'closed') return
     await this.ctx.resume()
-    if ((this.ctx.state as AudioContextState) === 'running') this.removeGestureListeners?.()
+    // statechange moves the output back to the context's track.
   }
 
   private endOutput(): void {
@@ -226,7 +314,10 @@ export class AudioDenoiser {
   destroy(): void {
     if (this.destroyed) return
     this.destroyed = true
-    this.outputTrack.stop()
+    this.destTrack.stop()
+    this.rawTrack?.stop()
+    if (this.suspendTimer) clearTimeout(this.suspendTimer)
+    this.removeStateListener?.()
     this.removeGestureListeners?.()
     this.removeEndedListener?.()
     try { this.node?.disconnect() } catch { /* already gone */ }
@@ -238,6 +329,27 @@ export class AudioDenoiser {
 type Graph =
   | { ok: true; ctx: AudioContext; source: MediaStreamAudioSourceNode }
   | { ok: false; error: unknown }
+
+// The context unlock() made, if it is running (one that didn't start is no
+// better than a fresh one, and on iOS getUserMedia can interrupt it) and the
+// mic connects to it. Otherwise it is closed.
+function adoptUnlocked(inputTrack: MediaStreamTrack): Graph {
+  const entry = unlocked
+  unlocked = null
+  if (!entry) return { ok: false, error: new Error('no unlocked AudioContext') }
+  clearTimeout(entry.timer)
+  const ctx = entry.ctx
+  if (ctx.state !== 'running') {
+    void ctx.close().catch(() => {})
+    return { ok: false, error: new Error(`unlocked AudioContext is ${ctx.state}`) }
+  }
+  try {
+    return { ok: true, ctx, source: ctx.createMediaStreamSource(new MediaStream([inputTrack])) }
+  } catch (error) {
+    void ctx.close().catch(() => {})
+    return { ok: false, error }
+  }
+}
 
 function buildGraph(inputTrack: MediaStreamTrack, sampleRate: number | undefined): Graph {
   let ctx: AudioContext | null = null

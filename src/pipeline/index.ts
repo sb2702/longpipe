@@ -155,6 +155,15 @@ export interface PipelineOptions {
   // `pipeline.stream` is already updated; call `sender.replaceTrack(videoTrack)`
   // on your RTCRtpSender. Never fires on the mstg / bitmap-shuttle paths.
   onTrackChanged?: (change: TrackChange) => void
+  // audio: 'denoise' only. Fires when the output AUDIO track was replaced: the
+  // denoise AudioContext isn't running (autoplay policy; see 'audio-suspended'),
+  // so the output carries the original mic audio on a clone of the mic track
+  // (`denoised: false`), and again when it runs (`denoised: true`, back on the
+  // denoised track). `pipeline.stream` is already updated; call
+  // `sender.replaceTrack(audioTrack)` on your audio RTCRtpSender. Never fires
+  // when the context starts normally (call EffectsPipeline.unlockAudio() in
+  // your click handler to make sure it does).
+  onAudioTrackChanged?: (change: AudioTrackChange) => void
   // Enable verbose internal logging (`[longpipe/pipeline] …`, etc) on both
   // the main thread and inside the worker. Default false — production
   // consumers see nothing in console unless they opt in.
@@ -187,6 +196,13 @@ export interface TrackChange {
   videoTrack:    MediaStreamTrack     // the new output video track
   previousTrack: MediaStreamTrack     // the old one (frozen; stopped on destroy())
   reason:        PipelineErrorType
+}
+
+export interface AudioTrackChange {
+  stream:        MediaStream          // === pipeline.stream
+  audioTrack:    MediaStreamTrack     // the new output audio track
+  previousTrack: MediaStreamTrack     // the old one (stays live; stopped on destroy())
+  denoised:      boolean              // false = original mic audio (context not running)
 }
 
 // Developer-facing touch-up options; thresholds/decode internals stay SDK-owned.
@@ -525,8 +541,10 @@ export class Pipeline implements PromiseLike<Pipeline> {
             enabled:        audio.denoise?.enabled,
             onError:        (message) => this.emitError(new LongpipeError('audio', message)),
             onSuspended:    () => this.emitError(new LongpipeError('audio-suspended',
-              'audio: the AudioContext is suspended by the autoplay policy, so the output audio is silent; ' +
-              'it resumes on the next user gesture, or call pipeline.resumeAudio() from one')),
+              'audio: the AudioContext is suspended by the autoplay policy, so the output carries the original ' +
+              '(not denoised) audio on a new track (onAudioTrackChanged); denoise starts on the next user gesture, ' +
+              'or call pipeline.resumeAudio() from one')),
+            onOutputTrackChanged: (track, previous, denoised) => this.swapAudioTrack(track, previous, denoised),
           })
           denoisedTrack = this.denoiser.outputTrack
         } catch (err) {
@@ -576,6 +594,25 @@ export class Pipeline implements PromiseLike<Pipeline> {
     this.watchdog = setInterval(() => this.watchdogTick(), 1000)
 
     void this.startWorker()
+  }
+
+  // The denoiser's output track changed (its AudioContext stopped / started
+  // running): swap it in pipeline.stream and tell the app.
+  private swapAudioTrack(track: MediaStreamTrack, previous: MediaStreamTrack, denoised: boolean): void {
+    if (this.status === 'destroyed') return
+    this.stream.removeTrack(previous)
+    this.stream.addTrack(track)
+    log(`audio output track changed (${denoised ? 'denoised' : 'original audio: AudioContext not running'})`)
+    safeCall(() => this.opts.onAudioTrackChanged?.({ stream: this.stream, audioTrack: track, previousTrack: previous, denoised }))
+  }
+
+  // Let audio denoise start without a later gesture: creates (and resumes) the
+  // AudioContext the next pipeline's denoiser will use. Call it synchronously
+  // in the click handler that starts the call, BEFORE awaiting getUserMedia —
+  // the browser only allows an AudioContext to start during a user gesture,
+  // and that has expired by the time the stream arrives. Harmless otherwise.
+  static unlockAudio(): void {
+    AudioDenoiser.unlock()
   }
 
   // ── Public state ──────────────────────────────────────────────────────────
@@ -1423,10 +1460,10 @@ export class Pipeline implements PromiseLike<Pipeline> {
     if (input.enabled != null) this.denoiser.setEnabled(input.enabled)
   }
 
-  // Resume the denoise AudioContext if the autoplay policy suspended it (a
-  // suspended context outputs silence). Call from a user gesture (join /
-  // unmute button). The SDK also resumes on the first gesture by itself.
-  // No-op without audio: 'denoise'.
+  // Resume the denoise AudioContext if the autoplay policy suspended it (the
+  // output carries the original audio meanwhile; see onAudioTrackChanged).
+  // Call from a user gesture (join / unmute button). The SDK also resumes on
+  // the first gesture by itself. No-op without audio: 'denoise'.
   async resumeAudio(): Promise<void> {
     try {
       await this.denoiser?.resume()

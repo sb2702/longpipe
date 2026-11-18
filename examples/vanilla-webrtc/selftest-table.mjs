@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Device self-test results → a markdown table, one row per run.
 //
-//   node examples/vanilla-webrtc/selftest-table.mjs [results.jsonl] [--json]
+//   node examples/vanilla-webrtc/selftest-table.mjs [results.jsonl] [--json] [--all]
 //
 // Default input: selftest-results.jsonl next to this file (written by the
 // dev server's POST /__selftest; see vite.config.js). --json adds each run's
-// full JSON below the table, for details the row leaves out.
+// full JSON below the table, for details the row leaves out. Runs tagged with
+// a ?label= (e.g. label=headless) are left out unless --all.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { headerRows, toRow } from './selftest-format.js'
@@ -19,9 +20,11 @@ try {
   console.error(`no results at ${file} (${e.code}): run the self-test first (README, "Device self-test")`)
   process.exit(1)
 }
-const runs = text.split('\n').filter(Boolean).flatMap((line, i) => {
+const all = text.split('\n').filter(Boolean).flatMap((line, i) => {
   try { return [JSON.parse(line)] } catch { console.error(`line ${i + 1}: not JSON, skipped`); return [] }
 })
+const runs = args.includes('--all') ? all : all.filter((r) => !r.label)
+if (runs.length < all.length) console.error(`${all.length - runs.length} labelled run(s) left out (--all to include)`)
 console.log(headerRows())
 for (const r of runs) console.log(toRow(r))
 const sdks = [...new Set(runs.map((r) => r.env?.sdk).filter(Boolean))]

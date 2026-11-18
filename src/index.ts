@@ -6,7 +6,7 @@ export { Pipeline as EffectsPipeline, LongpipeError } from '~/pipeline/index.ts'
 // as `preset` or to `setPreset()` to pin a tier. Read-only.
 export { PRESETS } from '~/pipeline/presets.ts'
 export type {
-  PipelineOptions, TouchupOptions, RecoveredInfo, TrackChange,
+  PipelineOptions, TouchupOptions, RecoveredInfo, TrackChange, AudioTrackChange,
   PipelineErrorType, ActiveBackend, BackendPreference, PipelineStats, PipelineStatus, ReadyInfo,
   BackgroundInput, Background, BlurInput, ColorInput, ImageInput, VideoInput,
   PresetName, ManualPreset, ModelName, ModelChoice,

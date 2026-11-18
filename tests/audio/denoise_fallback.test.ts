@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { userEvent } from '@vitest/browser/context'
 import { AudioDenoiser } from '~/audio/denoiser'
-import { Pipeline } from '~/pipeline/index'
+import { Pipeline, type AudioTrackChange } from '~/pipeline/index'
 import { syntheticCamera, stubWeights, restoreFetch, errorLog, SMALL, sleep, waitUntil } from '../helpers/pipeline'
 
 // A 440 Hz tone as a mic track.
@@ -49,12 +49,24 @@ describe('suspended AudioContext (autoplay policy)', () => {
     const cam = syntheticCamera(30)
     const tone = toneTrack()
     const log = errorLog()
-    const p = new Pipeline(new MediaStream([cam.track, tone.track]), { preset: SMALL, audio: { denoise: { model: 'rnnoise' } }, onError: log.onError })
+    const changes: AudioTrackChange[] = []
+    const p = new Pipeline(new MediaStream([cam.track, tone.track]), {
+      preset: SMALL, audio: { denoise: { model: 'rnnoise' } }, onError: log.onError,
+      onAudioTrackChanged: (c) => changes.push(c),
+    })
     cleanup.push(() => p.destroy(), cam.stop, tone.stop)
     const d = (p as unknown as { denoiser: AudioDenoiser & { ctx: AudioContext } }).denoiser
+    const denoisedTrack = p.stream.getAudioTracks()[0]
     const e = await log.waitFor('audio-suspended', 3000)
     expect(e.fatal).toBe(false)
     expect(d.state).toBe('suspended')
+    // Fail open: the output moved to the original mic audio (a clone of the
+    // input track), not the silent context track.
+    expect(changes.length).toBe(1)
+    expect(changes[0]).toMatchObject({ denoised: false, previousTrack: denoisedTrack })
+    expect(p.stream.getAudioTracks()).toEqual([changes[0].audioTrack])
+    expect(changes[0].audioTrack).not.toBe(denoisedTrack)
+    expect(changes[0].audioTrack.readyState).toBe('live')
     // The denoiser listens for the next gesture and resumes on it. (Whether
     // the browser then grants the resume depends on user activation, which a
     // parallel test iframe doesn't reliably get — so assert the call.)
@@ -123,5 +135,64 @@ describe('audio denoise fails open (original audio, never silence)', () => {
     expect(d.state).toBe('suspended')
     await p.resumeAudio()
     expect(d.state).toBe('running')
+  })
+
+  it('context stops running: original audio on a new track; runs again: back to denoised, same tracks', async () => {
+    await stubWeights({ 'rnnoise.wasm': () => new Response(null, { status: 404 }) })
+    const cam = syntheticCamera(30)
+    const tone = toneTrack()
+    const log = errorLog()
+    const changes: AudioTrackChange[] = []
+    const p = new Pipeline(new MediaStream([cam.track, tone.track]), {
+      preset: SMALL, audio: { denoise: { model: 'rnnoise' } }, onError: log.onError,
+      onAudioTrackChanged: (c) => changes.push(c),
+    })
+    cleanup.push(() => p.destroy(), cam.stop, tone.stop)
+    const d = (p as unknown as { denoiser: AudioDenoiser & { ctx: AudioContext } }).denoiser
+    const ctxTrack = p.stream.getAudioTracks()[0]
+    await waitUntil(() => d.state === 'running', 3000, 'context running')
+    await sleep(400)
+    expect(changes).toEqual([])                       // started normally: no track change
+    expect(await level(ctxTrack)).toBeGreaterThan(0.05)
+
+    await d.ctx.suspend()
+    await waitUntil(() => changes.length === 1, 3000, 'fallback to original audio')
+    expect(changes[0].denoised).toBe(false)
+    const raw = changes[0].audioTrack
+    expect(p.stream.getAudioTracks()).toEqual([raw])
+    expect(await level(raw)).toBeGreaterThan(0.05)    // original audio, not silence
+    expect(log.types()).toContain('audio-suspended')
+
+    await p.resumeAudio()
+    await waitUntil(() => changes.length === 2, 3000, 'back to the context track')
+    expect(changes[1]).toMatchObject({ denoised: true, audioTrack: ctxTrack, previousTrack: raw })
+    expect(p.stream.getAudioTracks()).toEqual([ctxTrack])
+
+    p.destroy()
+    expect(ctxTrack.readyState).toBe('ended')
+    expect(raw.readyState).toBe('ended')
+  })
+
+  it('unlockAudio(): the next pipeline adopts the context created in the gesture', async () => {
+    await stubWeights({ 'rnnoise.wasm': () => new Response(null, { status: 404 }) })
+    const Real = globalThis.AudioContext
+    const made: AudioContext[] = []
+    ;(globalThis as { AudioContext: unknown }).AudioContext = class extends Real {
+      constructor(o?: AudioContextOptions) { super(o); made.push(this) }
+    }
+    try {
+      Pipeline.unlockAudio()
+      expect(made.length).toBe(1)
+      await waitUntil(() => made[0].state === 'running', 3000, 'unlocked context running')
+      const cam = syntheticCamera(30)
+      const tone = toneTrack()   // its own context: made[1]
+      const p = new Pipeline(new MediaStream([cam.track, tone.track]), { preset: SMALL, audio: { denoise: { model: 'rnnoise' } } })
+      cleanup.push(() => p.destroy(), cam.stop, tone.stop)
+      const d = (p as unknown as { denoiser: AudioDenoiser & { ctx: AudioContext } }).denoiser
+      expect(d.ctx).toBe(made[0])
+      expect(made.length).toBe(2)
+    } finally {
+      ;(globalThis as { AudioContext: unknown }).AudioContext = Real
+    }
   })
 })
