@@ -817,6 +817,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
     if (this.checkInputEnded()) return
     const first = this.recoveryReason === null
     if (first) this.recoveryReason = type
+    // The failed worker never reached 'running' (first start-up, or a restart's).
+    const duringStartup = this.status === 'starting' || this.status === 'recovering'
     if (!opts.silent) {
       this.emitError(new LongpipeError(type, `${message}; output switched to the raw camera, restarting`, { cause }))
     }
@@ -839,13 +841,17 @@ export class Pipeline implements PromiseLike<Pipeline> {
     // workerBackendKind, not backendKind: a device lost during startup (before
     // startRender finished) must count too, or a GPU that dies on its first
     // frame retries WebGPU until recovery gives up instead of moving to WebGL2.
-    // Any failure while on WebGPU counts (device loss, or a worker/pipe crash
-    // such as an unsupported WebGPU feature): after two, use WebGL2.
+    // After two WebGPU failures, use WebGL2. What counts:
+    //   - every device loss on WebGPU;
+    //   - a worker crash/hang only while that worker was still starting up
+    //     (e.g. Firefox's worker dying in WebGPU init). A crash of a worker that
+    //     was already running says nothing about WebGPU, so it restarts on the
+    //     same backend.
     // A crash can arrive before init replies (frames already flow through the
     // boot renderer), so also count attempts that requested something other than WebGL.
     const onWebGPU = this.workerBackendKind === 'webgpu' ||
       (this.workerBackendKind === null && this.attemptBackend !== null && this.attemptBackend !== 'webgl' && this.attemptBackend !== 'none')
-    if (onWebGPU && (type === 'backend-lost' || type === 'worker-crash')) {
+    if (onWebGPU && (type === 'backend-lost' || duringStartup)) {
       this.webgpuLosses++
       if (this.webgpuLosses >= 2) this.preferBackend = 'webgl'
     }

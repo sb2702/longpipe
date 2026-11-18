@@ -116,6 +116,35 @@ describe('second WebGPU loss falls back to WebGL2', () => {
     expect(pipeline.backend).toBe('webgl2')
     expect(log.types().filter(t => t === 'backend-lost').length).toBe(2)
   })
+
+  // The device self-test's sequence: a GPU loss, then a crash of the running
+  // worker. The crash says nothing about WebGPU, so it must not count.
+  it('a crash of a running worker does not count: GPU loss + crash stays on WebGPU', async () => {
+    TUNING.watchdogMs = 1500
+    const { pipeline, log, recovered } = start()
+    await pipeline.ready
+    await pipeline._debug('lose-backend').catch(() => {})
+    await waitUntil(() => recovered.length === 1, 10_000, 'recovery after GPU loss')
+    expect(pipeline.backend).toBe('webgpu')
+    await pipeline._debug('terminate')
+    await log.waitFor('worker-crash', 15_000)
+    await waitUntil(() => recovered.length === 2, 10_000, 'recovery after crash')
+    expect(recovered[1]).toMatchObject({ reason: 'worker-crash', backend: 'webgpu' })
+    expect(pipeline.backend).toBe('webgpu')
+  })
+
+  // A worker dying during start-up (Firefox's pre-init WebGPU crash) does count.
+  it('a crash during start-up counts: start-up crash + GPU loss moves to WebGL2', async () => {
+    TUNING.initTimeoutMs = 1500
+    const { pipeline, log, recovered } = start()
+    await pipeline._debug('terminate')   // before init answers
+    await log.waitFor('worker-crash', 10_000)
+    await pipeline.ready
+    expect(pipeline.backend).toBe('webgpu')
+    await pipeline._debug('lose-backend').catch(() => {})
+    await waitUntil(() => recovered.length >= 1 && pipeline.backend === 'webgl2', 15_000, 'recovery on webgl2')
+    expect(pipeline.backend).toBe('webgl2')
+  })
 })
 
 describe.each(TOPOLOGIES)('worker crash ($name)', ({ name, topology }) => {
