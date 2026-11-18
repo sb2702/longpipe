@@ -30,6 +30,8 @@ videoEl.srcObject = pipeline.stream   // available immediately
 await pipeline.ready                  // optional — resolves once the effect is live
 ```
 
+No bundler? See the single-file [minimal example](https://github.com/sb2702/longpipe/tree/main/examples/minimal) (CDN import, ~25 lines).
+
 `pipeline.stream` is wired synchronously and emits the unprocessed input until the model is ready (~1–3 s on cold start), so users see live video the whole time. Model weights stream from `cdn.longpipe.dev` by default — no extra setup, and [self-hostable](https://longpipe.dev/docs/self-hosting).
 
 ## Why Longpipe
@@ -44,12 +46,12 @@ await pipeline.ready                  // optional — resolves once the effect i
 
 Longpipe implements multiple downstream features (face effects, backgrounds) with one neural network, but if you want to compare it to another library, the closest would be the Mediapipe selfie model for background segmentation, from the [@mediapipe/tasks-vision](https://www.npmjs.com/package/@mediapipe/tasks-vision) library. 
 
-![Frames per second, 360p, Apple M4](benchmarks/charts/speed-360p.svg)
+![Frames per second, 360p, Apple M4](https://raw.githubusercontent.com/sb2702/longpipe/main/benchmarks/charts/speed-360p.svg)
 
-![Matte error on P3M-500-P](benchmarks/charts/quality-p3m.svg)
+![Matte error on P3M-500-P](https://raw.githubusercontent.com/sb2702/longpipe/main/benchmarks/charts/quality-p3m.svg)
 
 Methodology, caveats (including where MediaPipe's model is faster, on LiteRT.js), the 720p, WebGL and IoU results,
-and scripts to reproduce everything: **[full analysis](benchmarks/README.md)**.
+and scripts to reproduce everything: **[full analysis](https://github.com/sb2702/longpipe/blob/main/benchmarks/README.md)**.
 
 ## Documentation
 
@@ -78,6 +80,6 @@ Machine-readable for LLMs and agents: [`llms.txt`](https://longpipe.dev/llms.txt
 
 ## License
 
-SDK source code **and** Longpipe's pre-trained model weights are MIT-licensed — see [LICENSE](LICENSE) and [WEIGHTS_LICENSE](WEIGHTS_LICENSE). You're free to self-host the weights inside other open-source or commercial projects under MIT-compatible terms. The optional MediaPipe selfie weights are Google's, under Apache-2.0 ([NOTICE](third_party/mediapipe/NOTICE.md)).
+SDK source code **and** Longpipe's pre-trained model weights are MIT-licensed — see [LICENSE](https://github.com/sb2702/longpipe/blob/main/LICENSE) and [WEIGHTS_LICENSE](https://github.com/sb2702/longpipe/blob/main/WEIGHTS_LICENSE). You're free to self-host the weights inside other open-source or commercial projects under MIT-compatible terms. The optional MediaPipe selfie weights are Google's, under Apache-2.0 ([NOTICE](https://cdn.longpipe.dev/models/mediapipe/selfie/v1/NOTICE.md)).
 
 The weights were trained on permissively-licensed public datasets (P3M-10k, AISegment, COCO, OpenImages), Z-Image synthetics, and a custom webcam dataset collected with participants' explicit, informed consent. The full dataset list and provenance details: [longpipe.dev/docs/licensing](https://longpipe.dev/docs/licensing).

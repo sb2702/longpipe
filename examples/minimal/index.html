@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- Longpipe minimal example: camera -> background blur, no build step.
+     Run: serve this folder with any static server, e.g. `npx serve .` or `python3 -m http.server`,
+     then open http://localhost:<port>/ (camera access needs localhost or HTTPS). -->
+<meta charset="utf-8">
+<title>Longpipe: minimal blur</title>
+<button id="start">Start camera</button>
+<video id="out" autoplay muted playsinline width="640"></video>
+<script type="module">
+  // Bump the version on release (pinned so a new release can't change this page).
+  import { EffectsPipeline } from 'https://cdn.jsdelivr.net/npm/longpipe@0.0.20/+esm'
+
+  document.getElementById('start').onclick = async () => {
+    const camera = await navigator.mediaDevices.getUserMedia({ video: true })
+    const pipeline = new EffectsPipeline(camera, {
+      background: 'blur',
+      onError: (e) => console.warn(e.type, e.message),
+    })
+    document.getElementById('out').srcObject = pipeline.stream   // live at once, blurred once ready
+    const info = await pipeline.ready
+    console.log('ready', info)
+  }
+</script>
