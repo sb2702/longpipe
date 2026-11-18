@@ -18,10 +18,14 @@ export function createTransferCaptureOutput(renderer: Renderer, onFrame: (entry?
       try {
         const src = await renderer.prepareSource(frame)
         try { renderer.process(frame, src) } finally { if (src !== frame) src.close() }
+        renderer.markSubmitted()
       } finally {
         frame.close()
       }
       onFrame(entry)
+      // captureStream samples the canvas and never pushes back, so, as on
+      // bitmap-shuttle, pace on the GPU: at most one frame in flight.
+      await renderer.waitForGpu(1)
     },
   })
 }

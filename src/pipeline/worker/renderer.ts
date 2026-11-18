@@ -358,19 +358,43 @@ export class Renderer {
   }
   private lastWeightsBuf: ArrayBuffer | null = null
 
-  // Frame pacing for WebGPU: nothing else stops the worker from submitting
-  // frames faster than the GPU finishes them (the bitmap-shuttle path has no
-  // consumer-side backpressure), so latency would grow without bound. Keep at
-  // most `maxInFlight` frames queued on the GPU; the input drops stale frames.
+  // GPU frame pacing. Nothing else stops the worker from submitting frames
+  // faster than the GPU finishes them on the outputs with no consumer-side
+  // backpressure (bitmap-shuttle, transfer-capture), so latency would grow
+  // without bound on a slow GPU. Keep at most `maxInFlight` frames queued on
+  // the GPU; the input drops stale frames meanwhile.
+  //   WebGPU: queue.onSubmittedWorkDone() per frame.
+  //   WebGL2: a fence per frame, polled with clientWaitSync(timeout 0) between
+  //           short sleeps (a WebGL fence only updates between tasks, and
+  //           gl.finish() would block the worker).
   private inFlight: Promise<unknown>[] = []
+  private glFences: WebGLSync[] = []
   async waitForGpu(maxInFlight = 1): Promise<void> {
-    if (this.backendKind !== 'webgpu') return
-    while (this.inFlight.length >= maxInFlight) await this.inFlight.shift()
+    if (this.backendKind === 'webgpu') {
+      while (this.inFlight.length >= maxInFlight) await this.inFlight.shift()
+      return
+    }
+    const gl = this.glContext()
+    while (this.glFences.length >= maxInFlight) {
+      const fence = this.glFences.shift()!
+      if (gl) await waitForFence(gl, fence)
+    }
   }
   markSubmitted(): void {
-    if (this.backendKind !== 'webgpu') return
-    const device = (this.backend as unknown as { device?: GPUDevice }).device
-    if (device) this.inFlight.push(device.queue.onSubmittedWorkDone().catch(() => {}))
+    if (this.backendKind === 'webgpu') {
+      const device = (this.backend as unknown as { device?: GPUDevice }).device
+      if (device) this.inFlight.push(device.queue.onSubmittedWorkDone().catch(() => {}))
+      return
+    }
+    const gl = this.glContext()
+    if (!gl || gl.isContextLost()) return
+    const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0)
+    if (!fence) return
+    gl.flush()   // submit now, or the fence may never signal
+    this.glFences.push(fence)
+  }
+  private glContext(): WebGL2RenderingContext | null {
+    return (this.backend as unknown as { gl?: WebGL2RenderingContext }).gl ?? null
   }
   async prepareSource(frame: VideoFrame): Promise<VideoFrame | ImageBitmap> {
     if (this.backendKind !== 'webgpu') return frame
@@ -1058,4 +1082,24 @@ function median(xs: number[]): number {
   const sorted = xs.slice().sort((a, b) => a - b)
   const mid = sorted.length >> 1
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+// Wait (without blocking the worker) until a WebGL fence has signalled, then
+// delete it. Gives up after FENCE_MAX_WAIT_MS (a wedged GPU is the watchdog's
+// job; pacing must never hold the pipe forever) or when the context is lost.
+const FENCE_POLL_MS = 1
+const FENCE_MAX_WAIT_MS = 1000
+async function waitForFence(gl: WebGL2RenderingContext, fence: WebGLSync): Promise<void> {
+  const end = performance.now() + FENCE_MAX_WAIT_MS
+  try {
+    for (;;) {
+      if (gl.isContextLost()) return
+      const status = gl.clientWaitSync(fence, 0, 0)
+      if (status !== gl.TIMEOUT_EXPIRED) return   // signalled, or WAIT_FAILED
+      if (performance.now() > end) return
+      await new Promise<void>(r => setTimeout(r, FENCE_POLL_MS))
+    }
+  } finally {
+    if (!gl.isContextLost()) gl.deleteSync(fence)
+  }
 }
