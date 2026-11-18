@@ -4,7 +4,9 @@ import type { Dtype } from '~/model/backend.ts'
 // GRU policy) in ~/model/tier_config.ts and a shipped model_<name>.bin.
 export type ModelName = 'xs' | 'small' | 'medium' | 'large' | 'xl'
 
-export type PresetName = 'fast' | 'balanced' | 'quality' | 'auto'
+// Shortcuts ('fast' | 'balanced' | 'quality'), 'auto' (benchmark at init), or a
+// tier name to pin that tier (the same names ready.preset / getStats() report).
+export type PresetName = 'fast' | 'balanced' | 'quality' | 'auto' | ModelName
 
 export interface ManualPreset {
   model:      ModelName
@@ -39,11 +41,17 @@ export const NAMED_PRESET_INDEX: Record<Exclude<PresetName, 'auto'>, number> = {
   fast:     0,   // xs
   balanced: 2,   // medium
   quality:  4,   // xl
+  xs:       0,
+  small:    1,
+  medium:   2,
+  large:    3,
+  xl:       4,
 }
 
 export function resolveNamedPreset(name: PresetName): ManualPreset | null {
   if (name === 'auto') return null   // caller must run autotune
-  return PRESETS[NAMED_PRESET_INDEX[name]]
+  const i = Object.hasOwn(NAMED_PRESET_INDEX, name) ? NAMED_PRESET_INDEX[name] : undefined
+  return i === undefined ? null : PRESETS[i]
 }
 
 export function presetIndex(p: ManualPreset): number {

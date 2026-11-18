@@ -137,10 +137,7 @@ export class AdaptiveController {
     this.headroomStart  = 0
     try {
       const weights = await this.opts.fetchWeights(preset.model)
-      // Pass the full ManualPreset: bare model names ('large') are NOT
-      // PresetNames (those are fast/balanced/quality) and the worker's
-      // resolveNamedPreset rejects them — the old `preset.model as PresetName`
-      // cast made every adaptive swap fail with "unknown preset".
+      // Pass the full ManualPreset (resolution / skipFrames included).
       await this.opts.swapPreset(preset, weights)
       this.currentPresetIdx = idx
       log(`swap to ${preset.model} done`)

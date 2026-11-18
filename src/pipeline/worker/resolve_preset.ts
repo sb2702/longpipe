@@ -4,7 +4,7 @@
 // follow so weights load and ops dispatch with matching width).
 //
 //   'auto'                 → microbench, pick largest fitting preset
-//   'fast' / 'balanced' / 'quality' → lookup in NAMED_PRESET_INDEX
+//   'fast' / 'balanced' / 'quality' / a tier name ('xs'…'xl') → lookup in NAMED_PRESET_INDEX
 //   ManualPreset           → passthrough
 //
 // In all three cases, if resolvedDtype differs from preset.dtype, we
