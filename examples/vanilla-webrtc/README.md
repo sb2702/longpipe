@@ -100,9 +100,7 @@ repo's `src/` (so it always runs the working tree), or to the built `dist/` with
 `LONGPIPE=dist npm run example` (after `npm run build`), which is exactly what npm ships.
 
 To use it in your own project: copy `index.html`, `main.js`, `call.js` and `inputs.js`, run
-`npm i longpipe vite`, and use a plain Vite config (or none). Drop the self-test (the
-`setupSelfTest` import and call in `main.js`, the `#selftest` section in `index.html`) or copy
-`selftest.js` and `selftest-format.js` too. The alias and the two plugins in
+`npm i longpipe vite`, and use a plain Vite config (or none). The alias and the two plugins in
 `vite.config.js` exist only to compile Longpipe from source.
 
 ## Open it from your phone or another computer
@@ -117,36 +115,6 @@ To use it in your own project: copy `index.html`, `main.js`, `call.js` and `inpu
 | **USB / remote debugging** | Android: `chrome://inspect` → port forwarding `5287 → localhost:5287`, open `http://localhost:5287` on the phone. iOS: no equivalent, use one of the above | Counts as localhost, so no certificate at all. Needs a cable and desktop Chrome. |
 
 On iOS every browser is WebKit, so this is also how to try "Safari" on a phone.
-
-## Device self-test
-
-One click runs the main checks of the list below on a device and saves the result on the dev server:
-start-up (time to `ready`, backend, model, transport paths), processed video received over WebRTC
-(remote fps, resolution, whether the solid-colour background is visible in the remote video's corners),
-received audio and denoise, a simulated GPU loss and a killed worker (`onRecovered` within 20 s? time,
-backend before → after, frames during and after, `onTrackChanged` → `replaceTrack`), the no-GPU
-fallback (`backend: 'none'`) and teardown. It uses the camera and mic, background magenta, denoise
-on, model and backend auto, and takes about 40 s ([`selftest.js`](selftest.js)).
-
-```bash
-npm run example:tunnel                     # terminal 1
-ngrok http 5287 --url <your-domain>        # terminal 2 (or any tunnel; see below)
-```
-
-On each device open `https://<your-domain>/?selftest=1`, tap **Run self-test**, allow the camera and
-mic, and stay in front of the camera (corners clear, so the background shows there). The page lists
-each step with ✓/✗, a markdown row, and "saved ✓" once the dev server has appended it to
-`selftest-results.jsonl` (gitignored; **Copy JSON** if saving fails). Then:
-
-```bash
-node examples/vanilla-webrtc/selftest-table.mjs          # markdown table, one row per run
-node examples/vanilla-webrtc/selftest-table.mjs --json   # plus each run's full JSON
-```
-
-The steps are independent: a failed step is recorded with its error and the test carries on. The SDK
-allows 3 automatic restarts per minute, so if earlier failures (e.g. WebGPU device losses at
-start-up) used two, the recovery step rebuilds the pipeline first ("fresh pipeline" in the row). The
-collector (`POST /__selftest` in [`vite.config.js`](vite.config.js)) only exists in the dev server.
 
 ## Manual test checklist (per browser)
 

@@ -28,41 +28,11 @@
     /* Glass-to-glass marker (?flash=1): lights up when the corner square is drawn into the input. */
     #flash { position: fixed; top: 8px; right: 8px; width: 64px; height: 64px; background: #000; border: 2px solid #888; z-index: 10; }
     #flash.on { background: #fff; }
-    /* Device self-test (selftest.js). ?selftest=1 makes it the first thing on the page. */
-    #selftest { margin: 0 0 12px; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
-    #selftest.prominent { border: 2px solid var(--ok); }
-    #selftest.prominent #st-run { font-size: 18px; padding: 10px 24px; }
-    #selftest p { margin: 4px 0 8px; color: var(--muted); }
-    #st-progress { width: 100%; max-width: 420px; height: 8px; vertical-align: middle; }
-    #st-steps { list-style: none; padding: 0; margin: 8px 0; font-variant-numeric: tabular-nums; }
-    #st-steps li { padding: 1px 0; }
-    #st-steps .ok::before { content: '✓ '; color: var(--ok); font-weight: 700; }
-    #st-steps .fail::before { content: '✗ '; color: var(--bad); font-weight: 700; }
-    #st-steps .run::before { content: '… '; color: var(--muted); }
-    #st-steps .detail { color: var(--muted); }
-    #st-row { width: 100%; font: 12px ui-monospace, monospace; }
-    #st-saved.bad { color: var(--bad); }
-    #st-saved.good { color: var(--ok); }
     #log { margin-top: 12px; max-height: 160px; overflow: auto; font: 12px ui-monospace, monospace; white-space: pre-wrap; color: var(--muted); }
   </style>
 </head>
 <body>
   <h1>Longpipe → RTCPeerConnection loopback</h1>
-
-  <section id="selftest" hidden>
-    <strong>Device self-test</strong>
-    <p>About 40 s with your camera and mic: starts a call, checks the processed video and audio
-      arrive over WebRTC, then simulates a GPU loss, a worker crash and no GPU. Results are saved on
-      the dev server (<code>selftest-results.jsonl</code>).</p>
-    <button id="st-run" type="button">Run self-test</button>
-    <progress id="st-progress" max="1" value="0" hidden></progress>
-    <span id="st-status"></span>
-    <ul id="st-steps"></ul>
-    <div id="st-result" hidden>
-      <textarea id="st-row" rows="3" readonly></textarea>
-      <div><span id="st-saved"></span> <button id="st-copy" type="button">Copy JSON</button></div>
-    </div>
-  </section>
 
   <form class="controls" id="controls" onsubmit="return false">
     <label>Input
@@ -109,7 +79,6 @@
     <label><span><input name="flash" type="checkbox" /> flash marker (on Start)</span></label>
     <button id="start" type="button">Start</button>
     <button id="stop" type="button" disabled>Stop</button>
-    <button id="selftest-open" type="button">Run self-test…</button>
     <label><span><input name="listen" type="checkbox" /> hear remote audio</span></label>
   </form>
 

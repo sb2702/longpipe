@@ -16,7 +16,6 @@ import { defineConfig } from 'vite'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import { appendFile } from 'node:fs/promises'
 import * as esbuild from 'esbuild'
 
 const REPO = fileURLToPath(new URL('../../', import.meta.url))
@@ -51,55 +50,10 @@ const inlineWorklet = {
   },
 }
 
-// ── Device self-test collector (selftest.js) ──
-// POST /__selftest appends the page's JSON result, plus a server timestamp and
-// the request's user-agent, as one line of selftest-results.jsonl (gitignored).
-// Dev server only (`apply: 'serve'`): not part of a build. Summarise with
-// `node examples/vanilla-webrtc/selftest-table.mjs`.
-const RESULTS = fileURLToPath(new URL('./selftest-results.jsonl', import.meta.url))
-const MAX_BODY = 100 * 1024
-const selftestCollector = {
-  name: 'longpipe-selftest-collector',
-  apply: 'serve',
-  configureServer(server) {
-    server.middlewares.use('/__selftest', (req, res) => {
-      const reply = (code, body) => { res.statusCode = code; res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(body)) }
-      if (req.method !== 'POST') return reply(405, { error: 'POST only' })
-      const chunks = []
-      let size = 0
-      let tooBig = false
-      req.on('data', (c) => {
-        size += c.length
-        if (size > MAX_BODY) tooBig = true
-        else chunks.push(c)
-      })
-      req.on('end', async () => {
-        if (tooBig) return reply(413, { error: `body over ${MAX_BODY} bytes` })
-        let body
-        try {
-          body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-          if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('not a JSON object')
-        } catch (e) {
-          return reply(400, { error: `invalid JSON: ${e.message}` })
-        }
-        try {
-          const line = { receivedAt: new Date().toISOString(), requestUserAgent: req.headers['user-agent'] ?? null, ...body }
-          await appendFile(RESULTS, JSON.stringify(line) + '\n')
-          server.config.logger.info(`[selftest] saved: ${body.row ?? '(no row)'}`)
-          reply(200, { ok: true })
-        } catch (e) {
-          reply(500, { error: e.message })
-        }
-      })
-    })
-  },
-}
-
 export default defineConfig(({ mode }) => ({
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [
     ...(useDist ? [] : [shaderText, inlineWorklet]),
-    selftestCollector,
     // `--mode lan`: serve HTTPS with a throwaway self-signed certificate, so
     // getUserMedia works when the page is opened by IP from another device.
     ...(mode === 'lan' ? [basicSsl()] : []),
@@ -124,8 +78,6 @@ export default defineConfig(({ mode }) => ({
     // Vite's live-reload websocket there too (otherwise it can't connect and keeps polling).
     ...(mode === 'tunnel' ? { hmr: { clientPort: 443, protocol: 'wss' } } : {}),
     fs: { allow: [REPO] },
-    // Self-test results are written next to the page: don't let that reload it.
-    watch: { ignored: ['**/selftest-results.jsonl'] },
   },
   // Longpipe ships its own worker; don't let the dep optimizer touch it.
   optimizeDeps: { exclude: ['longpipe'] },

@@ -22,6 +22,3 @@ dist-weights/
 examples/vanilla-webrtc/public/assets/
 tests/e2e/results/
 tests/e2e/.cache/
-
-# Device self-test results (examples/vanilla-webrtc/selftest.js → the dev server)
-examples/vanilla-webrtc/selftest-results.jsonl
