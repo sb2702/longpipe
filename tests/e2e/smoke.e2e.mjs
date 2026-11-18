@@ -119,7 +119,26 @@ async function expectFramesFlow(call, ms = 3000) {
   await new Promise((r) => setTimeout(r, ms))
   const b = await call.state()
   const decoded = (b.rtp.video.framesDecoded ?? 0) - (a.rtp.video.framesDecoded ?? 0)
-  expect(decoded, `remote frames decoded in ${ms} ms`).toBeGreaterThanOrEqual(3)
+  let why = ''
+  if (decoded < 3) {
+    // Say why: connection state, ICE candidates and the local video track.
+    why = await call.eval(async () => {
+      const c = window.example.call
+      if (!c) return 'no call'
+      const cands = []
+      for (const [name, pc] of [['pc1', c.pc1], ['pc2', c.pc2]]) {
+        const st = await pc.getStats()
+        st.forEach((r) => { if (r.type === 'local-candidate') cands.push(`${name}:${r.candidateType}/${r.protocol}/${r.address ?? r.ip}`) })
+      }
+      const t = c.senders?.video?.track
+      return JSON.stringify({
+        pc1: [c.pc1.connectionState, c.pc1.iceConnectionState, c.pc1.iceGatheringState],
+        pc2: [c.pc2.connectionState, c.pc2.iceConnectionState, c.pc2.iceGatheringState],
+        cands, videoTrack: t ? [t.readyState, t.muted, t.label] : null,
+      })
+    }).catch((e) => `diag failed: ${e.message}`)
+  }
+  expect(decoded, `remote frames decoded in ${ms} ms ${why}`).toBeGreaterThanOrEqual(3)
   b.measuredRemoteFps = decoded / (ms / 1000)
   return b
 }
