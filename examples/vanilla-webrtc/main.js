@@ -30,7 +30,9 @@ const PRESET_PARAM = { fast: 'xs', balanced: 'medium', quality: 'xl', auto: 'aut
 if (PRESET_PARAM && !params.has('model')) form.elements.model.value = PRESET_PARAM
 form.elements.bypass.checked = params.get('bypass') === '1'
 form.elements.flash.checked = params.get('flash') === '1'
-const CLIP_URL = './assets/media/woman_on_video_call_360p.mp4'
+// MP4 (H.264) first; the WebM (VP9) copy that `npm run e2e:assets` makes with ffmpeg covers
+// Firefox builds that can't decode H.264 (e.g. Playwright's Firefox on CI runners).
+const CLIP_URL = ['./assets/media/woman_on_video_call_360p.mp4', './assets/media/woman_on_video_call_360p.webm']
 // ?camera=back|front picks the phone camera (front/back rotation + mirroring checks).
 const CAMERA_FACING = { back: 'environment', front: 'user' }[params.get('camera')]
 const weightsParam = params.get('weights')

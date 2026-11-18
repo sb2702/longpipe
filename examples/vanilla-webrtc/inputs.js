@@ -17,14 +17,29 @@ export async function cameraInput({ facingMode } = {}) {
   return { stream, stop: () => stream.getTracks().forEach((t) => t.stop()) }
 }
 
+// Play the first URL this browser can decode (e.g. H.264 MP4, then a VP9 WebM for
+// Firefox builds without system H.264 codecs). Throws instead of hanging if none plays.
+async function playFirst(urls) {
+  for (const url of urls) {
+    const video = document.createElement('video')
+    video.muted = true
+    video.loop = true
+    video.playsInline = true
+    video.crossOrigin = 'anonymous'
+    video.src = url
+    const ok = await Promise.race([
+      video.play().then(() => true, () => false),
+      new Promise((r) => video.addEventListener('error', () => r(false), { once: true })),
+      new Promise((r) => setTimeout(() => r(false), 10_000)),
+    ])
+    if (ok) return video
+    video.removeAttribute('src')
+  }
+  throw new Error(`test clip: none of ${urls.join(', ')} plays in this browser`)
+}
+
 export async function clipInput(url, { fps = 30, audio = true } = {}) {
-  const video = document.createElement('video')
-  video.src = url
-  video.muted = true
-  video.loop = true
-  video.playsInline = true
-  video.crossOrigin = 'anonymous'
-  await video.play()
+  const video = await playFirst(Array.isArray(url) ? url : [url])
   if (!video.videoWidth) await new Promise((r) => video.addEventListener('loadedmetadata', r, { once: true }))
 
   const canvas = document.createElement('canvas')

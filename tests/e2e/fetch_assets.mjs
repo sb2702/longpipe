@@ -45,3 +45,19 @@ for (const [path, [url, digest]] of Object.entries(ASSETS)) {
   writeFileSync(out, buf)
 }
 console.log(`e2e assets ready in ${OUT}`)
+
+// VP9 WebM copy of the clip for browsers without H.264 (Firefox on Linux without system
+// ffmpeg libraries). Derived locally from the hash-checked MP4; skipped if ffmpeg is missing.
+{
+  const { execFileSync } = await import('node:child_process')
+  const mp4 = OUT + 'media/woman_on_video_call_360p.mp4'
+  const webm = OUT + 'media/woman_on_video_call_360p.webm'
+  if (!existsSync(webm)) {
+    try {
+      execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', mp4, '-an', '-c:v', 'libvpx-vp9', '-b:v', '1M', '-deadline', 'good', '-cpu-used', '4', webm], { stdio: 'inherit' })
+      process.stdout.write('made media/woman_on_video_call_360p.webm (VP9)\n')
+    } catch {
+      process.stdout.write('ffmpeg not found: skipping the VP9 WebM copy (only needed for Firefox without H.264)\n')
+    }
+  }
+}
