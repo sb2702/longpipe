@@ -15,9 +15,11 @@
 //   denoiseModel=rnnoise|dfn|…  (default 'auto')
 //   camera=front|back   which phone camera
 //   debug=1             verbose [longpipe/…] console logging
+//   selftest=1          show the device self-test prominently (selftest.js)
 import { EffectsPipeline, PRESETS } from 'longpipe'
 import { startLoopbackCall, callStats, latencyBreakdown } from './call.js'
 import { cameraInput, clipInput, generatedBackgroundImage, withFlashMarker } from './inputs.js'
+import { setupSelfTest } from './selftest.js'
 
 const $ = (id) => document.getElementById(id)
 const form = $('controls')
@@ -55,6 +57,8 @@ const state = {
   model: null,          // the model control value the current pipeline runs ('auto', 'xs'…, 'mediapipe')
   livePreset: null,     // last model name the worker reported (getStats().preset)
   latency: null,        // { captureMs, longpipeMs, encodeMs, jitterMs, decodeMs, totalMs } (ms, last ~1 s)
+  readyMs: null,        // new EffectsPipeline → `ready` resolved (ms)
+  replaceTracks: [],    // result of each onTrackChanged → replaceTrack: { ok, error? }
 }
 
 let input = null       // { stream, stop }
@@ -109,6 +113,7 @@ async function backgroundFor(cfg) {
 // blocks until the effect is live and throws if startup failed. Keep the
 // instance in a variable and use `pipeline.ready` when you want to wait.
 function startPipeline(cfg, stream, background) {
+  const t0 = performance.now()
   const p = new EffectsPipeline(stream, {
     background,
     backend: cfg.backend,                 // 'auto' in production
@@ -135,7 +140,12 @@ function startPipeline(cfg, stream, background) {
     // The canonical fix is one line, no renegotiation:
     onTrackChanged: ({ videoTrack, reason }) => {
       state.trackChanges++
-      call?.senders.video?.replaceTrack(videoTrack)
+      const replaced = call?.senders.video?.replaceTrack(videoTrack)
+      // (Recording the outcome is only for the self-test.)
+      Promise.resolve(replaced).then(
+        () => state.replaceTracks.push(replaced ? { ok: true } : { ok: false, error: 'no video sender' }),
+        (e) => state.replaceTracks.push({ ok: false, error: String(e?.message ?? e) }),
+      )
       $('local').srcObject = p.stream
       log(`onTrackChanged (${reason}): replaced the sender's video track`)
     },
@@ -143,7 +153,7 @@ function startPipeline(cfg, stream, background) {
   // `pipeline.stream` is usable right away (raw camera until the effect is
   // live); `ready` says when it is, and which backend it got.
   p.ready.then(
-    (info) => { if (pipeline === p) { state.ready = info; log(`ready: ${JSON.stringify(info)}`) } },
+    (info) => { if (pipeline === p) { state.ready = info; state.readyMs = Math.round(performance.now() - t0); log(`ready: ${JSON.stringify(info)}`) } },
     (e) => { if (pipeline === p) { state.readyError = { type: e.type, fatal: e.fatal, message: e.message }; log(`ready rejected: ${e.type}`) } },
   )
   return p
@@ -154,7 +164,7 @@ function startPipeline(cfg, stream, background) {
 async function start() {
   if (state.running) return
   const cfg = readConfig()
-  Object.assign(state, { running: true, config: cfg, ready: null, readyError: null, errors: [], recovered: [], trackChanges: 0, bypass: cfg.bypass, model: null, livePreset: null, latency: null })
+  Object.assign(state, { running: true, config: cfg, ready: null, readyError: null, errors: [], recovered: [], trackChanges: 0, replaceTracks: [], readyMs: null, bypass: cfg.bypass, model: null, livePreset: null, latency: null })
   $('start').disabled = true
   try {
     input = cfg.input === 'clip' ? await clipInput(CLIP_URL) : await cameraInput({ facingMode: CAMERA_FACING })
@@ -195,7 +205,7 @@ async function sendStream(stream) {
 async function restartPipeline() {
   if (!state.running || state.bypass) return
   const cfg = readConfig()
-  Object.assign(state, { config: cfg, ready: null, readyError: null, stats: null, livePreset: null })
+  Object.assign(state, { config: cfg, ready: null, readyError: null, readyMs: null, stats: null, livePreset: null })
   pipeline?.destroy()
   pipeline = startPipeline(cfg, input.stream, await backgroundFor(cfg))
   state.model = cfg.model
@@ -433,3 +443,6 @@ window.example = {
   get call() { return call },
   async refreshStats() { await updateStats(); return state },
 }
+
+// One-click device self-test (selftest.js): the button, and ?selftest=1.
+setupSelfTest({ example: window.example, form, log, show: params.get('selftest') === '1' })
