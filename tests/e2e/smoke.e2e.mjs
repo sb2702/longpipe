@@ -39,10 +39,20 @@ const test = base.extend({
       },
       // Wait until `ready` settled (resolved or rejected). Returns the state.
       async settled(timeout = 60_000) {
-        await expect.poll(() => page.evaluate(() => {
-          const s = window.example.state
-          return !!(s.ready || s.readyError)
-        }), { timeout, intervals: [250] }).toBe(true)
+        try {
+          await expect.poll(() => page.evaluate(() => {
+            const s = window.example.state
+            return !!(s.ready || s.readyError)
+          }), { timeout, intervals: [250] }).toBe(true)
+        } catch (e) {
+          // Say where it got stuck: the example's state, the SDK's stats and the audio context.
+          const dump = await page.evaluate(async () => {
+            const s = window.example.state
+            const stats = await window.example.pipeline?.getStats?.().catch((err) => String(err))
+            return JSON.stringify({ running: s.running, config: s.config, errors: s.errors, stats, audio: window.example.input?.audioContext?.state })
+          }).catch((err) => `state unavailable: ${err.message}`)
+          throw new Error(`ready never settled after ${timeout} ms. State: ${dump}`)
+        }
         return this.state()
       },
       state: () => page.evaluate(async () => {

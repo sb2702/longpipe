@@ -44,7 +44,9 @@ jobs:
       # WebKit is skipped in CI (Playwright's Linux WebKit has no GPU path; see tests/e2e/README.md).
       - run: npx playwright install --with-deps chromium firefox
       # Firefox on Linux decodes the H.264 test clip with the system's ffmpeg libraries.
-      - run: sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: sudo apt-get install -y --no-install-recommends ffmpeg pulseaudio
+      # A virtual sound card: Firefox's AudioContext needs an audio backend (the runner has none).
+      - run: pulseaudio -D --exit-idle-time=-1 && pactl load-module module-null-sink sink_name=dummy && pactl set-default-sink dummy
 
       # Test clip + weights: pinned URLs + sha256 (tests/e2e/fetch_assets.mjs),
       # cached by that file's hash. The script re-verifies hashes on a cache hit.
