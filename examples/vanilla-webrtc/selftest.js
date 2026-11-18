@@ -16,6 +16,7 @@
 //
 // Each step is independent: a failure is recorded with its error and the test
 // carries on. Uses the example's own controls and window.example, like the e2e tests.
+import { EffectsPipeline } from 'longpipe'
 import { callStats } from './call.js'
 import { toRow } from './selftest-format.js'
 import pkg from '../../package.json'
@@ -419,6 +420,9 @@ export function setupSelfTest({ example, form, log, show }) {
 
   async function go() {
     if (running) return
+    // First thing in the tap, before any await: Firefox only lets an AudioContext
+    // start inside the gesture (the checks below take seconds).
+    EffectsPipeline.unlockAudio()
     running = true
     section.hidden = false
     $('st-run').disabled = $('selftest-open').disabled = true
