@@ -22,8 +22,14 @@ const dist = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])))
 
 // ── Fixture: one example page per test, torn down with a console-error check ──
 
+// Browsers whose CI runner can't connect the in-page WebRTC call (E2E_NO_RTC=firefox):
+// check MediaStream in → MediaStream out on the local pipeline.stream instead.
+let noRtc = false
+
 const test = base.extend({
   call: async ({ page }, use, testInfo) => {
+    noRtc = (process.env.E2E_NO_RTC ?? '').split(',').includes(testInfo.project.name)
+    if (noRtc) testInfo.annotations.push({ type: 'scope', description: 'no WebRTC: checked pipeline.stream locally' })
     const consoleErrors = []
     page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()) })
     page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`))
@@ -59,7 +65,7 @@ const test = base.extend({
         await window.example.refreshStats()
         return JSON.parse(JSON.stringify(window.example.state))
       }),
-      sample: (points) => page.evaluate((p) => window.example.sampleRemote(p), points),
+      sample: (points) => page.evaluate(([p, id]) => window.example.sampleRemote(p, id), [points, noRtc ? 'local' : 'remote']),
       levels: () => page.evaluate(() => window.example.audioLevels()),
       eval: (fn, arg) => page.evaluate(fn, arg),
       record(actual) { testInfo.annotations.push({ type: 'backend', description: actual }) },
@@ -115,6 +121,13 @@ function checkBackend(call, s, requested, { allowNone = false } = {}) {
 
 // "Flowing", not "fast": WebKit's software path here delivers ~3-5 fps.
 async function expectFramesFlow(call, ms = 3000) {
+  if (noRtc) {
+    const n = await call.eval((t) => window.example.countLocalFrames(t), ms)
+    expect(n, `pipeline.stream frames in ${ms} ms`).toBeGreaterThanOrEqual(3)
+    const s = await call.state()
+    s.measuredRemoteFps = n / (ms / 1000)
+    return s
+  }
   const a = await call.state()
   await new Promise((r) => setTimeout(r, ms))
   const b = await call.state()
@@ -161,6 +174,12 @@ async function expectRawVideo(call, color = GREEN) {
 }
 
 async function expectAudioReceived(call) {
+  if (noRtc) {
+    const lv = await call.levels()
+    expect(lv.local, 'pipeline.stream audio RMS (not silence)').toBeGreaterThan(1e-5)
+    lv.remote = lv.local   // later checks compare "what would be sent"
+    return lv
+  }
   const a = await call.state()
   await new Promise((r) => setTimeout(r, 1500))
   const b = await call.state()

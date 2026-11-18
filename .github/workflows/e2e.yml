@@ -60,6 +60,8 @@ jobs:
         run: npm run test:e2e -- --project=chromium --project=firefox
         env:
           CI: '1'
+          # Firefox's in-page WebRTC loopback doesn't connect on GitHub runners; Chromium covers RTCPeerConnection.
+          E2E_NO_RTC: firefox
 
       - name: Results summary
         if: always()

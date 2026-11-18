@@ -357,9 +357,9 @@ form.elements.listen.addEventListener('change', () => {
 
 // ── Test hooks (used by tests/e2e; harmless otherwise) ──────────────────────
 
-// Average RGB of small patches of the REMOTE video, at fractional (x, y) spots.
-function sampleRemote(points) {
-  const v = $('remote')
+// Average RGB of small patches of the remote (or local) video, at fractional (x, y) spots.
+function sampleRemote(points, id = 'remote') {
+  const v = $(id)
   if (!v.videoWidth) return null
   const c = document.createElement('canvas')
   c.width = v.videoWidth
@@ -416,6 +416,16 @@ window.example = {
   setModel(m) { form.elements.model.value = m; return serial('model switch', switchModel) },
   setBypass(on) { form.elements.bypass.checked = on; return serial('bypass', () => setBypass(on)) },
   sampleRemote,
+  // Frames rendered by the local <video> (pipeline.stream) in `ms`: MediaStream out, no WebRTC.
+  countLocalFrames(ms) {
+    const v = $('local')
+    return new Promise((resolve) => {
+      let n = 0
+      const tick = () => { n++; v.requestVideoFrameCallback(tick) }
+      v.requestVideoFrameCallback(tick)
+      setTimeout(() => resolve(n), ms)
+    })
+  },
   get pipeline() { return pipeline },
   async audioLevels() {
     return { local: await rmsLevel(pipeline?.stream), remote: await rmsLevel(call?.remoteStream) }
