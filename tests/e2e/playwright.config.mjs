@@ -81,6 +81,9 @@ export default defineConfig({
             'media.navigator.permission.disabled': true,
             // Loopback ICE without mDNS host candidates (no mDNS resolver on CI).
             'media.peerconnection.ice.obfuscate_host_addresses': false,
+            // CI runners: allow loopback/link-local ICE candidates so the in-page loopback call connects.
+            'media.peerconnection.ice.loopback': true,
+            'media.peerconnection.ice.link_local': true,
           },
         },
       },
