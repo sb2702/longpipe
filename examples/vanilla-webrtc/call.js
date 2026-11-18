@@ -5,8 +5,19 @@
 export async function startLoopbackCall(localStream, { onRemoteTrack } = {}) {
   const pc1 = new RTCPeerConnection()
   const pc2 = new RTCPeerConnection()
-  pc1.onicecandidate = (e) => { if (e.candidate) pc2.addIceCandidate(e.candidate).catch(() => {}) }
-  pc2.onicecandidate = (e) => { if (e.candidate) pc1.addIceCandidate(e.candidate).catch(() => {}) }
+  // A peer can't take ICE candidates before it has a remote description, so
+  // queue them until then (a real app's signaling has the same rule).
+  const relay = (to) => {
+    const queue = []
+    const add = (c) => to.addIceCandidate(c).catch((err) => console.warn('addIceCandidate:', err))
+    return {
+      onCandidate: (e) => { if (e.candidate) (to.remoteDescription ? add(e.candidate) : queue.push(e.candidate)) },
+      flush: () => { for (const c of queue.splice(0)) add(c) },
+    }
+  }
+  const toPc2 = relay(pc2), toPc1 = relay(pc1)
+  pc1.onicecandidate = toPc2.onCandidate
+  pc2.onicecandidate = toPc1.onCandidate
 
   const remoteStream = new MediaStream()
   pc2.ontrack = (e) => {
@@ -22,9 +33,11 @@ export async function startLoopbackCall(localStream, { onRemoteTrack } = {}) {
   const offer = await pc1.createOffer()
   await pc1.setLocalDescription(offer)
   await pc2.setRemoteDescription(offer)
+  toPc2.flush()
   const answer = await pc2.createAnswer()
   await pc2.setLocalDescription(answer)
   await pc1.setRemoteDescription(answer)
+  toPc1.flush()
 
   return {
     pc1, pc2, senders, remoteStream,
