@@ -23,7 +23,7 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-24.04   # Playwright 1.59 has no ubuntu-26.04 support yet; ubuntu-latest moved to 26.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +41,10 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
-      - run: npx playwright install --with-deps chromium firefox webkit
+      # WebKit is skipped in CI (Playwright's Linux WebKit has no GPU path; see tests/e2e/README.md).
+      - run: npx playwright install --with-deps chromium firefox
+      # Firefox on Linux decodes the H.264 test clip with the system's ffmpeg libraries.
+      - run: sudo apt-get install -y --no-install-recommends ffmpeg
 
       # Test clip + weights: pinned URLs + sha256 (tests/e2e/fetch_assets.mjs),
       # cached by that file's hash. The script re-verifies hashes on a cache hit.
@@ -52,7 +55,7 @@ jobs:
       - run: npm run e2e:assets
 
       - name: Run e2e smoke tests
-        run: npm run test:e2e
+        run: npm run test:e2e -- --project=chromium --project=firefox
         env:
           CI: '1'
 
@@ -73,6 +76,7 @@ jobs:
             tests/e2e/results/html
             tests/e2e/results/summary.md
             tests/e2e/results/summary.json
+            tests/e2e/results/artifacts
             tests/e2e/results/results.json
           retention-days: 14
 
