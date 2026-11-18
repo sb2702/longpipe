@@ -132,12 +132,13 @@ async function rtp(example) {
 }
 const decoded = async (example) => (await rtp(example))?.video.framesDecoded ?? 0
 
-// Corners of the remote video against the background colour: how many match.
+// Corners of the remote video against the background colour. `match` counts the
+// TOP corners only (0-2): in portrait the subject's shoulders fill the bottom ones.
 function cornersMatching(example) {
   const s = example.sampleRemote(CORNERS)
   if (!s) return null
-  const match = Object.keys(CORNERS).filter((k) => dist(s.patches[k], RGB) <= 60)
-  return { match: match.length, patches: s.patches }
+  const hit = (k) => dist(s.patches[k], RGB) <= 60
+  return { match: ['tl', 'tr'].filter(hit).length, all: Object.keys(CORNERS).filter(hit).length, patches: s.patches }
 }
 
 const stats = async (example) => (example.pipeline ? example.pipeline.getStats().catch(() => null) : null)
@@ -192,7 +193,7 @@ async function recoveryStep(example, action) {
   const framesAfter = (await decoded(example)) - a0
   const recovered = recoverAt != null
   let effectAfter = null
-  if (recovered) effectAfter = !!(await waitFor(() => (cornersMatching(example)?.match ?? 0) >= 3, 5000))
+  if (recovered) effectAfter = !!(await waitFor(() => (cornersMatching(example)?.match ?? 0) >= 2, 5000))
   const after = await stats(example)
   const out = {
     recovered,
@@ -292,7 +293,7 @@ export async function runSelfTest({ example, form, onProgress = () => {} }) {
   await run('video', async () => {
     if (!example.call) throw new Error('no call')
     // Effect visible: corners of the remote video match the background colour.
-    const effect = await waitFor(() => { const c = cornersMatching(example); return c && c.match >= 3 ? c : null }, 10_000)
+    const effect = await waitFor(() => { const c = cornersMatching(example); return c && c.match >= 2 ? c : null }, 10_000)
     const a = await rtp(example)
     const t = performance.now()
     await sleep(3000)
@@ -371,7 +372,7 @@ export async function runSelfTest({ example, form, onProgress = () => {} }) {
         framesDelta,
         noBackendError: !!e, noBackendFatal: e?.fatal ?? null,
         // Raw video: the corners shouldn't be the background colour any more.
-        rawVideo: c ? c.match < 3 : null,
+        rawVideo: c ? c.match < 2 : null,
       }
     } finally {
       form.elements.backend.value = 'auto'
