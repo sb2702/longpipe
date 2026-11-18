@@ -111,7 +111,7 @@ self.addEventListener('unhandledrejection', (e) => {
 async function handleCommand(cmd: CmdName, data: unknown): Promise<unknown> {
   switch (cmd) {
     case 'init':          return handleInit(data as InitData)
-    case 'startRender':   return handleStartRender((data as CmdDataMap['startRender']).weights)
+    case 'startRender':   return handleStartRender(data as CmdDataMap['startRender'])
     case 'setBackground': return handleSetBackground(data as Background)
     case 'setEnabled':    return handleSetEnabled((data as CmdDataMap['setEnabled']).enabled)
     case 'setPreset':   return handleSetPreset(data as CmdDataMap['setPreset'])
@@ -325,8 +325,9 @@ async function handleInit(data: InitData): Promise<InitResponse> {
   }
 }
 
-async function handleStartRender(weights: ArrayBuffer): Promise<void> {
+async function handleStartRender({ weights, preset }: CmdDataMap['startRender']): Promise<void> {
   log('handleStartRender: start; weights bytes:', weights.byteLength)
+  if (preset) resolvedPreset = preset
   if (!renderer) throw new Error('handleStartRender: handleInit not completed')
 
   if (model.family === 'mediapipe-selfie') {

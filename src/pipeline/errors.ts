@@ -106,3 +106,9 @@ export function isLongpipeError(e: unknown): e is LongpipeError {
 export function errorMessage(e: unknown): string {
   return (e as Error)?.message ?? String(e)
 }
+
+// `${prefix}: ${message}`, unless the message already starts with that prefix
+// (the worker prefixes its own failures, e.g. "init failed: …").
+export function prefixMessage(prefix: string, message: string): string {
+  return message.startsWith(`${prefix}:`) ? message : `${prefix}: ${message}`
+}

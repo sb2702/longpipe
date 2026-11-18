@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import { Pipeline } from '~/pipeline/index'
 import { TUNING } from '~/pipeline/tuning'
+import { LongpipeError, prefixMessage } from '~/pipeline/errors'
+import { PRESETS, resolveNamedPreset, type ModelName } from '~/pipeline/presets'
 import { syntheticCamera, frameCounter, stubWeights, restoreFetch, errorLog, SMALL, sleep, waitUntil } from '../helpers/pipeline'
 
 let cleanup: (() => void)[] = []
@@ -242,5 +244,110 @@ describe('control calls', () => {
     expect(stopped).toBe(true)
     expect((pipeline as unknown as { adaptive: unknown }).adaptive).toBeNull()
     expect((await pipeline.getStats()).preset).toBe('small')
+  })
+})
+
+describe('tier names as presets', () => {
+  it('resolve to the shipped preset for that tier', () => {
+    for (const p of PRESETS) expect(resolveNamedPreset(p.model)).toBe(p)
+    expect(resolveNamedPreset('fast')).toBe(PRESETS[0])
+    expect(resolveNamedPreset('nope' as never)).toBeNull()
+    expect(resolveNamedPreset('toString' as never)).toBeNull()
+  })
+
+  it("preset: 'small' at construction and setPreset('small') at runtime; ready.preset round-trips", async () => {
+    const { pipeline, log } = start({ preset: 'small' })
+    const info = await pipeline.ready
+    expect(info.preset).toBe('small')
+    await pipeline.setPreset(info.preset as ModelName)
+    expect((await pipeline.getStats()).preset).toBe('small')
+    expect(log.errors).toEqual([])
+  })
+})
+
+describe('enabled: false', () => {
+  function countModelFetches() {
+    const inner = globalThis.fetch
+    const urls: string[] = []
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (/model_[a-z]+(\.f16)?\.bin$/.test(url)) urls.push(url)
+      return inner(input, init)
+    }) as typeof fetch
+    return urls
+  }
+
+  it('fetches no weights until setEnabled(true), then loads and runs the effect', async () => {
+    const fetched = countModelFetches()
+    const { pipeline, out, log } = start({ enabled: false })
+    const info = await pipeline.ready
+    expect(info).toMatchObject({ backend: 'webgpu', preset: null })
+    expect(fetched).toEqual([])
+    expect(await out.during(800)).toBeGreaterThan(10)
+    expect((await pipeline.getStats()).enabled).toBe(false)
+
+    await pipeline.setEnabled(true)
+    expect(fetched.length).toBeGreaterThan(0)
+    const stats = await pipeline.getStats()
+    expect(stats).toMatchObject({ enabled: true, preset: 'small', status: 'running' })
+    expect(await out.during(800)).toBeGreaterThan(10)
+    expect(log.errors).toEqual([])
+  })
+
+  it('setPreset while disabled records the tier without fetching; setEnabled(true) loads it', async () => {
+    const fetched = countModelFetches()
+    const { pipeline } = start({ enabled: false, preset: 'auto', adaptive: false, backend: 'webgpu' })
+    // 'auto' would pick some tier; pin 'small' (the only fixture) before enabling.
+    await pipeline.ready.catch(() => {})
+    await pipeline.setPreset('small')
+    expect(fetched).toEqual([])
+    await pipeline.setEnabled(true)
+    expect((await pipeline.getStats()).preset).toBe('small')
+  })
+})
+
+describe('typed control-call errors', () => {
+  it('Longpipe-only calls under a MediaPipe model reject with a LongpipeError and fire onError', async () => {
+    TUNING.forceBackend = 'none'
+    const { pipeline, log } = start({ model: 'mediapipe-selfie', preset: undefined })
+    for (const call of [
+      () => pipeline.setTouchup({}),
+      () => pipeline.setReframe(true),
+      () => pipeline.reframe(),
+      () => pipeline.setPreset('fast'),
+    ]) {
+      const err = await call().then(() => null, (e: unknown) => e)
+      expect(err).toBeInstanceOf(LongpipeError)
+      expect(err).toMatchObject({ type: 'control-failed', fatal: false })
+    }
+    expect(log.types().filter(t => t === 'control-failed')).toHaveLength(4)
+  })
+
+  it('constructor option checks throw a LongpipeError', () => {
+    const cam = syntheticCamera(30)
+    cleanup.push(() => cam.stop())
+    expect(() => new Pipeline(cam.stream, { model: 'mediapipe-selfie', touchup: {} }))
+      .toThrow(expect.objectContaining({ name: 'LongpipeError', type: 'init-failed' }))
+  })
+
+  it('attachPreview on an already-transferred canvas and setInputStream with no video reject typed', async () => {
+    const { pipeline } = start()
+    await pipeline.ready
+    const canvas = document.createElement('canvas')
+    await pipeline.attachPreview(canvas)
+    await expect(pipeline.attachPreview(canvas)).rejects.toBeInstanceOf(LongpipeError)
+    await expect(pipeline.setInputStream(new MediaStream())).rejects.toMatchObject({ type: 'control-failed' })
+  })
+})
+
+describe('error messages', () => {
+  it('prefixes once', async () => {
+    expect(prefixMessage('init failed', 'init failed: x')).toBe('init failed: x')
+    expect(prefixMessage('init failed', 'x')).toBe('init failed: x')
+    const { pipeline } = start({ preset: 'nope' })
+    const err = await pipeline.ready.then(() => null, (e: unknown) => e as LongpipeError)
+    expect(err).toMatchObject({ type: 'init-failed' })
+    expect(err!.message).toMatch(/^init failed: resolve_preset: unknown preset name 'nope'/)
+    expect(err!.message).not.toMatch(/init failed: init failed/)
   })
 })

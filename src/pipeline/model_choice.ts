@@ -15,6 +15,7 @@
 // model: presets / autotune / adaptive never swap it (or swap to it).
 import type { MediaPipeSelfieVariant } from '~/model/networks/mediapipe_selfie.ts'
 import { pickMediaPipeSelfieVariant } from '~/model/networks/mediapipe_selfie.ts'
+import { LongpipeError } from './errors'
 
 export type ModelChoice =
   | 'longpipe'
@@ -44,9 +45,10 @@ export function resolveModel(choice: ModelChoice | undefined, outputSize: { w: n
   return { family: 'mediapipe-selfie', variant }
 }
 
-// The error every Longpipe-only feature throws under a MediaPipe model.
-export function requiresLongpipe(feature: string, model: string): Error {
-  return new Error(
+// The error every Longpipe-only feature throws under a MediaPipe model:
+// 'control-failed' from a control call, 'init-failed' from the constructor.
+export function requiresLongpipe(feature: string, model: string, type: 'control-failed' | 'init-failed' = 'control-failed'): LongpipeError {
+  return new LongpipeError(type,
     `longpipe: ${feature} requires a Longpipe model; set model: 'longpipe' ` +
     `(model '${model}' is segmentation-only — background effects only)`,
   )
@@ -61,9 +63,9 @@ export function validateModelOptions(choice: ModelChoice | undefined, opts: {
 }): void {
   const model = choice ?? 'longpipe'
   if (model === 'longpipe') return
-  if (opts.touchup) throw requiresLongpipe('touchup', model)
-  if (opts.reframe) throw requiresLongpipe('reframe', model)
+  if (opts.touchup) throw requiresLongpipe('touchup', model, 'init-failed')
+  if (opts.reframe) throw requiresLongpipe('reframe', model, 'init-failed')
   // 'auto' (the default) is accepted and ignored: there is nothing to tune.
   if (opts.preset !== undefined && opts.preset !== 'auto')
-    throw requiresLongpipe(`preset ${JSON.stringify(opts.preset)}`, model)
+    throw requiresLongpipe(`preset ${JSON.stringify(opts.preset)}`, model, 'init-failed')
 }

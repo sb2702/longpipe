@@ -36,7 +36,7 @@ import type {
   ReadyInfo, RendererStats, WorkerErrorEvent,
 } from './messages'
 import type { PipelineError, PipelineErrorType } from './errors'
-import { LongpipeError, isLongpipeError, errorMessage } from './errors'
+import { LongpipeError, isLongpipeError, errorMessage, prefixMessage } from './errors'
 import type { Topology } from './topology'
 import { selectTopology } from './topology'
 import { buildOutputStream, normalizeAudio } from './audio'
@@ -113,7 +113,9 @@ export interface PipelineOptions {
   // 'denoise' runs input audio through the AudioWorklet denoiser (separate from
   // the video worker). Default: 'passthrough'.
   audio?:          AudioInput
-  enabled?:        boolean                      // default: true
+  // default: true. false = raw passthrough, and the model weights aren't
+  // fetched until setEnabled(true) (`ready` resolves with preset: null).
+  enabled?:        boolean
   // Output canvas dimensions. Default: matches the input video track's
   // intrinsic size (preserves aspect ratio + avoids pointless rescale).
   // Falls back to 1280×720 if the track hasn't reported its size yet.
@@ -415,7 +417,12 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // Resolved on the current worker.
   private activeBackend:  ActiveBackend | null = null
   private backendKind:    BackendKind | null = null
+  // The tier chosen for the current worker (autotune / named / setPreset).
+  // Its weights are only loaded once `modelLoaded` (deferred while disabled).
   private resolvedPreset: ManualPreset | null = null
+  private modelLoaded = false
+  private modelLoading: Promise<void> | null = null
+  private pendingWeights: ArrayBuffer | null = null
   private resolvedDtype:  Dtype = 'f32'
   private preferBackend:  'auto' | 'webgl' = 'auto'
   private webgpuLosses = 0
@@ -666,20 +673,17 @@ export class Pipeline implements PromiseLike<Pipeline> {
         return
       }
 
-      const weights = isMediaPipe(this.model)
-        ? await fetchMediaPipeWeights(this.modelBaseUrl, this.model.variant)
-        : await fetchModelWeights(this.modelBaseUrl, initRes.resolvedPreset!.model, initRes.resolvedDtype)
-      if (gen !== this.gen) return
-      log('weights bytes:', weights.byteLength)
-
-      log('sending startRender…')
-      await this.busyCall(() =>
-        controller.sendMessage('startRender', { weights }, [weights], { timeoutMs: TUNING.initTimeoutMs }))
-      if (gen !== this.gen) return
+      this.resolvedPreset = initRes.resolvedPreset
+      this.modelLoaded    = false
+      this.modelLoading   = null
+      // Disabled: no weights until setEnabled(true) (the renderer passes frames through).
+      if (this.desired.enabled) {
+        await this.loadModel(controller, gen)
+        if (gen !== this.gen) return
+      }
 
       this.backendKind    = initRes.resolvedBackend
       this.activeBackend  = toPublicBackend(initRes.resolvedBackend)
-      this.resolvedPreset = initRes.resolvedPreset
       this.onRunning(gen)
     } catch (err) {
       const st = this.status as PipelineStatus
@@ -689,7 +693,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
         this.recover('worker-crash', err.message, err, { silent: isRestart })
         return
       }
-      const e = new LongpipeError('init-failed', `init failed: ${errorMessage(err)}`, { cause: err })
+      const e = new LongpipeError('init-failed', prefixMessage('init failed', errorMessage(err)), { cause: err })
       if (isRestart) {
         // A restart attempt failed: try again (or give up), without a new
         // onError per attempt.
@@ -708,6 +712,25 @@ export class Pipeline implements PromiseLike<Pipeline> {
     // When forcing WebGL after a WebGPU loss the old (WebGPU-tuned) preset may
     // be too heavy — re-run autotune instead of reusing it.
     return pref === 'webgl' ? 'webgl' : this.backendKind
+  }
+
+  // Fetch the current model's weights and attach the network (startRender).
+  private async loadModel(controller: WorkerController, gen: number): Promise<void> {
+    const preset = this.resolvedPreset
+    let weights = this.pendingWeights
+    this.pendingWeights = null
+    if (!weights) {
+      weights = isMediaPipe(this.model)
+        ? await fetchMediaPipeWeights(this.modelBaseUrl, this.model.variant)
+        : await fetchModelWeights(this.modelBaseUrl, preset!.model, this.resolvedDtype)
+    }
+    if (gen !== this.gen) return
+    log('weights bytes:', weights.byteLength)
+    log('sending startRender…')
+    const buf = weights
+    await this.busyCall(() => controller.sendMessage('startRender',
+      { weights: buf, preset: preset ?? undefined }, [buf], { timeoutMs: TUNING.initTimeoutMs }))
+    if (gen === this.gen) this.modelLoaded = true
   }
 
   private onRunning(gen: number): void {
@@ -968,13 +991,13 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // output track. Call it BEFORE stopping the old camera. Only the video track
   // is switched; audio stays as configured at construction.
   setInputStream(stream: MediaStream): Promise<void> {
-    return quiet(this.switchInput(stream))
+    return quiet(this.switchInput(stream).catch((err) => { throw this.reportControlError('setInputStream', err) }))
   }
 
   private async switchInput(stream: MediaStream): Promise<void> {
     const track = stream.getVideoTracks()[0]
     if (!track || track.readyState === 'ended') {
-      throw this.reportControlError('setInputStream', new LongpipeError('control-failed', 'setInputStream: the stream has no live video track'))
+      throw new LongpipeError('control-failed', 'setInputStream: the stream has no live video track')
     }
     if (this.status === 'destroyed' || this.status === 'ended') {
       throw new LongpipeError('control-failed', `setInputStream: pipeline is ${this.status}`)
@@ -1003,7 +1026,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     } catch (err) {
       next.cleanup()
       if (gen !== this.gen) return   // worker replaced meanwhile; it picks up this.inputStream
-      throw this.reportControlError('setInputStream', err)
+      throw err
     }
     if (gen !== this.gen) { next.cleanup(); return }
     this.input?.cleanup()
@@ -1066,11 +1089,16 @@ export class Pipeline implements PromiseLike<Pipeline> {
   private reportControlError(name: string, err: unknown): LongpipeError {
     const e = isLongpipeError(err)
       ? err
-      : new LongpipeError('control-failed', `${name} failed: ${errorMessage(err)}`, { cause: err })
+      : new LongpipeError('control-failed', prefixMessage(`${name} failed`, errorMessage(err)), { cause: err })
     if (e.type === 'control-failed' || e.type === 'control-timeout' || e.type === 'background-load') {
       this.emitError(e)
     }
     return e
+  }
+
+  // A control call refused up front (wrong model, bad argument): typed, reported.
+  private refuse(name: string, err: unknown): Promise<never> {
+    return quiet(Promise.reject(this.reportControlError(name, err)))
   }
 
   private async normalizeOrFail(input: BackgroundInput, what: string): Promise<NormalizedBackground> {
@@ -1129,7 +1157,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // the loaded tier weights to carry a face blob (all current tiers do) — if
   // they don't, the worker silently leaves the effect off.
   setTouchup(opts: TouchupOptions | null): Promise<void> {
-    if (opts !== null && isMediaPipe(this.model)) return Promise.reject(requiresLongpipe('touchup', this.modelName))
+    if (opts !== null && isMediaPipe(this.model)) return this.refuse('setTouchup', requiresLongpipe('touchup', this.modelName))
     return this.control('setTouchup', async (controller) => {
       await this.sendTouchup(controller, opts)
       this.desired.touchup = opts
@@ -1160,7 +1188,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // default; `false` (or null) turns it off. Needs no assets — it rides the face
   // heatmaps the tier already carries — so unlike setTouchup this never fetches.
   setReframe(cfg: ReframeConfig | null): Promise<void> {
-    if (cfg && isMediaPipe(this.model)) return Promise.reject(requiresLongpipe('reframe', this.modelName))
+    if (cfg && isMediaPipe(this.model)) return this.refuse('setReframe', requiresLongpipe('reframe', this.modelName))
     return this.control('setReframe', async (controller) => {
       await this.busyCall(() => controller.sendMessage('setReframe', normalizeReframe(cfg)))
       this.desired.reframe = cfg || null
@@ -1171,7 +1199,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // wire to a "reframe" button. In auto mode the camera already tracks, so this
   // is a no-op there.
   reframe(): Promise<void> {
-    if (isMediaPipe(this.model)) return Promise.reject(requiresLongpipe('reframe', this.modelName))
+    if (isMediaPipe(this.model)) return this.refuse('reframe', requiresLongpipe('reframe', this.modelName))
     return this.control('reframe', (controller) => controller.sendMessage('reframeNow', undefined))
   }
 
@@ -1197,9 +1225,10 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // weightsBaseUrl unless you pass them. Stops the adaptive controller (an
   // explicit choice is respected from here on, including after recovery).
   // Rejects ('control-failed') on an unknown preset / weights failure; the
-  // current preset keeps running.
+  // current preset keeps running. While disabled with no model loaded yet,
+  // it only records the choice; setEnabled(true) loads it.
   setPreset(p: PresetName | ManualPreset, weights?: ArrayBuffer): Promise<void> {
-    if (isMediaPipe(this.model)) throw requiresLongpipe('setPreset', this.modelName)
+    if (isMediaPipe(this.model)) return this.refuse('setPreset', requiresLongpipe('setPreset', this.modelName))
     this.adaptive?.stop()
     this.adaptive = null
     return this.control('setPreset', async (controller) => {
@@ -1207,6 +1236,12 @@ export class Pipeline implements PromiseLike<Pipeline> {
       const manual = typeof p === 'string' ? resolveNamedPreset(p) : p
       if (!manual) throw new LongpipeError('control-failed', `setPreset: unknown preset '${String(p)}'`)
       const preset: ManualPreset = { ...manual, dtype: this.resolvedDtype }
+      if (!this.modelLoaded && !this.modelLoading) {
+        this.resolvedPreset = preset
+        this.presetOverride = preset
+        this.pendingWeights = weights ?? null
+        return
+      }
       const buf = weights ?? await fetchModelWeights(this.modelBaseUrl, preset.model, this.resolvedDtype)
       const res = await this.busyCall(() =>
         controller.sendMessage('setPreset', { preset, weights: buf }, [buf], { timeoutMs: TUNING.initTimeoutMs }))
@@ -1218,7 +1253,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
   private startAdaptive(): void {
     this.adaptive?.stop()
     this.adaptive = null
-    if (!this.adaptiveEligible || this.presetOverride || !this.resolvedPreset || !this.backendKind) return
+    if (!this.adaptiveEligible || this.presetOverride || !this.resolvedPreset || !this.backendKind || !this.modelLoaded) return
     const dtype = this.resolvedDtype
     this.adaptive = new AdaptiveController({
       backendKind:  this.backendKind,
@@ -1255,7 +1290,12 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // compositors don't resample), so just CSS-size the element for display.
   // A worker restart loses the canvas (it can't come back); onError says so.
   attachPreview(canvas: HTMLCanvasElement): Promise<void> {
-    const offscreen = canvas.transferControlToOffscreen()
+    let offscreen: OffscreenCanvas
+    try {
+      offscreen = canvas.transferControlToOffscreen()
+    } catch (err) {
+      return this.refuse('attachPreview', err)
+    }
     return this.control('attachPreview', async (controller) => {
       await controller.sendMessage('attachPreview', { canvas: offscreen }, [offscreen])
       this.previewAttached = true
@@ -1291,8 +1331,16 @@ export class Pipeline implements PromiseLike<Pipeline> {
     })
   }
 
+  // false = raw passthrough. The first setEnabled(true) on a pipeline started
+  // with enabled: false fetches the weights first.
   setEnabled(on: boolean): Promise<void> {
     return this.control('setEnabled', async (controller) => {
+      if (on && !this.modelLoaded) {
+        const gen = this.gen
+        this.modelLoading ??= this.loadModel(controller, gen).finally(() => { this.modelLoading = null })
+        await this.modelLoading
+        if (gen === this.gen) this.startAdaptive()   // else the next send rejects (worker gone)
+      }
       await controller.sendMessage('setEnabled', { enabled: on })
       this.desired.enabled = on
     })
@@ -1341,7 +1389,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     return {
       backend: this.activeBackend ?? 'none',
       dtype:   this.activeBackend && this.activeBackend !== 'none' ? this.resolvedDtype : null,
-      preset:  this.activeBackend === 'none' ? null
+      preset:  this.activeBackend === 'none' || !this.modelLoaded ? null
              : isMediaPipe(this.model) ? `mediapipe-selfie-${this.model.variant}`
              : this.resolvedPreset?.model ?? null,
     }
@@ -1374,7 +1422,13 @@ export class Pipeline implements PromiseLike<Pipeline> {
   // unmute button). The SDK also resumes on the first gesture by itself.
   // No-op without audio: 'denoise'.
   async resumeAudio(): Promise<void> {
-    await this.denoiser?.resume()
+    try {
+      await this.denoiser?.resume()
+    } catch (err) {
+      const e = new LongpipeError('audio', prefixMessage('resumeAudio failed', errorMessage(err)), { cause: err })
+      this.emitError(e)
+      throw e
+    }
   }
 
   // Latest per-hop audio telemetry (p50/p95 ms vs the render-quantum deadline,
@@ -1396,7 +1450,7 @@ export class Pipeline implements PromiseLike<Pipeline> {
     }
     return this.controller
       ? this.controller.sendMessage('debug', { action }).then(() => {})
-      : Promise.reject(new Error('no worker'))
+      : Promise.reject(new LongpipeError('control-failed', '_debug: no worker'))
   }
 
   destroy(): void {

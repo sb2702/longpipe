@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { resolveModel, validateModelOptions } from '~/pipeline/model_choice'
+import { LongpipeError } from '~/pipeline/errors'
 
 describe('model option', () => {
   it("defaults to 'longpipe'", () => {
@@ -25,5 +26,6 @@ describe('model option', () => {
     expect(() => validateModelOptions('mediapipe-selfie', { preset: 'auto', reframe: false })).not.toThrow()
     expect(() => validateModelOptions('longpipe', { touchup: {}, reframe: true, preset: 'fast' })).not.toThrow()
     expect(() => validateModelOptions(undefined, { touchup: {} })).not.toThrow()
+    expect(() => validateModelOptions('mediapipe-selfie', { touchup: {} })).toThrow(LongpipeError)
   })
 })

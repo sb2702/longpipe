@@ -19,7 +19,7 @@ export type { PipelineError, ErrorSource, PipelineErrorType } from './errors'
 
 export interface CmdDataMap {
   init:          InitData
-  startRender:   { weights: ArrayBuffer }
+  startRender:   { weights: ArrayBuffer; preset?: ManualPreset }   // preset: overrides init's (setPreset while disabled)
   setBackground: Background
   setEnabled:    { enabled: boolean }
   setPreset:     { preset: PresetName | ManualPreset; weights?: ArrayBuffer }
