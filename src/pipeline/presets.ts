@@ -26,8 +26,9 @@ export interface ManualPreset {
 // expensive. The adaptive controller walks this index up/down at runtime.
 //
 // Per-source-frame cost = per-run cost / (skipFrames + 1). xl/large run
-// every frame (skipFrames=0); the others skip every other frame
-// (skipFrames=1). resolution = canvas res (mirrors TIER_CONFIG.canvasRes).
+// every frame (skipFrames=0); small/medium skip every other frame
+// (skipFrames=1); xs skips 2 of every 3 (skipFrames=2). resolution = canvas
+// res (mirrors TIER_CONFIG.canvasRes).
 export const PRESETS: readonly Readonly<ManualPreset>[] = [
   { model: 'xs',      dtype: 'f16', resolution: { w: 384,  h: 240 }, skipFrames: 2 },
   { model: 'small',   dtype: 'f16', resolution: { w: 384,  h: 224 }, skipFrames: 1 },
