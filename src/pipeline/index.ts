@@ -813,6 +813,12 @@ export class Pipeline implements PromiseLike<Pipeline> {
     if (this.output.path === 'transfer-capture' && !initRes.workerDrawsRaw) {
       this.takeoverOutput('no-backend')
     }
+    // Raw comes from main's output path, so the worker reads no input: stop
+    // feeding it (rVFC path: a VideoFrame per camera frame into a closed port).
+    if (!initRes.workerDrawsRaw) {
+      this.input?.cleanup()
+      this.input = null
+    }
     const detail = initRes.backendError ? ` (${initRes.backendError})` : ''
     const e = isRestart
       ? new LongpipeError('recovery-failed', `recovery failed: no usable GPU backend after ${this.recoveryReason}${detail}; output is the raw camera`)
@@ -1060,6 +1066,8 @@ export class Pipeline implements PromiseLike<Pipeline> {
       this.pendingInput = setupInput(this.topology.input, stream)
       return
     }
+    // No GPU, raw from main: the worker reads no input (see onNoBackend).
+    if (this.status === 'passthrough' && this.activeBackend === 'none' && !this.input) return
     const controller = this.controller
     if (!controller || controller.isTerminated || this.status === 'recovering') return   // next worker uses the new stream
     const next = setupInput(this.topology.input, stream)
