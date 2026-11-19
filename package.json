@@ -9,7 +9,7 @@
   "homepage": "https://longpipe.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sb2702/longpipe.git"
+    "url": "git+https://github.com/sb2702/longpipe.git"
   },
   "bugs": {
     "url": "https://github.com/sb2702/longpipe/issues"
