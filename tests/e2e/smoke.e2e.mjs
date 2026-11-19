@@ -297,7 +297,8 @@ const checkBackendName = (s) => s.ready?.backend ?? 'none'
 // a ~10 s timer, so a leak used to fail whichever later test's teardown that
 // report happened to land in. Three pipelines on one page (create → ready →
 // worker restart → destroy, then a new one), the restart alternating GPU loss
-// and a killed worker, then GC and wait past the next report.
+// and a killed worker; then a backend 'none' rebuild and back; then GC and wait
+// past the next report.
 test('no unclosed VideoFrames across restarts and destroy [auto]', async ({ call, page, browserName }) => {
   test.skip(browserName !== 'chromium', 'only Chromium reports unclosed VideoFrames')
   const gc = async () => {
@@ -315,6 +316,14 @@ test('no unclosed VideoFrames across restarts and destroy [auto]', async ({ call
     const before = (await call.state()).recovered.length
     await call.eval((a) => window.example.pipeline._debug(a), i % 2 ? 'terminate' : 'lose-backend')
     await expect.poll(async () => (await call.state()).recovered.length, { timeout: 30_000 }).toBeGreaterThan(before)
+    await expectFramesFlow(call, 1500)
+  }
+  // The no-GPU rebuild: destroy() + a new pipeline with backend 'none' (main-side
+  // raw output, the worker releases its input), then back to a GPU pipeline.
+  for (const backend of ['none', 'auto']) {
+    await call.eval((b) => { document.getElementById('controls').elements.backend.value = b; return window.example.restartPipeline() }, backend)
+    const s = await call.settled()
+    if (backend === 'none') expect(s.ready?.backend).toBe('none')
     await expectFramesFlow(call, 1500)
   }
   await call.eval(() => window.example.stop())
