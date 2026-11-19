@@ -13,9 +13,14 @@ import { tagFrameEntry } from '../latency'
 export function createPostMessageInput(port: MessagePort): ReadableStream<VideoFrame> {
   let pending: VideoFrame | null = null
   let resolvePull: ((frame: VideoFrame) => void) | null = null
+  // Set once the consumer cancels. Frames already in flight on the port can
+  // still arrive after that (seen in Firefox during GPU-loss recovery); close
+  // them instead of enqueueing into a closed stream.
+  let closed = false
 
   port.onmessage = (e: MessageEvent<{ frame: VideoFrame; orientation?: Orientation; sentAt?: number }>) => {
     const { frame, orientation, sentAt } = e.data
+    if (closed) { frame?.close(); return }
     // When main created the frame: the start of getStats().latencyMs.
     tagFrameEntry(frame, sentAt)
     // Main measured the display orientation the frame still needs (Safari's
@@ -42,12 +47,21 @@ export function createPostMessageInput(port: MessagePort): ReadableStream<VideoF
       }
       return new Promise<void>((resolve) => {
         resolvePull = (frame) => {
-          controller.enqueue(frame)
+          if (closed) { frame.close(); resolve(); return }
+          try {
+            controller.enqueue(frame)
+          } catch {
+            // Stream closed/errored underneath us: drop the frame quietly.
+            closed = true
+            frame.close()
+          }
           resolve()
         }
       })
     },
     cancel() {
+      closed = true
+      resolvePull = null
       if (pending) { pending.close(); pending = null }
       port.close()
     },
