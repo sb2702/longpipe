@@ -22,3 +22,7 @@ dist-weights/
 examples/vanilla-webrtc/public/assets/
 tests/e2e/results/
 tests/e2e/.cache/
+
+# LiveKit example: downloaded server binary; LiveKit e2e output
+examples/livekit/.server/
+tests/e2e-livekit/results/

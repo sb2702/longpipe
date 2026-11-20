@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Longpipe · LiveKit</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #fafafa; --fg: #1b1b1b; --muted: #6b6b6b; --card: #fff; --line: #ddd; --bad: #b3261e; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #141414; --fg: #eee; --muted: #9a9a9a; --card: #1e1e1e; --line: #333; --bad: #ff8a80; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; font: 14px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; margin-bottom: 12px; }
+    label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
+    select, button { font: inherit; }
+    button { padding: 6px 14px; }
+    .videos { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+    figcaption { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 4px; }
+    table { border-collapse: collapse; margin-top: 12px; font-variant-numeric: tabular-nums; }
+    td { padding: 2px 12px 2px 0; }
+    td:first-child { color: var(--muted); }
+    #error { color: var(--bad); }
+    #log { margin-top: 12px; max-height: 160px; overflow: auto; font: 12px ui-monospace, monospace; white-space: pre-wrap; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <h1>Longpipe → LiveKit room → second participant</h1>
+
+  <form class="controls" id="controls" onsubmit="return false">
+    <label>Input
+      <select name="input"><option value="camera">camera + mic</option><option value="clip">test clip + tone</option></select>
+    </label>
+    <label>Processor
+      <select name="processor"><option value="longpipe">Longpipe (@longpipe/livekit)</option><option value="livekit">LiveKit (@livekit/track-processors)</option></select>
+    </label>
+    <label>Background
+      <select name="bg"><option value="blur">blur</option><option value="image">image</option><option value="color">green (Longpipe only)</option><option value="none">none</option></select>
+    </label>
+    <label>Denoise (Longpipe)
+      <select name="denoise"><option value="on">on</option><option value="off">off</option></select>
+    </label>
+    <button id="join" type="button">Join</button>
+    <button id="leave" type="button" disabled>Leave</button>
+  </form>
+
+  <div class="videos">
+    <figure><figcaption>Local (publisher)</figcaption><video id="local" autoplay playsinline muted></video></figure>
+    <figure><figcaption>Remote (what the subscriber receives from the LiveKit server)</figcaption><video id="remote" autoplay playsinline muted></video></figure>
+  </div>
+
+  <table>
+    <tr><td>Processor</td><td id="r-processor">–</td></tr>
+    <tr><td>Backend · model</td><td id="r-backend">–</td></tr>
+    <tr><td>Effect fps (in / out)</td><td id="r-fps">–</td></tr>
+    <tr><td>Remote video</td><td id="r-remote">–</td></tr>
+    <tr><td>Denoise</td><td id="r-denoise">–</td></tr>
+    <tr><td>Error</td><td id="error">none</td></tr>
+  </table>
+  <div id="log"></div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
