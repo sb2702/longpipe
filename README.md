@@ -84,3 +84,6 @@ Machine-readable for LLMs and agents: [`llms.txt`](https://longpipe.dev/llms.txt
 SDK source code **and** Longpipe's pre-trained model weights are MIT-licensed — see [LICENSE](https://github.com/sb2702/longpipe/blob/main/LICENSE) and [WEIGHTS_LICENSE](https://github.com/sb2702/longpipe/blob/main/WEIGHTS_LICENSE). You're free to self-host the weights inside other open-source or commercial projects under MIT-compatible terms. The optional MediaPipe selfie weights are Google's, under Apache-2.0 ([NOTICE](https://cdn.longpipe.dev/models/mediapipe/selfie/v1/NOTICE.md)).
 
 The weights were trained on permissively-licensed public datasets (P3M-10k, AISegment, COCO, OpenImages), Z-Image synthetics, and a custom webcam dataset collected with participants' explicit, informed consent. The full dataset list and provenance details: [longpipe.dev/docs/licensing](https://longpipe.dev/docs/licensing).
+
+
+This project is tested with BrowserStack
