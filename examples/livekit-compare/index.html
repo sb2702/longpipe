@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LiveKit vs Longpipe</title>
+  <style>
+    :root { --bg: #0e0f12; --fg: #f2f2f4; --muted: #8b8d96; --line: #2a2c33; --accent: #7c9cff; --lp: #ffb86b; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+      display: flex; flex-direction: column; overflow: hidden; }
+    .stage { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 28px 32px 16px; align-content: center; }
+    figure { margin: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    figcaption { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+    figcaption code { font: 500 17px ui-monospace, 'SF Mono', Menlo, monospace; color: var(--muted); }
+    .chip { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: rgba(255,184,107,0.14); color: var(--lp); display: none; }
+    .chip.on { display: inline-block; }
+    .frame { position: relative; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px var(--line); }
+    video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    body.mirror video { transform: scaleX(-1); }
+    .hud { position: absolute; left: 10px; bottom: 10px; padding: 3px 8px; border-radius: 6px; background: rgba(0,0,0,0.45);
+      color: rgba(255,255,255,0.8); font: 12px ui-monospace, 'SF Mono', Menlo, monospace; font-variant-numeric: tabular-nums; backdrop-filter: blur(6px); }
+
+    .controls { display: flex; flex-wrap: wrap; gap: 20px 36px; justify-content: center; align-items: flex-end; padding: 14px 24px 22px; border-top: 1px solid var(--line); }
+    .group { display: flex; flex-direction: column; gap: 8px; }
+    .group > span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .group > span em { font-style: normal; color: var(--lp); text-transform: none; letter-spacing: 0; }
+    .row { display: flex; gap: 8px; }
+    button { font: 600 16px inherit; font-family: inherit; color: var(--fg); background: #1c1e24; border: 1px solid var(--line); border-radius: 10px;
+      padding: 12px 22px; cursor: pointer; }
+    button:hover { border-color: #444752; }
+    button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #0b0d14; }
+    .lp button[aria-pressed="true"] { background: var(--lp); border-color: var(--lp); }
+    button kbd { font: 11px ui-monospace, monospace; opacity: 0.55; margin-left: 6px; }
+    .thumbs { display: flex; gap: 8px; }
+    .thumbs button { padding: 0; width: 84px; height: 48px; background-size: cover; background-position: center; }
+    .thumbs button[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--accent); }
+    #error { color: #ff8a80; font-size: 13px; text-align: center; }
+
+    body.clean .controls, body.clean #error { display: none; }
+    body.clean .stage { padding: 40px; }
+  </style>
+</head>
+<body class="mirror">
+  <main class="stage">
+    <figure>
+      <figcaption>LiveKit <code id="lk-label">(@livekit/track-processors)</code></figcaption>
+      <div class="frame"><video id="v-livekit" autoplay playsinline muted></video><div class="hud" id="hud-livekit">starting…</div></div>
+    </figure>
+    <figure>
+      <figcaption>Longpipe <code id="lp-label">(@longpipe/livekit, xl)</code>
+        <span class="chip" id="chip-touchup">touch-up</span><span class="chip" id="chip-reframe">auto-reframe</span></figcaption>
+      <div class="frame"><video id="v-longpipe" autoplay playsinline muted></video><div class="hud" id="hud-longpipe">starting…</div></div>
+    </figure>
+  </main>
+
+  <div id="error"></div>
+  <nav class="controls">
+    <div class="group"><span>Effect · both</span>
+      <div class="row">
+        <button data-mode="blur">Blur<kbd>1</kbd></button>
+        <button data-mode="background">Background<kbd>2</kbd></button>
+        <button data-mode="none">None<kbd>3</kbd></button>
+      </div>
+    </div>
+    <div class="group"><span>Background image</span><div class="thumbs" id="thumbs"></div></div>
+    <div class="group lp"><span>Longpipe only · <em>LiveKit has no equivalent</em></span>
+      <div class="row">
+        <button id="touchup">Touch-up<kbd>t</kbd></button>
+        <button id="reframe">Auto-reframe<kbd>r</kbd></button>
+      </div>
+    </div>
+  </nav>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
