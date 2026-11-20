@@ -62,7 +62,9 @@
     "example:lan": "vite --config examples/vanilla-webrtc/vite.config.js --mode lan",
     "e2e:assets": "node tests/e2e/fetch_assets.mjs",
     "test:e2e": "playwright test -c tests/e2e/playwright.config.mjs",
-    "example:tunnel": "vite --config examples/vanilla-webrtc/vite.config.js --mode tunnel"
+    "example:tunnel": "vite --config examples/vanilla-webrtc/vite.config.js --mode tunnel",
+    "test:e2e:livekit": "playwright test -c tests/e2e-livekit/playwright.config.mjs",
+    "example:livekit": "vite --config examples/livekit/vite.config.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
@@ -76,5 +78,9 @@
     "typescript": "^5.5.0",
     "vite": "^7.3.2",
     "vitest": "^3.0.0"
-  }
+  },
+  "workspaces": [
+    "packages/*",
+    "examples/livekit"
+  ]
 }

@@ -1,0 +1,15 @@
+{
+  // Type-checks against the Longpipe source in this repo (the published package
+  // resolves `longpipe` from node_modules instead).
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "baseUrl": ".",
+    "paths": {
+      "longpipe": ["../../src/index.ts"],
+      "longpipe/audio": ["../../src/audio.ts"],
+      "~/*": ["../../src/*"]
+    }
+  },
+  "include": ["src", "../../src/shaders.d.ts"]
+}

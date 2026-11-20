@@ -1,0 +1,47 @@
+{
+  "name": "@longpipe/livekit",
+  "version": "0.0.1",
+  "description": "Longpipe video effects (background blur, virtual backgrounds, touch-up, reframe, denoise) as LiveKit track processors.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "Sam Bhattacharyya",
+  "homepage": "https://longpipe.dev/docs/livekit",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sb2702/longpipe.git",
+    "directory": "packages/livekit"
+  },
+  "keywords": [
+    "livekit",
+    "track-processor",
+    "background-blur",
+    "virtual-background",
+    "webrtc",
+    "webgpu",
+    "longpipe"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "peerDependencies": {
+    "livekit-client": "^2.0.0",
+    "longpipe": "^0.0.22"
+  },
+  "devDependencies": {
+    "livekit-client": "^2.25.0"
+  }
+}

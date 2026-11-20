@@ -1,0 +1,15 @@
+{
+  "name": "longpipe-example-livekit",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config vite.config.js"
+  },
+  "dependencies": {
+    "@livekit/track-processors": "^0.8.3",
+    "livekit-client": "^2.25.0"
+  },
+  "devDependencies": {
+    "livekit-server-sdk": "^2.20.1"
+  }
+}
