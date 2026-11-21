@@ -67,7 +67,8 @@
     "example:livekit": "vite --config examples/livekit/vite.config.js",
     "demo:compare": "vite --config examples/livekit-compare/vite.config.js",
     "demo:compare:tunnel": "vite --config examples/livekit-compare/vite.config.js --mode tunnel",
-    "demo:mediapipe": "vite --config examples/mediapipe-compare/vite.config.js"
+    "demo:mediapipe": "vite --config examples/mediapipe-compare/vite.config.js",
+    "demo:mediapipe:tunnel": "vite --config examples/mediapipe-compare/vite.config.js --mode tunnel"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
