@@ -254,10 +254,13 @@ class DenoiseProcessor extends AudioWorkletProcessor {
       this.feed48k(inCh, n)
     }
 
-    // Prime one hop before draining so the device-rate ring never underruns.
+    // Prime one hop, plus one more quantum, before draining. Hops land every
+    // 3.75 quanta (at 48 kHz), so draining from the quantum the first hop lands
+    // in underran once, three quanta later (128 samples of silence mid-onset).
     if (!this.primed) {
       if (this.outCount >= HOP) this.primed = true
-      else { outCh.fill(0); return true }
+      outCh.fill(0)
+      return true
     }
     if (this.outCount >= n) {
       for (let i = 0; i < n; i++) {
