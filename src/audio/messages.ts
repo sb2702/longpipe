@@ -45,4 +45,5 @@ export interface ProcessorInit {
   enabled:         boolean
   postFilterBeta?: number
   gruLeak?:        number
+  debug?:          boolean   // console.warn (once) if the guard ever catches a non-finite sample
 }

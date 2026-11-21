@@ -26,8 +26,11 @@ export const ASSETS = {
   // shader-f16 adapters and WebGL2; f32 .bin for WebGPU adapters without f16.
   'models/model_xs.f16.bin': [`${LP_BASE}/model_xs.f16.bin`, 'f1786bf9ffb03916fd265c253f4928ec4a7576855162aacc856aaf90908899e9'],
   'models/model_xs.bin':     [`${LP_BASE}/model_xs.bin`,     '501cd8fc26a260552c62d22cde4d5ab7b32087921f42ba2539a9b5300d3f8c9d'],
-  // Audio denoise: the tests pin model 'rnnoise' (weights embedded in the wasm).
+  // Audio denoise: the e2e tests pin model 'rnnoise' (weights embedded in the wasm).
   'models/rnnoise.wasm':     [`${LP_BASE}/rnnoise.wasm`,     'c2b6449c5f3d3136c9819dd23211907233b6cfd2b2195082463ba26c879e1910'],
+  // DFN (int8 pack, the smaller one): the worklet unit test (tests/audio/worklet_output.test.ts).
+  'models/dfn.wasm':              [`${LP_BASE}/dfn.wasm`,              'bb06861ecb54e94c178c80225c99c4b13aa6113943aa2f5c782b341d5ed27998'],
+  'models/dfn_weights_int8.pack': [`${LP_BASE}/dfn_weights_int8.pack`, '57ddb56075bd48ce28876aa3295fbd13f6ee0c5dc50100df2a1af526b1f5f71e'],
 }
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')

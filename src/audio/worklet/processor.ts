@@ -48,9 +48,14 @@ class DenoiseProcessor extends AudioWorkletProcessor {
   private outRs = 0
   private rsDevInPtr = 0   // device-rate input scratch (one quantum)
   private rsOutPtr = 0     // resampler output-burst scratch (RS_CAP)
+  // JS copy of a resampled input burst: feed48k runs hops, which may grow wasm
+  // memory and detach any view into it mid-loop.
+  private rsIn = new Float32Array(RS_CAP)
 
   private enabled: boolean
   private model: ProcessorInit['model']
+  private debug: boolean
+  private warnedNonFinite = false
 
   // 128 ⇄ 480 buffering (at 48 kHz). outRing is at the OUTPUT (device) rate.
   private inAcc = new Float32Array(HOP)
@@ -72,12 +77,16 @@ class DenoiseProcessor extends AudioWorkletProcessor {
     const init = options.processorOptions
     this.model = init.model
     this.enabled = init.enabled
+    this.debug = !!init.debug
     this.cfg = KERNELS[init.model]
 
     try {
       const ex = this.instantiate(init.wasmBytes)
       const pick = (name?: string) => (name ? ex[name] : undefined)
       this.mem = ex.memory
+      // WASI reactors (rnnoise, emscripten) must run their ctors once before any
+      // other export; wasm-bindgen builds (DFN) have no _initialize.
+      ex['_initialize']?.()
       const malloc = ex[this.cfg.exports.malloc]
       this.run = ex[this.cfg.exports.process] as typeof this.run
       this.inPtr = malloc(HOP * 4)
@@ -151,7 +160,16 @@ class DenoiseProcessor extends AudioWorkletProcessor {
 
   private post(msg: FromWorklet): void { this.port.postMessage(msg) }
 
+  // Last line of defence: a non-finite sample must never reach the output (one
+  // NaN poisons every downstream node and the encoder). Replaced by silence.
   private pushOut(v: number): void {
+    if (v - v !== 0) {   // NaN or ±Inf (cheaper than Number.isFinite)
+      if (this.debug && !this.warnedNonFinite) {
+        this.warnedNonFinite = true
+        console.warn(`[longpipe/denoise] ${this.model} produced a non-finite sample; replacing with 0 (logged once)`)
+      }
+      v = 0
+    }
     this.outRing[this.outWrite] = v
     this.outWrite = (this.outWrite + 1) % this.outRing.length
     this.outCount++
@@ -160,7 +178,9 @@ class DenoiseProcessor extends AudioWorkletProcessor {
   // Accumulate 48 kHz samples; run a hop each time 480 fill.
   private feed48k(s: ArrayLike<number>, n: number): void {
     for (let i = 0; i < n; i++) {
-      this.inAcc[this.inFill++] = s[i]
+      // A non-finite input sample would poison the recurrent state for good.
+      const v = s[i]
+      this.inAcc[this.inFill++] = v - v === 0 ? v : 0
       if (this.inFill === HOP) { this.runHop(); this.inFill = 0 }
     }
   }
@@ -173,12 +193,16 @@ class DenoiseProcessor extends AudioWorkletProcessor {
     const t0 = this.now ? this.now() : 0
     this.run(this.state, this.inPtr, this.outPtr)
     if (this.now) this.times[this.tIdx = (this.tIdx + 1) & 255] = this.now() - t0
+    // The kernel may grow wasm memory (DFN does on its first hop: lazy scratch
+    // buffers), which detaches the old ArrayBuffer. Reading through a stale view
+    // yields undefined → NaN, so re-take the view after every call into wasm.
+    f32 = this.heap()
 
     if (this.resample && this.rsPush) {
       // outPtr holds the 48 kHz net output (DFN scaleOut === 1) — resample it to
       // device rate and ring the result. df_resampler_push may grow memory.
       const got = this.rsPush(this.outRs, this.outPtr, HOP, this.rsOutPtr, RS_CAP)
-      f32 = this.heap()
+      f32 = this.heap()   // may have grown again
       const ob = this.rsOutPtr >> 2
       for (let i = 0; i < got; i++) this.pushOut(f32[ob + i])
     } else {
@@ -224,7 +248,8 @@ class DenoiseProcessor extends AudioWorkletProcessor {
       for (let i = 0; i < n; i++) f32[ib + i] = inCh[i]
       const got = this.rsPush(this.inRs, this.rsDevInPtr, n, this.rsOutPtr, RS_CAP)
       f32 = this.heap()
-      this.feed48k(f32.subarray(this.rsOutPtr >> 2, (this.rsOutPtr >> 2) + got), got)
+      this.rsIn.set(f32.subarray(this.rsOutPtr >> 2, (this.rsOutPtr >> 2) + got))
+      this.feed48k(this.rsIn, got)
     } else {
       this.feed48k(inCh, n)
     }

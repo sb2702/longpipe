@@ -26,6 +26,7 @@ import { selectTier } from './probe'
 import type { ProcessorInit, FromWorklet, AudioStats } from './messages'
 import { WORKLET_SOURCE } from './worklet_inline'
 import { DEFAULT_WEIGHTS_BASE_URL } from '~/weights_url.ts'
+import { isDebug } from '~/pipeline/debug.ts'
 
 export interface AudioDenoiserOptions {
   model?:          DenoiseModelOption   // 'auto' (default) | tier | explicit model
@@ -33,6 +34,7 @@ export interface AudioDenoiserOptions {
   postFilterBeta?: number               // default 0.03 (DFN)
   gruLeak?:        number               // default 0.995 (DFN)
   enabled?:        boolean              // default true
+  debug?:          boolean              // default: the Pipeline's `debug` flag
   onReady?:        () => void
   onError?:        (message: string) => void
   // The AudioContext is suspended (autoplay policy) and couldn't be resumed
@@ -234,6 +236,7 @@ export class AudioDenoiser {
       enabled:        this.opts.enabled ?? true,
       postFilterBeta: this.opts.postFilterBeta ?? DEFAULT_BETA,
       gruLeak:        this.opts.gruLeak ?? DEFAULT_GRU_LEAK,
+      debug:          this.opts.debug ?? isDebug(),
     }
     const node = new AudioWorkletNode(this.ctx, 'denoise', {
       numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], processorOptions,
