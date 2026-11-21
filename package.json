@@ -66,7 +66,8 @@
     "test:e2e:livekit": "playwright test -c tests/e2e-livekit/playwright.config.mjs",
     "example:livekit": "vite --config examples/livekit/vite.config.js",
     "demo:compare": "vite --config examples/livekit-compare/vite.config.js",
-    "demo:compare:tunnel": "vite --config examples/livekit-compare/vite.config.js --mode tunnel"
+    "demo:compare:tunnel": "vite --config examples/livekit-compare/vite.config.js --mode tunnel",
+    "demo:mediapipe": "vite --config examples/mediapipe-compare/vite.config.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
