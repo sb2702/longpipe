@@ -32,7 +32,7 @@ export interface AudioDenoiserOptions {
   model?:          DenoiseModelOption   // 'auto' (default) | tier | explicit model
   weightsBaseUrl?: string               // default: the public CDN (DEFAULT_WEIGHTS_BASE_URL)
   postFilterBeta?: number               // default 0.03 (DFN)
-  gruLeak?:        number               // default 0.995 (DFN)
+  gruLeak?:        number               // default 0.9995 (DFN): decays GRU state per hop; 1 = off, lower = more suppression, less speech quality
   enabled?:        boolean              // default true
   debug?:          boolean              // default: the Pipeline's `debug` flag
   onReady?:        () => void
@@ -50,7 +50,9 @@ export interface AudioDenoiserOptions {
 }
 
 const DEFAULT_BETA = 0.03
-const DEFAULT_GRU_LEAK = 0.995
+// 0.995 cost up to 0.7 PESQ on noisy speech. 0.9995 is within ~0.1 of no leak on a
+// fresh 20 s clip and ~0.1 better than no leak over a 14-min stream; no drift either way.
+const DEFAULT_GRU_LEAK = 0.9995
 const GESTURES = ['pointerdown', 'keydown', 'touchend'] as const
 // How long the context may stay not-running before the output falls back to
 // the original audio (a context created while allowed starts within a few ms).

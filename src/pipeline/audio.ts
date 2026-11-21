@@ -13,7 +13,7 @@ export interface DenoiseOptions {
   // ('rnnoise'|'dfn'|'dfnint8'). Default 'auto'.
   model?:          DenoiseModelOption
   postFilterBeta?: number   // DFN post-filter (residual suppression). Default 0.03.
-  gruLeak?:        number   // DFN GRU-leak (bounds recurrent drift). Default 0.995.
+  gruLeak?:        number   // DFN GRU-state decay per hop (1 = off; lower suppresses more, hurts speech). Default 0.9995.
   enabled?:        boolean  // start denoising vs. passthrough. Default true.
 }
 

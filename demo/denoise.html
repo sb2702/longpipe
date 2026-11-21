@@ -47,7 +47,7 @@
         <input id="beta" type="range" min="0" max="0.25" step="0.01" value="0.03"><span id="betaVal">0.030</span></label>
       </div>
       <div class="line"><label>GRU-leak
-        <input id="gruLeak" type="range" min="0.90" max="1.0" step="0.005" value="0.995"><span id="gruLeakVal">0.995</span></label>
+        <input id="gruLeak" type="range" min="0.99" max="1.0" step="0.0005" value="0.9995"><span id="gruLeakVal">0.9995</span></label>
         <span class="muted">(dfn only)</span>
       </div>
     </div>
@@ -139,7 +139,7 @@
         $('toggle').classList.toggle('dry', !enabled)
       })
       $('beta').addEventListener('input', () => { $('betaVal').textContent = (+$('beta').value).toFixed(3); pipeline?.setDenoise({ postFilterBeta: +$('beta').value }) })
-      $('gruLeak').addEventListener('input', () => { $('gruLeakVal').textContent = (+$('gruLeak').value).toFixed(3); pipeline?.setDenoise({ gruLeak: +$('gruLeak').value }) })
+      $('gruLeak').addEventListener('input', () => { $('gruLeakVal').textContent = (+$('gruLeak').value).toFixed(4); pipeline?.setDenoise({ gruLeak: +$('gruLeak').value }) })
     </script>
   </body>
 </html>
