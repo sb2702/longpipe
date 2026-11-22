@@ -73,6 +73,10 @@ jobs:
           retention-days: 14
 
   ios-camera:
+    # After the Playwright job, not alongside it: two BrowserStack Local tunnels starting at once on one account
+    # knocked the first one out (every session then failed with "local testing ... is not connected").
+    needs: playwright
+    if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:

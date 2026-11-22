@@ -61,7 +61,7 @@ async function startServer() {
 async function startTunnel() {
   if (process.env.BROWSERSTACK_LOCAL_RUNNING === '1') return
   const local = new browserstack.Local()
-  await new Promise((res, rej) => local.start({ key: KEY, force: 'true', forceLocal: 'true', logFile: `${OUT}browserstack-local.log` }, (e) => (e ? rej(e) : res())))
+  await new Promise((res, rej) => local.start({ key: KEY, force: 'true', forceLocal: 'true', logFile: `${OUT}browserstack-local.log`, ...(process.env.BROWSERSTACK_LOCAL_IDENTIFIER ? { localIdentifier: process.env.BROWSERSTACK_LOCAL_IDENTIFIER } : {}) }, (e) => (e ? rej(e) : res())))
   cleanups.push(() => new Promise((r) => local.stop(r)))
 }
 
