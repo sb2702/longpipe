@@ -18,6 +18,7 @@
 import { EffectsPipeline, PRESETS } from 'longpipe'
 import { startLoopbackCall, callStats, latencyBreakdown } from './call.js'
 import { cameraInput, clipInput, generatedBackgroundImage, withFlashMarker } from './inputs.js'
+import { cameraRestartSoak } from './soak.js'
 
 const $ = (id) => document.getElementById(id)
 const form = $('controls')
@@ -437,6 +438,40 @@ window.example = {
       v.requestVideoFrameCallback(tick)
       setTimeout(() => resolve(n), ms)
     })
+  },
+  // Camera-restart soak (soak.js): camera off/on through setInputStream() + background
+  // changes, measuring delivered fps and orientation after each step. Runs in the
+  // background; poll window.example.soak (steps, phase, done, error).
+  soak: null,
+  startSoak(opts = {}) {
+    const status = { steps: [], phase: 'starting', done: false, error: null }
+    window.example.soak = status
+    const videoOnly = (s) => new MediaStream(s.getVideoTracks())
+    const ctx = {
+      ...opts,
+      pipeline: () => pipeline,
+      input: () => input,
+      // "Camera off" ends only the video track (like an app's camera toggle); the
+      // page's input keeps the original audio, and Stop stops everything.
+      setInput(cam) {
+        const audio = input.stream.getAudioTracks()
+        const prevStop = input.stop
+        input = { stream: new MediaStream([...cam.stream.getVideoTracks(), ...audio]), stop: () => { cam.stop(); prevStop() } }
+      },
+      async openCamera() {
+        if (state.config.input === 'clip') return clipInput(CLIP_URL, { audio: false })
+        const s = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720, frameRate: 30, ...(CAMERA_FACING ? { facingMode: { ideal: CAMERA_FACING } } : {}) },
+        })
+        return { stream: videoOnly(s), stop: () => s.getTracks().forEach((t) => t.stop()) }
+      },
+      outVideo: () => $('local'),
+      backgrounds: ['blur', { color: '#00ff00' }, generatedBackgroundImage, 'none', 'blur'],
+    }
+    // input().stop() in the soak = camera off: stop the video track only.
+    const soakCtx = { ...ctx, input: () => ({ stream: input.stream, stop: () => input.stream.getVideoTracks().forEach((t) => t.stop()) }) }
+    cameraRestartSoak(soakCtx, status).catch((e) => { status.error = `${e?.type ?? e?.name ?? ''} ${e?.message ?? e}`; status.done = true })
+    return true
   },
   get pipeline() { return pipeline },
   async audioLevels() {

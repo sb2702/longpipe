@@ -94,5 +94,33 @@ once.
 [`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml) (draft): ubuntu-latest, Node 22,
 `playwright install --with-deps`, cached assets, the suite, the HTML report + summary as artifacts,
 and `summary.md` in the job summary. It runs on software GPUs only: WebGL2 effects on Chromium and
-Firefox, no WebGPU anywhere, no real Safari/iOS. A commented BrowserStack outline is at the bottom
-for real Safari/iOS later.
+Firefox, no WebGPU anywhere, no real Safari/iOS. For those, see BrowserStack below.
+
+## Camera restart soak
+
+[`camera-restart.e2e.mjs`](camera-restart.e2e.mjs): `setInputStream()` placeholder → new camera
+×10, then `setBackground()` ×5. After each step: output aspect vs the upright input, which rotation
+of the input the output matches, and the fps the page actually presents (`requestVideoFrameCallback`).
+Logic is in [`examples/vanilla-webrtc/soak.js`](../../examples/vanilla-webrtc/soak.js). Fails on a
+sideways/upside-down output or a drop below half the baseline fps. Fake camera on Chromium/Firefox,
+a fresh test-clip track elsewhere.
+
+## BrowserStack (real devices)
+
+```bash
+export BROWSERSTACK_USERNAME=… BROWSERSTACK_ACCESS_KEY=…
+npm run test:e2e:bs                              # iOS Safari, Android Chrome, macOS WebKit, Windows Chrome/Edge/Firefox
+npm run test:e2e:bs -- --project=ios-safari      # one platform
+npm run test:e2e:bs:ios-camera                   # soak on a real iPhone camera (WebDriver; --device, --os, --camera back)
+```
+
+[`browserstack.config.mjs`](browserstack.config.mjs) runs a subset of the suite (the `[auto]`
+effect scenarios, GPU loss, no-GPU, the soak), about two sessions per platform. It builds the example
+against `dist/` and serves it over HTTPS (throwaway cert) through BrowserStack Local, which it
+starts itself. The dev server doesn't work here: on iOS the page never ran through the tunnel.
+Playwright can't answer iOS Safari's camera prompt, so the real-camera soak is a plain WebDriver
+script ([`browserstack/ios-camera.mjs`](browserstack/ios-camera.mjs)). BrowserStack's iPhone cameras
+see black, so it checks aspect and fps but can't tell upright content.
+
+CI: [`.github/workflows/browserstack.yml`](../../.github/workflows/browserstack.yml), manual only.
+Add the repository secrets `BROWSERSTACK_USERNAME` and `BROWSERSTACK_ACCESS_KEY`.

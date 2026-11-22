@@ -62,6 +62,9 @@
     "example:lan": "vite --config examples/vanilla-webrtc/vite.config.js --mode lan",
     "e2e:assets": "node tests/e2e/fetch_assets.mjs",
     "test:e2e": "playwright test -c tests/e2e/playwright.config.mjs",
+    "test:e2e:bs": "playwright test -c tests/e2e/browserstack.config.mjs",
+    "test:e2e:bs:ios-camera": "node tests/e2e/browserstack/ios-camera.mjs",
+    "e2e:bs:serve": "node tests/e2e/fetch_assets.mjs && npm run build && LONGPIPE=dist vite build --config examples/vanilla-webrtc/vite.config.js --outDir ../../tests/e2e/results-bs/site --emptyOutDir && LONGPIPE=dist ALLOWED_HOSTS=bs-local.com vite preview --config examples/vanilla-webrtc/vite.config.js --mode lan --strictPort --outDir ../../tests/e2e/results-bs/site --port ${E2E_PORT:-5182}",
     "example:tunnel": "vite --config examples/vanilla-webrtc/vite.config.js --mode tunnel",
     "test:e2e:livekit": "playwright test -c tests/e2e-livekit/playwright.config.mjs",
     "example:livekit": "vite --config examples/livekit/vite.config.js"
@@ -72,6 +75,7 @@
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitest/browser": "^3.0.0",
     "@webgpu/types": "^0.1.69",
+    "browserstack-local": "^1.5.16",
     "esbuild": "^0.27.7",
     "playwright": "^1.44.0",
     "tsup": "^8.1.0",

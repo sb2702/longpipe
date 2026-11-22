@@ -21,6 +21,8 @@ dist-weights/
 # e2e / example: downloaded media + weights (tests/e2e/fetch_assets.mjs), test output
 examples/vanilla-webrtc/public/assets/
 tests/e2e/results/
+tests/e2e/results-bs/
+local.log
 tests/e2e/.cache/
 
 # LiveKit example: downloaded server binary; LiveKit e2e output

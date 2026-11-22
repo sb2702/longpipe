@@ -1,0 +1,115 @@
+# Real devices + desktop browsers on BrowserStack (tests/e2e/README.md, "BrowserStack").
+# Manual only. Needs repository secrets BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY.
+#
+# Two jobs, each a handful of BrowserStack sessions (the free open-source plan
+# allows 5 in parallel):
+#   playwright  - a subset of tests/e2e on iOS Safari (iPhone), Android Chrome,
+#                 macOS WebKit, Windows Chrome / Edge / Firefox; ~2 sessions per platform, ~5 min
+#   ios-camera  - the camera-restart soak on a real iPhone camera (WebDriver)
+name: browserstack
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Playwright projects (space-separated; empty = all): ios-safari android-chrome macos-webkit windows-chrome windows-edge windows-firefox'
+        required: false
+        default: ''
+      ios_device:
+        description: 'iPhone for the camera soak'
+        required: false
+        default: 'iPhone Air'
+      ios_version:
+        description: 'iOS version'
+        required: false
+        default: '26'
+
+concurrency:
+  group: browserstack
+  cancel-in-progress: false
+
+env:
+  BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+  BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+  BROWSERSTACK_BUILD_NAME: longpipe ${{ github.ref_name }} run ${{ github.run_number }}
+
+jobs:
+  playwright:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      # Separate tunnels per job (both jobs run at once).
+      BROWSERSTACK_LOCAL_IDENTIFIER: gh-${{ github.run_id }}-pw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: examples/vanilla-webrtc/public/assets
+          key: e2e-assets-${{ hashFiles('tests/e2e/fetch_assets.mjs') }}
+      - run: npm run e2e:assets
+      - name: Run on BrowserStack
+        run: |
+          args=""
+          for p in $PLATFORMS; do args="$args --project=$p"; done
+          npm run test:e2e:bs -- $args
+        env:
+          CI: '1'
+          PLATFORMS: ${{ github.event.inputs.platforms }}
+      - name: Results summary
+        if: always()
+        run: cat tests/e2e/results-bs/summary.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "No summary" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browserstack-playwright
+          path: |
+            tests/e2e/results-bs
+            !tests/e2e/results-bs/browserstack-local.log
+          retention-days: 14
+
+  ios-camera:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BROWSERSTACK_LOCAL_IDENTIFIER: gh-${{ github.run_id }}-cam
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: examples/vanilla-webrtc/public/assets
+          key: e2e-assets-${{ hashFiles('tests/e2e/fetch_assets.mjs') }}
+      - run: npm run e2e:assets
+      - name: Camera-restart soak on a real iPhone
+        run: npm run test:e2e:bs:ios-camera -- --device "$IOS_DEVICE" --os "$IOS_VERSION"
+        env:
+          IOS_DEVICE: ${{ github.event.inputs.ios_device || 'iPhone Air' }}
+          IOS_VERSION: ${{ github.event.inputs.ios_version || '26' }}
+      - name: Results summary
+        if: always()
+        run: |
+          for f in tests/e2e/results-bs/ios-camera-*.json; do
+            [ -f "$f" ] && node -e '
+              const r = require(process.argv[1]);
+              console.log(`### iOS camera soak: ${r.device} iOS ${r.os}\n`);
+              console.log(r.problems.length ? "**FAIL**\n\n- " + r.problems.join("\n- ") : "**PASS**");
+              console.log("\n| step | orientation | out | shown fps | getStats fps |\n|---|---|---|---|---|");
+              for (const s of r.soak.steps) console.log(`| ${s.step} | ${s.verdict} | ${s.out} | ${s.deliveredFps} | ${s.statsFps} |`);
+            ' "$PWD/$f" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browserstack-ios-camera
+          path: |
+            tests/e2e/results-bs/ios-camera-*
+          retention-days: 14

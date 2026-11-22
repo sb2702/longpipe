@@ -9,7 +9,7 @@
 // `backend` option). A forced backend the browser can't provide is SKIPPED
 // with the reason; the backend each run actually used is recorded and lands in
 // results/summary.md.
-import { test as base, expect } from '@playwright/test'
+import { test as base, expect } from './fixtures.mjs'
 
 const GREEN = [0, 255, 0]
 const CORNERS = { tl: [0.04, 0.06], tr: [0.96, 0.06], bl: [0.04, 0.94], br: [0.96, 0.94] }
@@ -91,14 +91,16 @@ const test = base.extend({
   },
 })
 
-test.describe.configure({ mode: 'parallel' })
+// On BrowserStack each worker is a device session: keep a platform's tests in one.
+test.describe.configure({ mode: process.env.E2E_BROWSERSTACK ? 'default' : 'parallel' })
 test.beforeEach(({}, testInfo) => {
   testInfo.annotations.push({ type: 'scenario', description: testInfo.title.split(' [')[0] })
 })
 
 // Record the backend the pipeline actually got, and skip when a FORCED one
 // wasn't available (the SDK fell back, as it should; there's nothing to test).
-const NO_GPU_REASON = 'no GPU backend reachable from the SDK worker here (Playwright\'s WPE WebKit has no WebGL2/WebGPU in workers); ' +
+const NO_GPU_REASON = 'no GPU backend reachable from the SDK worker here (e.g. Playwright\'s WPE WebKit has no WebGL2/WebGPU in workers; ' +
+  'Playwright\'s Firefox on BrowserStack\'s Windows VMs has none either); ' +
   'the SDK failed open to raw video, which the no-GPU test covers'
 
 function checkBackend(call, s, requested, { allowNone = false } = {}) {
@@ -201,7 +203,10 @@ async function expectAudioReceived(call) {
 async function expectDenoise(call, testInfo) {
   await expect.poll(async () => {
     const s = await call.state()
-    return s.audioStats?.active || s.errors.some((e) => e.type === 'audio')
+    if (s.audioStats?.active || s.errors.some((e) => e.type === 'audio')) return true
+    // Say why it's waiting: the SDK's audio stats and the input's AudioContext.
+    const ac = await call.eval(() => window.example.input?.audioContext?.state ?? 'n/a').catch(() => '?')
+    return `waiting: audioStats ${JSON.stringify(s.audioStats)}, audioTrackChanges ${JSON.stringify(s.audioTrackChanges)}, input AudioContext ${ac}`
   }, { timeout: 30_000 }).toBe(true)
   const s = await call.state()
   const lv = await expectAudioReceived(call)

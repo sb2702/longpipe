@@ -74,7 +74,9 @@ export async function clipInput(url, { fps = 30, audio = true } = {}) {
     noise.connect(noiseGain).connect(dest)
     tone.start()
     noise.start()
-    if (ac.state === 'suspended') await ac.resume().catch(() => {})
+    // Without a real user gesture (e.g. a click scripted by WebDriver on iOS) resume()
+    // never settles: don't wait for it forever. The tone starts once the context runs.
+    if (ac.state === 'suspended') await Promise.race([ac.resume().catch(() => {}), new Promise((r) => setTimeout(r, 1000))])
     stream.addTrack(dest.stream.getAudioTracks()[0])
   }
 
