@@ -200,15 +200,29 @@ async function expectAudioReceived(call) {
 // of a WebAudio-processed track over WebRTC, SDK or not (see README, "WebKit
 // audio"), so there the remote check is recorded, not asserted, until it's
 // verified on real Safari.
+// 'audio' = denoise couldn't load; 'audio-suspended' = the browser kept the AudioContext suspended (no real user
+// gesture, e.g. iOS Safari under automation). Both are the fail-open path: original audio passes through.
+const FALLBACK_TYPES = ['audio', 'audio-suspended']
+
 async function expectDenoise(call, testInfo) {
   await expect.poll(async () => {
     const s = await call.state()
-    if (s.audioStats?.active || s.errors.some((e) => e.type === 'audio')) return true
+    if (s.audioStats?.active || s.errors.some((e) => FALLBACK_TYPES.includes(e.type))) return true
     // Say why it's waiting: the SDK's audio stats and the input's AudioContext.
     const ac = await call.eval(() => window.example.input?.audioContext?.state ?? 'n/a').catch(() => '?')
     return `waiting: audioStats ${JSON.stringify(s.audioStats)}, audioTrackChanges ${JSON.stringify(s.audioTrackChanges)}, input AudioContext ${ac}`
   }, { timeout: 30_000 }).toBe(true)
   const s = await call.state()
+  // iOS Safari under automation: no real user gesture, so the browser keeps every AudioContext suspended,
+  // including the test's own tone generator. The input is silent, so there is nothing to receive. Check that the
+  // SDK reported it, non-fatally, then skip the audio checks (environment limit; verify denoise by hand on iOS).
+  const suspended = s.errors.find((x) => x.type === 'audio-suspended')
+  const inputAc = await call.eval(() => window.example.input?.audioContext?.state ?? 'n/a').catch(() => '?')
+  if (suspended && inputAc === 'suspended') {
+    expect(suspended.fatal, 'audio-suspended is non-fatal').toBe(false)
+    testInfo.annotations.push({ type: 'denoise', description: 'audio-suspended reported (non-fatal); input tone suspended too' })
+    testInfo.skip(true, 'no real user gesture under automation: all AudioContexts stay suspended (input tone included); check denoise by hand on iOS')
+  }
   const lv = await expectAudioReceived(call)
   if (s.audioStats?.active) {
     const remoteOk = lv.remote < RAW_TONE_RMS
@@ -216,7 +230,7 @@ async function expectDenoise(call, testInfo) {
     expect(lv.local, 'pipeline.stream audio: tone+noise attenuated').toBeLessThan(RAW_TONE_RMS)
     if (testInfo.project.name !== 'webkit') expect(lv.remote, 'remote audio: tone+noise attenuated').toBeLessThan(RAW_TONE_RMS)
   } else {
-    const e = s.errors.find((x) => x.type === 'audio')
+    const e = s.errors.find((x) => FALLBACK_TYPES.includes(x.type))
     testInfo.annotations.push({ type: 'denoise', description: `fallback: ${e.message}` })
     expect(e.fatal).toBe(false)
     expect(lv.remote, 'fallback passes the original audio').toBeGreaterThan(RAW_TONE_RMS)

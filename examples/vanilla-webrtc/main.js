@@ -478,5 +478,6 @@ window.example = {
     return { local: await rmsLevel(pipeline?.stream), remote: await rmsLevel(call?.remoteStream) }
   },
   get call() { return call },
+  get input() { return input },   // tests read input.audioContext
   async refreshStats() { await updateStats(); return state },
 }

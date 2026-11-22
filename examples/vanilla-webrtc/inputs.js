@@ -82,6 +82,7 @@ export async function clipInput(url, { fps = 30, audio = true } = {}) {
 
   return {
     stream,
+    audioContext: ac,   // the tests read its state (suspended without a real user gesture, e.g. iOS)
     stop() {
       clearInterval(timer)
       stream.getTracks().forEach((t) => t.stop())
