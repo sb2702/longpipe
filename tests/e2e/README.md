@@ -122,5 +122,5 @@ Playwright can't answer iOS Safari's camera prompt, so the real-camera soak is a
 script ([`browserstack/ios-camera.mjs`](browserstack/ios-camera.mjs)). BrowserStack's iPhone cameras
 see black, so it checks aspect and fps but can't tell upright content.
 
-CI: [`.github/workflows/browserstack.yml`](../../.github/workflows/browserstack.yml), manual only.
+CI: [`.github/workflows/browserstack.yml`](../../.github/workflows/browserstack.yml): runs on every release (a version bump in `package.json` pushed to `main`) and from Actions → Run workflow.
 Add the repository secrets `BROWSERSTACK_USERNAME` and `BROWSERSTACK_ACCESS_KEY`.
